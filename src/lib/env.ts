@@ -76,7 +76,7 @@ export const env = createEnv({
     FEATURE_DOCUMENT_VIRUS_SCAN: type("'true' | 'false'"),
 
     // File Upload
-    MAX_FILE_SIZE: type("number.integer"),
+    MAX_FILE_SIZE: type("string.integer"),
   },
   client: {
     NEXT_PUBLIC_API_URL: type("string.url"),

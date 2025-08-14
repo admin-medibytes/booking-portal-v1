@@ -2,19 +2,37 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
+- Docker and Docker Compose
+- Node.js 18+
+- pnpm package manager
+
+### Development Setup
+
+1. Start the development environment:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+docker compose up -d
+```
+
+2. Run database migrations:
+```bash
+pnpm db:push
+```
+
+3. Start the development server:
+```bash
 pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+### Database Management
+
+- **View database with Drizzle Studio**: `pnpm db:studio` (opens at https://local.drizzle.studio)
+- **Generate migrations**: `pnpm db:generate`
+- **Run migrations**: `pnpm db:migrate`
+- **Push schema changes**: `pnpm db:push`
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

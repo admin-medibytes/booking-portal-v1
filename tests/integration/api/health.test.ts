@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import app from '@/server/app'
+import app from '../test-app'
 
 describe('Health Check Endpoint', () => {
   it('should return 200 OK with system status', async () => {
@@ -15,11 +15,9 @@ describe('Health Check Endpoint', () => {
     expect(data).toHaveProperty('environment')
     expect(data).toHaveProperty('checks')
     
-    expect(data.checks).toEqual({
-      app: 'running',
-      database: 'pending',
-      redis: 'pending'
-    })
+    expect(data.checks.app).toBe('running')
+    expect(data.checks.database).toHaveProperty('status', 'healthy')
+    expect(data.checks.redis).toBe('pending')
   })
   
   it('should include valid timestamp', async () => {

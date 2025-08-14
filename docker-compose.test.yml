@@ -1,0 +1,44 @@
+version: '3.9'
+
+services:
+  postgres-test:
+    image: postgres:15.4
+    container_name: booking-portal-postgres-test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: booking_portal_test
+    ports:
+      - "5433:5432" # Different port to avoid conflicts
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  redis-test:
+    image: redis:7.2
+    container_name: booking-portal-redis-test
+    ports:
+      - "6380:6379" # Different port to avoid conflicts
+    volumes:
+      - redis-test-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+volumes:
+  postgres-test-data:
+  redis-test-data:
+
+networks:
+  test-network:
+    driver: bridge
