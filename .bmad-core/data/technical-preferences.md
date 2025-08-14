@@ -79,8 +79,7 @@ const ageRange = type("number")
 ```
 
 ### Integration Guidelines:
-- Replace ALL Zod, Yup, or other validation libraries with ArkType
 - Use ArkType's 1:1 TypeScript syntax for consistency
 - Leverage compile-time type inference for better DX
-- Take advantage of 100x performance improvement over Zod
+- Take advantage of 100x performance improvement
 - Use set theory capabilities for complex type relationships

@@ -19,14 +19,14 @@ This is the DEFINITIVE technology selection for the entire project. All developm
 | File Storage | AWS S3 | - | Document storage | HIPAA compliant with encryption, scalable |
 | Authentication | Better Auth | Latest | Auth solution | Supports all required plugins (admin, org, 2FA, phone) |
 | Validation | ArkType | 2.1.20 | Runtime validation | 100x faster than Zod, TypeScript-first syntax |
-| Frontend Testing | Vitest | 2.0.0 | Unit/integration testing | Fast, ESM support, Next.js compatible |
-| Backend Testing | Vitest | 2.0.0 | API testing | Same as frontend for consistency |
+| Frontend Testing | Vitest | 3.2.4 | Unit/integration testing | Fast, ESM support, Next.js compatible |
+| Backend Testing | Vitest | 3.2.4 | API testing | Same as frontend for consistency |
 | E2E Testing | Playwright | 1.45.0 | Browser automation | Cross-browser, reliable, good debugging |
 | Package Manager | pnpm | 10.14.0 | Dependency management | Fast, efficient disk usage |
 | IaC Tool | AWS CDK | 2.150.0 | Infrastructure as Code | Type-safe infrastructure, integrates with TypeScript |
 | CI/CD | GitHub Actions | - | Automation pipeline | Free for public repos, good AWS integration |
 | Monitoring | AWS CloudWatch | - | Logs and metrics | Native AWS integration, works with Pino |
-| Logging | Pino | 9.3.0 | Structured logging | Fast, JSON output for audit systems |
+| Logging | Pino | 9.9.0 | Structured logging | Fast, JSON output for audit systems |
 | CSS Framework | Tailwind CSS | 4.4.1 | Utility CSS | Works with Shadcn UI, fast development |
 | Date Handling | date-fns | 4.1.0 | Date utilities | Tree-shakeable, timezone support |
 | Forms | TanStack Form | 1.19.1 | Form state management & validation | Type-safe forms with ArkType integration, excellent TypeScript support |

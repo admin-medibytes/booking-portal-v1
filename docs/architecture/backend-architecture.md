@@ -39,7 +39,6 @@ server/
 ```typescript
 // server/routes/bookings.routes.ts
 import { Hono } from 'hono';
-import { z } from 'zod';
 import { type } from 'arktype';
 import { bookingService } from '@/server/services/booking.service';
 import { authMiddleware } from '@/server/middleware/auth.middleware';
