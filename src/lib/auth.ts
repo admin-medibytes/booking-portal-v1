@@ -52,6 +52,13 @@ export const auth = betterAuth({
       hash: async (password) => await hashPassword(password),
       verify: async ({ password, hash }) => await verifyPassword(password, hash),
     },
+    sendResetPassword: async ({ user, url }) => {
+      await emailService.sendPasswordResetEmail({
+        email: user.email,
+        resetLink: url,
+      });
+    },
+    resetPasswordPageUrl: "/reset-password",
   },
 
   emailVerification: {
@@ -81,7 +88,7 @@ export const auth = betterAuth({
       },
       creatorRole: "owner",
       membershipLimit: 100,
-      invitationExpiresIn: 172800, // 48 hours
+      invitationExpiresIn: 604800, // 7 days
       sendInvitationEmail: async ({ email, inviter, organization, id, invitation }) => {
         const inviteLink = `${env.APP_URL}/accept-invitation/${id}`;
         await emailService.sendInvitationEmail({

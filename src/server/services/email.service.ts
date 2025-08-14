@@ -1,5 +1,9 @@
 import { env } from "@/lib/env";
 import { logger } from "@/server/utils/logger";
+import { render } from "@react-email/render";
+import InvitationEmail from "@/emails/invitation";
+import OTPEmail from "@/emails/otp";
+import PasswordResetEmail from "@/emails/password-reset";
 
 export interface EmailTemplate {
   to: string;
@@ -23,6 +27,11 @@ export interface InvitationEmailData {
   expiresAt: Date;
 }
 
+export interface PasswordResetEmailData {
+  email: string;
+  resetLink: string;
+}
+
 export interface PhoneOTPData {
   phoneNumber: string;
   code: string;
@@ -44,10 +53,13 @@ export class EmailService {
    */
   async sendOTPEmail(data: OTPEmailData): Promise<void> {
     const subject = this.getOTPSubject(data.type);
-    const template = this.generateOTPTemplate(data);
 
     try {
-      // TODO: Implement AWS SES sending
+      const html = await render(OTPEmail({ otp: data.otp, type: data.type }));
+      const text = await render(OTPEmail({ otp: data.otp, type: data.type }), {
+        plainText: true,
+      });
+
       logger.info("Sending OTP email", {
         to: data.email,
         type: data.type,
@@ -57,8 +69,8 @@ export class EmailService {
       await this.sendEmail({
         to: data.email,
         subject,
-        html: template.html,
-        text: template.text,
+        html,
+        text,
       });
     } catch (error) {
       logger.error("Failed to send OTP email", error as Error, {
@@ -74,10 +86,28 @@ export class EmailService {
    */
   async sendInvitationEmail(data: InvitationEmailData): Promise<void> {
     const subject = `You're invited to join ${data.organizationName}`;
-    const template = this.generateInvitationTemplate(data);
 
     try {
-      // TODO: Implement AWS SES sending
+      const html = await render(
+        InvitationEmail({
+          inviterName: data.inviterName,
+          inviterEmail: data.inviterEmail,
+          organizationName: data.organizationName,
+          inviteLink: data.inviteLink,
+          expiresAt: data.expiresAt,
+        })
+      );
+      const text = await render(
+        InvitationEmail({
+          inviterName: data.inviterName,
+          inviterEmail: data.inviterEmail,
+          organizationName: data.organizationName,
+          inviteLink: data.inviteLink,
+          expiresAt: data.expiresAt,
+        }),
+        { plainText: true }
+      );
+
       logger.info("Sending invitation email", {
         to: data.email,
         organization: data.organizationName,
@@ -87,8 +117,8 @@ export class EmailService {
       await this.sendEmail({
         to: data.email,
         subject,
-        html: template.html,
-        text: template.text,
+        html,
+        text,
       });
     } catch (error) {
       logger.error("Failed to send invitation email", error as Error, {
@@ -117,6 +147,27 @@ export class EmailService {
       });
       throw error;
     }
+  }
+
+  async sendPasswordResetEmail(data: PasswordResetEmailData): Promise<void> {
+    const html = await render(
+      PasswordResetEmail({
+        resetLink: data.resetLink,
+        userEmail: data.email,
+      })
+    );
+
+    const template: EmailTemplate = {
+      to: data.email,
+      subject: "Reset your Medibytes password",
+      html,
+    };
+
+    await this.sendEmail(template);
+
+    logger.info("Password reset email sent", {
+      email: data.email,
+    });
   }
 
   /**
@@ -156,117 +207,6 @@ export class EmailService {
         return "Reset your password for Medibytes";
       default:
         return "Your verification code for Medibytes";
-    }
-  }
-
-  private generateOTPTemplate(data: OTPEmailData): { html: string; text: string } {
-    const action = this.getOTPAction(data.type);
-    
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>${this.getOTPSubject(data.type)}</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #2563eb;">Medibytes Booking Portal</h2>
-            <p>Hello,</p>
-            <p>${action}</p>
-            <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
-              <h1 style="font-size: 32px; letter-spacing: 8px; margin: 0; color: #1f2937;">${data.otp}</h1>
-            </div>
-            <p>This code will expire in 5 minutes.</p>
-            <p>If you didn't request this code, please ignore this email.</p>
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-            <p style="font-size: 12px; color: #6b7280;">
-              This is an automated message from Medibytes Booking Portal. Please do not reply to this email.
-            </p>
-          </div>
-        </body>
-      </html>
-    `;
-
-    const text = `
-Medibytes Booking Portal
-
-Hello,
-
-${action}
-
-Your verification code is: ${data.otp}
-
-This code will expire in 5 minutes.
-
-If you didn't request this code, please ignore this email.
-
----
-This is an automated message from Medibytes Booking Portal.
-    `.trim();
-
-    return { html, text };
-  }
-
-  private generateInvitationTemplate(data: InvitationEmailData): { html: string; text: string } {
-    const expiryDate = new Date(data.expiresAt).toLocaleDateString();
-    
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Invitation to join ${data.organizationName}</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #2563eb;">Medibytes Booking Portal</h2>
-            <p>Hello,</p>
-            <p><strong>${data.inviterName}</strong> (${data.inviterEmail}) has invited you to join <strong>${data.organizationName}</strong> on Medibytes Booking Portal.</p>
-            <div style="margin: 30px 0; text-align: center;">
-              <a href="${data.inviteLink}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Accept Invitation</a>
-            </div>
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #2563eb;">${data.inviteLink}</p>
-            <p style="color: #dc2626; margin-top: 20px;">This invitation will expire on ${expiryDate}.</p>
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-            <p style="font-size: 12px; color: #6b7280;">
-              This is an automated message from Medibytes Booking Portal. Please do not reply to this email.
-            </p>
-          </div>
-        </body>
-      </html>
-    `;
-
-    const text = `
-Medibytes Booking Portal
-
-Hello,
-
-${data.inviterName} (${data.inviterEmail}) has invited you to join ${data.organizationName} on Medibytes Booking Portal.
-
-Accept the invitation by clicking this link:
-${data.inviteLink}
-
-This invitation will expire on ${expiryDate}.
-
----
-This is an automated message from Medibytes Booking Portal.
-    `.trim();
-
-    return { html, text };
-  }
-
-  private getOTPAction(type: OTPEmailData["type"]): string {
-    switch (type) {
-      case "sign-in":
-        return "Use the code below to sign in to your account:";
-      case "email-verification":
-        return "Use the code below to verify your email address:";
-      case "forget-password":
-        return "Use the code below to reset your password:";
-      default:
-        return "Use the code below to continue:";
     }
   }
 }

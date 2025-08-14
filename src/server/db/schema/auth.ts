@@ -1,8 +1,14 @@
 import { pgTable, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
 
 // Define role enums
-export const userRoleEnum = pgEnum("user_role", ["admin", "specialist", "referrer", "patient"]);
-export const memberRoleEnum = pgEnum("member_role", ["owner", "admin", "member"]);
+export const userRoleEnum = pgEnum("user_role", ["admin", "user"]);
+export const memberRoleEnum = pgEnum("member_role", [
+  "owner",
+  "manager",
+  "team_lead",
+  "referrer",
+  "specialist",
+]);
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -100,6 +106,7 @@ export const organizations = pgTable("organizations", {
   slug: text("slug").unique(),
   logo: text("logo"),
   createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
   metadata: text("metadata"),
 });
 
@@ -111,7 +118,7 @@ export const members = pgTable("members", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  role: memberRoleEnum("role").default("member").notNull(),
+  role: memberRoleEnum("role").default("referrer").notNull(),
   createdAt: timestamp("created_at").notNull(),
 });
 

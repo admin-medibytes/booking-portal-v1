@@ -80,6 +80,7 @@ export const generateTestOrganization = (
   logo: null,
   metadata: JSON.stringify({}),
   createdAt: new Date(),
+  updatedAt: new Date(),
   ...overrides,
 });
 

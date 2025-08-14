@@ -6,14 +6,26 @@ import { env } from '@/lib/env'
 import { logger as appLogger } from './utils/logger'
 import { AppError } from './utils/errors'
 import authRoutes from './routes/auth.routes'
+import adminRoutes from './routes/admin.routes'
+import publicRoutes from './routes/public.routes'
+import userRoutes from './routes/user.routes'
 
 const app = new Hono().basePath('/api')
 
 app.use('*', logger())
 app.use('*', cors())
 
+// Mount public routes (no auth required)
+app.route('/public', publicRoutes)
+
 // Mount auth routes
 app.route('/auth', authRoutes)
+
+// Mount admin routes
+app.route('/admin', adminRoutes)
+
+// Mount user routes (authenticated)
+app.route('/user', userRoutes)
 
 app.get('/health', async (c) => {
   const dbHealth = await healthCheck();
