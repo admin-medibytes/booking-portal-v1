@@ -1,15 +1,14 @@
-import { pgTable, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
-
-// Define role enums
-export const userRoleEnum = pgEnum("user_role", ["admin", "specialist", "referrer", "patient"]);
-export const memberRoleEnum = pgEnum("member_role", ["owner", "admin", "member"]);
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  integer,
+} from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
-  jobTitle: text("job_title").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified")
     .$defaultFn(() => false)
@@ -21,13 +20,16 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at")
     .$defaultFn(() => /* @__PURE__ */ new Date())
     .notNull(),
-  role: userRoleEnum("role"),
+  role: text("role"),
   banned: boolean("banned"),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),
+  twoFactorEnabled: boolean("two_factor_enabled"),
   phoneNumber: text("phone_number").unique(),
   phoneNumberVerified: boolean("phone_number_verified"),
-  twoFactorEnabled: boolean("two_factor_enabled"),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  jobTitle: text("job_title").notNull(),
 });
 
 export const sessions = pgTable("sessions", {
@@ -41,8 +43,8 @@ export const sessions = pgTable("sessions", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  activeOrganizationId: text("active_organization_id"),
   impersonatedBy: text("impersonated_by"),
+  activeOrganizationId: text("active_organization_id"),
   activeTeamId: text("active_team_id"),
 });
 
@@ -69,8 +71,12 @@ export const verifications = pgTable("verifications", {
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").$defaultFn(() => /* @__PURE__ */ new Date()),
-  updatedAt: timestamp("updated_at").$defaultFn(() => /* @__PURE__ */ new Date()),
+  createdAt: timestamp("created_at").$defaultFn(
+    () => /* @__PURE__ */ new Date(),
+  ),
+  updatedAt: timestamp("updated_at").$defaultFn(
+    () => /* @__PURE__ */ new Date(),
+  ),
 });
 
 export const teams = pgTable("teams", {
@@ -111,7 +117,7 @@ export const members = pgTable("members", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  role: memberRoleEnum("role").default("member").notNull(),
+  role: text("role").default("member").notNull(),
   createdAt: timestamp("created_at").notNull(),
 });
 
@@ -121,7 +127,7 @@ export const invitations = pgTable("invitations", {
     .notNull()
     .references(() => organizations.id, { onDelete: "cascade" }),
   email: text("email").notNull(),
-  role: memberRoleEnum("role"),
+  role: text("role"),
   teamId: text("team_id"),
   status: text("status").default("pending").notNull(),
   expiresAt: timestamp("expires_at").notNull(),

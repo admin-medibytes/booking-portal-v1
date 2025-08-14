@@ -25,8 +25,8 @@ describe('Booking Progress Tracking', () => {
       const org = generateTestOrganization();
       const specialist = generateTestSpecialist(user.id);
       
-      await db.insert(schema.user).values(user);
-      await db.insert(schema.organization).values(org);
+      await db.insert(schema.users).values(user);
+      await db.insert(schema.organizations).values(org);
       await db.insert(schema.specialists).values(specialist);
 
       const booking = generateTestBooking(org.id, user.id, specialist.id);
@@ -88,8 +88,8 @@ describe('Booking Progress Tracking', () => {
       const user = generateTestUser();
       const org = generateTestOrganization();
       
-      await db.insert(schema.user).values(user);
-      await db.insert(schema.organization).values(org);
+      await db.insert(schema.users).values(user);
+      await db.insert(schema.organizations).values(org);
 
       const booking = generateTestBooking(org.id, user.id, null, {
         status: 'scheduled',
@@ -142,8 +142,8 @@ describe('Booking Progress Tracking', () => {
       const org = generateTestOrganization();
       const specialist = generateTestSpecialist(user.id);
       
-      await db.insert(schema.user).values([user, adminUser]);
-      await db.insert(schema.organization).values(org);
+      await db.insert(schema.users).values([user, adminUser]);
+      await db.insert(schema.organizations).values(org);
       await db.insert(schema.specialists).values(specialist);
 
       const examDate = new Date(Date.now() - 86400000); // Yesterday
@@ -191,8 +191,8 @@ describe('Booking Progress Tracking', () => {
       const org = generateTestOrganization();
       const specialist = generateTestSpecialist(user.id);
       
-      await db.insert(schema.user).values(user);
-      await db.insert(schema.organization).values(org);
+      await db.insert(schema.users).values(user);
+      await db.insert(schema.organizations).values(org);
       await db.insert(schema.specialists).values(specialist);
 
       const booking = generateTestBooking(org.id, user.id, specialist.id, {
@@ -245,8 +245,8 @@ describe('Booking Progress Tracking', () => {
       const user = generateTestUser();
       const org = generateTestOrganization();
       
-      await db.insert(schema.user).values(user);
-      await db.insert(schema.organization).values(org);
+      await db.insert(schema.users).values(user);
+      await db.insert(schema.organizations).values(org);
 
       const booking = generateTestBooking(org.id, user.id, null);
       await db.insert(schema.bookings).values(booking);

@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, integer, jsonb, pgEnum, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { user, organization } from './auth';
+import { users, organizations } from './auth';
 import { specialists } from './specialists';
 import { encryptedText, encryptedTextNullable } from './encrypted-column';
 
@@ -14,8 +14,8 @@ export const bookingStatusEnum = pgEnum('booking_status', [
 
 export const bookings = pgTable('bookings', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
-  referrerId: text('referrer_id').notNull().references(() => user.id),
+  organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  referrerId: text('referrer_id').notNull().references(() => users.id),
   specialistId: text('specialist_id').references(() => specialists.id),
   status: bookingStatusEnum('status').notNull().default('scheduling'),
   
@@ -59,7 +59,7 @@ export const bookingProgress = pgTable('booking_progress', {
   bookingId: text('booking_id').notNull().references(() => bookings.id, { onDelete: 'cascade' }),
   fromStatus: bookingStatusEnum('from_status'),
   toStatus: bookingStatusEnum('to_status').notNull(),
-  changedBy: text('changed_by').notNull().references(() => user.id),
+  changedBy: text('changed_by').notNull().references(() => users.id),
   reason: text('reason'),
   metadata: jsonb('metadata').$type<Record<string, unknown>>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -69,13 +69,13 @@ export const bookingProgress = pgTable('booking_progress', {
 }));
 
 export const bookingsRelations = relations(bookings, ({ one, many }) => ({
-  organization: one(organization, {
+  organization: one(organizations, {
     fields: [bookings.organizationId],
-    references: [organization.id],
+    references: [organizations.id],
   }),
-  referrer: one(user, {
+  referrer: one(users, {
     fields: [bookings.referrerId],
-    references: [user.id],
+    references: [users.id],
   }),
   specialist: one(specialists, {
     fields: [bookings.specialistId],
@@ -89,8 +89,8 @@ export const bookingProgressRelations = relations(bookingProgress, ({ one }) => 
     fields: [bookingProgress.bookingId],
     references: [bookings.id],
   }),
-  changedBy: one(user, {
+  changedBy: one(users, {
     fields: [bookingProgress.changedBy],
-    references: [user.id],
+    references: [users.id],
   }),
 }));

@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, boolean, integer, index, pgEnum } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { user } from './auth';
+import { users } from './auth';
 
 // Define specialty enum with common medical specialties
 export const specialtyEnum = pgEnum('specialty', [
@@ -20,7 +20,7 @@ export const specialtyEnum = pgEnum('specialty', [
 
 export const specialists = pgTable('specialists', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   acuityCalendarId: integer('acuity_calendar_id').notNull().unique(),
   specialty: specialtyEnum('specialty').notNull(),
   isActive: boolean('is_active').default(true).notNull(),
@@ -33,8 +33,8 @@ export const specialists = pgTable('specialists', {
 }));
 
 export const specialistsRelations = relations(specialists, ({ one }) => ({
-  user: one(user, {
+  user: one(users, {
     fields: [specialists.userId],
-    references: [user.id],
+    references: [users.id],
   }),
 }));

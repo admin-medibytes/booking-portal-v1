@@ -11,7 +11,8 @@ export const createTestDb = () => {
   // Use singleton pattern to avoid multiple connections
   if (!testClient) {
     testClient = postgres(
-      process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/booking_portal_test",
+      process.env.DATABASE_URL ||
+        "postgresql://postgres:postgres@localhost:5432/booking_portal_test",
       {
         max: 5, // Allow a few connections for parallel tests
         idle_timeout: 20,
@@ -47,19 +48,22 @@ export const cleanupTestDb = async (db: ReturnType<typeof createTestDb>) => {
   await db.delete(schema.webhookEvents).execute();
   await db.delete(schema.auditLogs).execute();
   await db.delete(schema.specialists).execute();
-  await db.delete(schema.member).execute();
-  await db.delete(schema.organization).execute();
-  await db.delete(schema.verification).execute();
-  await db.delete(schema.session).execute();
-  await db.delete(schema.account).execute();
-  await db.delete(schema.user).execute();
+  await db.delete(schema.members).execute();
+  await db.delete(schema.organizations).execute();
+  await db.delete(schema.verifications).execute();
+  await db.delete(schema.sessions).execute();
+  await db.delete(schema.accounts).execute();
+  await db.delete(schema.users).execute();
 };
 
 // Test data generators
-export const generateTestUser = (overrides?: Partial<typeof schema.user.$inferInsert>) => ({
+export const generateTestUser = (overrides?: Partial<typeof schema.users.$inferInsert>) => ({
   id: crypto.randomUUID(),
   email: `test-${Date.now()}@example.com`,
   name: "Test User",
+  firstName: "Test",
+  lastName: "User",
+  jobTitle: "Test Role",
   emailVerified: false,
   image: null,
   createdAt: new Date(),
@@ -68,7 +72,7 @@ export const generateTestUser = (overrides?: Partial<typeof schema.user.$inferIn
 });
 
 export const generateTestOrganization = (
-  overrides?: Partial<typeof schema.organization.$inferInsert>
+  overrides?: Partial<typeof schema.organizations.$inferInsert>
 ) => ({
   id: crypto.randomUUID(),
   name: "Test Organization",

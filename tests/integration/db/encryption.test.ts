@@ -26,8 +26,8 @@ describe('Database Encryption', () => {
       const org = generateTestOrganization();
       const specialist = generateTestSpecialist(user.id);
       
-      await db.insert(schema.user).values(user);
-      await db.insert(schema.organization).values(org);
+      await db.insert(schema.users).values(user);
+      await db.insert(schema.organizations).values(org);
       await db.insert(schema.specialists).values(specialist);
 
       const booking = generateTestBooking(org.id, user.id, specialist.id, {
@@ -72,8 +72,8 @@ describe('Database Encryption', () => {
       const org = generateTestOrganization();
       const specialist = generateTestSpecialist(user.id);
       
-      await db.insert(schema.user).values(user);
-      await db.insert(schema.organization).values(org);
+      await db.insert(schema.users).values(user);
+      await db.insert(schema.organizations).values(org);
       await db.insert(schema.specialists).values(specialist);
 
       const booking = generateTestBooking(org.id, user.id, specialist.id, {
@@ -100,8 +100,8 @@ describe('Database Encryption', () => {
       const org = generateTestOrganization();
       const specialist = generateTestSpecialist(user.id);
       
-      await db.insert(schema.user).values(user);
-      await db.insert(schema.organization).values(org);
+      await db.insert(schema.users).values(user);
+      await db.insert(schema.organizations).values(org);
       await db.insert(schema.specialists).values(specialist);
 
       const booking = generateTestBooking(org.id, user.id, specialist.id);
@@ -149,8 +149,8 @@ describe('Database Encryption', () => {
       const user = generateTestUser();
       const org = generateTestOrganization();
       
-      await db.insert(schema.user).values(user);
-      await db.insert(schema.organization).values(org);
+      await db.insert(schema.users).values(user);
+      await db.insert(schema.organizations).values(org);
 
       const specialists = Array.from({ length: 10 }, () => 
         generateTestSpecialist(user.id)

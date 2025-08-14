@@ -5,11 +5,15 @@ import { healthCheck } from './db'
 import { env } from '@/lib/env'
 import { logger as appLogger } from './utils/logger'
 import { AppError } from './utils/errors'
+import authRoutes from './routes/auth.routes'
 
 const app = new Hono().basePath('/api')
 
 app.use('*', logger())
 app.use('*', cors())
+
+// Mount auth routes
+app.route('/auth', authRoutes)
 
 app.get('/health', async (c) => {
   const dbHealth = await healthCheck();
