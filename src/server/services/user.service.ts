@@ -275,7 +275,7 @@ export class UserService {
   }) {
     try {
       const offset = (params.page - 1) * params.limit;
-      
+
       const whereConditions = [];
       if (params.organizationId) {
         whereConditions.push(eq(invitations.organizationId, params.organizationId));
@@ -299,7 +299,6 @@ export class UserService {
             expiresAt: invitations.expiresAt,
             inviterName: users.name,
             inviterEmail: users.email,
-            createdAt: invitations.createdAt,
           })
           .from(invitations)
           .leftJoin(organizations, eq(invitations.organizationId, organizations.id))
@@ -308,10 +307,7 @@ export class UserService {
           .limit(params.limit)
           .offset(offset)
           .orderBy(invitations.expiresAt),
-        db
-          .select({ count: count() })
-          .from(invitations)
-          .where(whereClause),
+        db.select({ count: count() }).from(invitations).where(whereClause),
       ]);
 
       const total = totalCount[0]?.count || 0;
@@ -358,7 +354,11 @@ export class UserService {
 
       // Check if invitation was already used
       if (invite.status !== "pending") {
-        throw new AppError(ErrorCode.INVITATION_ALREADY_USED, "Invitation has already been used", 400);
+        throw new AppError(
+          ErrorCode.INVITATION_ALREADY_USED,
+          "Invitation has already been used",
+          400
+        );
       }
 
       // Check if user already exists
