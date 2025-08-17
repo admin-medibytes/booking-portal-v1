@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { DocumentCategory, Document } from "@/types/document";
+import type { DocumentCategory, DocumentSection, Document } from "@/types/document";
 
 interface UploadDocumentParams {
   file: File;
   bookingId: string;
+  section: DocumentSection;
   category: DocumentCategory;
 }
 
@@ -34,13 +35,14 @@ export function useUploadDocument() {
     UploadError,
     UploadDocumentParams & { onProgress?: (progress: number) => void }
   >({
-    mutationFn: async ({ file, bookingId, category, onProgress }) => {
+    mutationFn: async ({ file, bookingId, section, category, onProgress }) => {
       const formData = new FormData();
       formData.append("file", file);
       formData.append(
         "metadata",
         JSON.stringify({
           bookingId,
+          section,
           category,
           fileName: file.name,
           fileSize: file.size,

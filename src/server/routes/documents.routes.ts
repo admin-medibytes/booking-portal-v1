@@ -1,10 +1,13 @@
 import { Hono } from "hono";
 import { type } from "arktype";
 import { documentService } from "@/server/services/document.service";
+import { documentPermissionsService } from "@/server/services/document-permissions.service";
 import { authMiddleware, requireAuth, checkImpersonation } from "@/server/middleware/auth.middleware";
 import { validateMiddleware } from "@/server/middleware/validate.middleware";
 import { documentUploadRateLimit, createRateLimiter } from "@/server/middleware/rate-limit.middleware";
 import { env } from "@/lib/env";
+import { convertToPdf } from "@/lib/pdf-converter";
+import type { DocumentCategory } from "@/types/document";
 
 const documentsRoutes = new Hono();
 
@@ -28,7 +31,8 @@ const documentDownloadRateLimit = createRateLimiter({
 
 const uploadDocumentSchema = type({
   bookingId: "string",
-  category: "'consent_form' | 'brief' | 'report' | 'dictation' | 'other'",
+  section: "'ime_documents' | 'supplementary_documents'",
+  category: "'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report'",
   fileName: "string",
   fileSize: "number",
   mimeType: "string",
@@ -63,14 +67,20 @@ documentsRoutes.post(
 
       const fileBuffer = Buffer.from(await file.arrayBuffer());
 
+      const memberRole = 'user' in authContext && authContext.user && 'memberRole' in authContext.user
+        ? (authContext.user as {memberRole?: string}).memberRole
+        : undefined;
+
       const document = await documentService.uploadDocument({
         bookingId: metadata.bookingId,
         uploadedById: user.id,
         fileName: file.name,
         fileSize: file.size,
         mimeType: file.type,
+        section: metadata.section,
         category: metadata.category,
         fileBuffer,
+        userRole: memberRole,
       });
 
       return c.json({ data: document });
@@ -101,6 +111,9 @@ documentsRoutes.get(
       }
 
       const documentId = c.req.param("id");
+      const memberRole = 'user' in authContext && authContext.user && 'memberRole' in authContext.user
+        ? (authContext.user as {memberRole?: string}).memberRole
+        : undefined;
       const ipAddress = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown";
       const userAgent = c.req.header("user-agent") || "unknown";
       const rangeHeader = c.req.header("range");
@@ -125,6 +138,7 @@ documentsRoutes.get(
           ipAddress,
           userAgent,
           range,
+          userRole: memberRole,
         }
       );
       
@@ -134,7 +148,19 @@ documentsRoutes.get(
         return c.json({ error: "Document not found" }, 404);
       }
 
-      // Set secure headers
+      // Check if referrer needs PDF-only download for final reports
+      const role = documentPermissionsService.getUserRole(memberRole);
+      const downloadFormat = documentPermissionsService.getDownloadFormat(role, document.category);
+      
+      if (downloadFormat.pdfOnly && document.mimeType !== "application/pdf") {
+        // Convert to PDF for referrers downloading final reports
+        const pdfStream = await convertToPdf(stream, document.mimeType, document.fileName);
+        c.header("Content-Type", "application/pdf");
+        c.header("Content-Disposition", `attachment; filename="${sanitizeFilename(document.fileName.replace(/\.[^.]+$/, '.pdf'))}"`);  
+        return c.body(pdfStream);
+      }
+      
+      // Set secure headers for normal download
       c.header("Content-Type", document.mimeType);
       c.header("Content-Disposition", `attachment; filename="${sanitizeFilename(document.fileName)}"`);
       c.header("Cache-Control", "private, no-cache, no-store, must-revalidate");
@@ -188,7 +214,10 @@ documentsRoutes.delete("/:id", async (c) => {
     }
 
     const documentId = c.req.param("id");
-    await documentService.deleteDocument(documentId, user.id);
+    const memberRole = 'user' in authContext && authContext.user && 'memberRole' in authContext.user
+      ? (authContext.user as {memberRole?: string}).memberRole
+      : undefined;
+    await documentService.deleteDocument(documentId, user.id, memberRole);
 
     return c.json({ message: "Document deleted successfully" });
   } catch (error) {
@@ -215,9 +244,20 @@ documentsRoutes.get("/booking/:bookingId", async (c) => {
     }
 
     const bookingId = c.req.param("bookingId");
+    const section = c.req.query("section") as "ime_documents" | "supplementary_documents" | undefined;
+    const category = c.req.query("category") as DocumentCategory | undefined;
+    const memberRole = 'user' in authContext && authContext.user && 'memberRole' in authContext.user
+      ? (authContext.user as {memberRole?: string}).memberRole
+      : undefined;
+    
     const documents = await documentService.getDocumentsByBooking(
       bookingId,
-      user.id
+      user.id,
+      {
+        section,
+        category,
+        userRole: memberRole,
+      }
     );
 
     return c.json({ data: documents });

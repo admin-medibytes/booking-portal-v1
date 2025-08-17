@@ -22,10 +22,13 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useUploadDocument } from "@/hooks/use-upload-document";
-import type { DocumentCategory } from "@/types/document";
+import { documentPermissionsService } from "@/server/services/document-permissions.service";
+import type { DocumentCategory, DocumentSection } from "@/types/document";
 
 interface DocumentUploadProps {
   bookingId: string;
+  section: DocumentSection;
+  userRole?: string;
   onUploadComplete?: () => void;
   maxFiles?: number;
   maxSize?: number;
@@ -49,6 +52,8 @@ const ACCEPTED_TYPES = {
   "audio/mp4": [".m4a"],
   "audio/wav": [".wav"],
   "audio/x-m4a": [".m4a"],
+  "audio/webm": [".webm"],
+  "audio/ogg": [".ogg"],
   "application/zip": [".zip"],
   "application/x-zip-compressed": [".zip"],
 };
@@ -65,23 +70,38 @@ function formatBytes(bytes: number, decimals = 2) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 }
 
+const AUDIO_MIME_TYPES = [
+  "audio/mpeg",
+  "audio/wav",
+  "audio/mp4",
+  "audio/webm",
+  "audio/ogg",
+  "audio/x-m4a",
+];
+
 function suggestCategory(file: File): DocumentCategory {
   const fileType = file.type.toLowerCase();
   const fileName = file.name.toLowerCase();
 
-  if (fileType.startsWith("audio/") || fileName.match(/\.(mp3|m4a|wav)$/)) {
+  if (AUDIO_MIME_TYPES.includes(fileType) || fileName.match(/\.(mp3|m4a|wav|ogg|webm)$/)) {
     return "dictation";
   }
   if (fileName.includes("consent") || fileName.includes("authorization")) {
     return "consent_form";
   }
   if (fileName.includes("brief") || fileName.includes("summary")) {
-    return "brief";
+    return "document_brief";
+  }
+  if (fileName.includes("draft") && fileName.includes("report")) {
+    return "draft_report";
+  }
+  if (fileName.includes("final") && fileName.includes("report")) {
+    return "final_report";
   }
   if (fileName.includes("report")) {
-    return "report";
+    return "draft_report";
   }
-  return "other";
+  return "document_brief";
 }
 
 function getFileIconAndColor(file: File) {
@@ -114,6 +134,8 @@ function getFileIconAndColor(file: File) {
 
 export function DocumentUpload({
   bookingId,
+  section,
+  userRole,
   onUploadComplete,
   maxFiles = 10,
   maxSize = MAX_FILE_SIZE,
@@ -122,6 +144,9 @@ export function DocumentUpload({
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { uploadDocument } = useUploadDocument();
+  
+  const role = documentPermissionsService.getUserRole(userRole);
+  const availableCategories = documentPermissionsService.getAvailableCategoriesForSection(role, section);
 
   const handleFilesAdded = useCallback(
     (newFiles: FileList | File[]) => {
@@ -134,6 +159,12 @@ export function DocumentUpload({
       }
 
       const validFiles = fileArray.slice(0, remainingSlots).map((file) => {
+        const suggestedCategory = suggestCategory(file);
+        // Ensure suggested category is available for this user/section
+        const finalCategory = availableCategories.includes(suggestedCategory) 
+          ? suggestedCategory 
+          : availableCategories[0] || "document_brief";
+
         if (file.size > maxSize) {
           return {
             id: `${file.name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -141,7 +172,7 @@ export function DocumentUpload({
             progress: 0,
             status: "error" as const,
             error: `File size exceeds ${formatBytes(maxSize)}`,
-            category: suggestCategory(file),
+            category: finalCategory,
           };
         }
 
@@ -150,7 +181,7 @@ export function DocumentUpload({
           file,
           progress: 0,
           status: "pending" as const,
-          category: suggestCategory(file),
+          category: finalCategory,
         };
       });
 
@@ -178,6 +209,7 @@ export function DocumentUpload({
         {
           file: fileWithProgress.file,
           bookingId,
+          section,
           category: fileWithProgress.category,
         },
         (progress) => {
@@ -368,11 +400,15 @@ export function DocumentUpload({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="consent_form">Consent Form</SelectItem>
-                        <SelectItem value="brief">Brief</SelectItem>
-                        <SelectItem value="report">Report</SelectItem>
-                        <SelectItem value="dictation">Dictation</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        {availableCategories.map(cat => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat === "consent_form" && "Consent Form"}
+                            {cat === "document_brief" && "Document Brief"}
+                            {cat === "dictation" && "Dictation"}
+                            {cat === "draft_report" && "Draft Report"}
+                            {cat === "final_report" && "Final Report"}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}

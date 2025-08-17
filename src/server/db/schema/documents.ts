@@ -4,13 +4,17 @@ import { users } from "./auth";
 import { bookings } from "./bookings";
 import { encryptedText, encryptedTextNullable } from "./encrypted-column";
 
-export const documentTypeEnum = pgEnum("document_type", [
-  "medical_report",
-  "test_result",
-  "prescription",
-  "insurance_card",
-  "referral_letter",
-  "other",
+export const documentSectionEnum = pgEnum("document_section", [
+  "ime_documents",
+  "supplementary_documents",
+]);
+
+export const documentCategoryEnum = pgEnum("document_category", [
+  "consent_form",
+  "document_brief", 
+  "dictation",
+  "draft_report",
+  "final_report",
 ]);
 
 export const documents = pgTable(
@@ -25,7 +29,8 @@ export const documents = pgTable(
     uploadedBy: text("uploaded_by")
       .notNull()
       .references(() => users.id),
-    documentType: documentTypeEnum("document_type").notNull(),
+    section: documentSectionEnum("section").notNull(),
+    category: documentCategoryEnum("category").notNull(),
 
     // S3 Storage (Encrypted)
     s3Key: encryptedText("s3_key").notNull(),
@@ -40,14 +45,16 @@ export const documents = pgTable(
     description: encryptedTextNullable("description"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
 
-    // Soft delete
+    // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),
   },
   (table) => ({
     bookingIdIdx: index("documents_booking_id_idx").on(table.bookingId),
     uploadedByIdx: index("documents_uploaded_by_idx").on(table.uploadedBy),
-    documentTypeIdx: index("documents_document_type_idx").on(table.documentType),
+    sectionIdx: index("documents_section_idx").on(table.section),
+    categoryIdx: index("documents_category_idx").on(table.category),
     deletedAtIdx: index("documents_deleted_at_idx").on(table.deletedAt),
   })
 );

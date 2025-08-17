@@ -11,7 +11,8 @@ import {
 import { documentRepository } from "@/server/repositories/document.repository";
 import { auditService } from "@/server/services/audit.service";
 import { bookingService } from "@/server/services/booking.service";
-import { type Document, type CreateDocumentInput, type UpdateDocumentInput } from "@/types/document";
+import { documentPermissionsService } from "@/server/services/document-permissions.service";
+import { type Document, type CreateDocumentInput, type UpdateDocumentInput, type DocumentSection, type DocumentCategory } from "@/types/document";
 import { env } from "@/lib/env";
 
 const MAX_FILE_SIZE = parseInt(env.S3_UPLOAD_MAX_SIZE || "104857600"); // 100MB default
@@ -23,8 +24,18 @@ const uploadDocumentSchema = type({
   fileName: "string",
   fileSize: "number",
   mimeType: "string",
-  category: "'consent_form' | 'brief' | 'report' | 'dictation' | 'other'",
+  section: "'ime_documents' | 'supplementary_documents'",
+  category: "'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report'",
 });
+
+const AUDIO_MIME_TYPES = [
+  "audio/mpeg",
+  "audio/wav",
+  "audio/mp4",
+  "audio/webm",
+  "audio/ogg",
+  "audio/x-m4a",
+];
 
 export class DocumentService {
   async uploadDocument(
@@ -34,15 +45,33 @@ export class DocumentService {
       fileName: string;
       fileSize: number;
       mimeType: string;
-      category: Document["category"];
+      section: DocumentSection;
+      category: DocumentCategory;
       fileBuffer: Buffer;
+      userRole?: string;
     },
     onProgress?: (progress: number) => void
   ): Promise<Document> {
-    const { fileBuffer, ...dataWithoutBuffer } = data;
-    const validation = uploadDocumentSchema(dataWithoutBuffer);
+    const { fileBuffer, userRole, ...dataWithoutBuffer } = data;
+    
+    // Auto-detect audio files and set category to dictation
+    let finalCategory = data.category;
+    if (AUDIO_MIME_TYPES.includes(data.mimeType.toLowerCase())) {
+      finalCategory = "dictation";
+    }
+    
+    const validationData = { ...dataWithoutBuffer, category: finalCategory };
+    const validation = uploadDocumentSchema(validationData);
     if (validation instanceof type.errors) {
       throw new Error(`Invalid document data: ${validation.summary}`);
+    }
+
+    // Check upload permission
+    if (userRole) {
+      const role = documentPermissionsService.getUserRole(userRole);
+      if (!documentPermissionsService.hasPermission({ role, category: finalCategory, permission: "upload" })) {
+        throw new Error("You do not have permission to upload this document type");
+      }
     }
 
     if (data.fileSize > MAX_FILE_SIZE) {
@@ -86,7 +115,8 @@ export class DocumentService {
         fileName: data.fileName,
         fileSize: data.fileSize,
         mimeType: data.mimeType,
-        category: data.category,
+        section: data.section,
+        category: finalCategory,
       };
 
       const document = await documentRepository.create({
@@ -104,7 +134,8 @@ export class DocumentService {
           bookingId: data.bookingId,
           fileName: data.fileName,
           fileSize: data.fileSize,
-          category: data.category,
+          section: data.section,
+          category: finalCategory,
         },
       });
 
@@ -115,14 +146,14 @@ export class DocumentService {
     }
   }
 
-  async getDocument(id: string, userId: string): Promise<Document | null> {
+  async getDocument(id: string, userId: string, userRole?: string): Promise<Document | null> {
     const document = await documentRepository.findById(id);
     
     if (!document) {
       return null;
     }
 
-    const hasAccess = await this.verifyAccess(document, userId);
+    const hasAccess = await this.verifyAccess(document, userId, userRole);
     if (!hasAccess) {
       throw new Error("Access denied");
     }
@@ -149,6 +180,7 @@ export class DocumentService {
       ipAddress?: string;
       userAgent?: string;
       range?: { start: number; end: number };
+      userRole?: string;
     }
   ): Promise<{
     stream: ReadableStream | null;
@@ -194,7 +226,7 @@ export class DocumentService {
         throw new Error("Document not found");
       }
 
-      const hasAccess = await this.verifyAccess(document, userId);
+      const hasAccess = await this.verifyAccess(document, userId, context?.userRole);
       if (!hasAccess) {
         // Log access denied
         await auditService.log({
@@ -319,14 +351,23 @@ export class DocumentService {
     return updated;
   }
 
-  async deleteDocument(id: string, userId: string): Promise<void> {
-    const document = await this.getDocument(id, userId);
+  async deleteDocument(id: string, userId: string, userRole?: string): Promise<void> {
+    const document = await this.getDocument(id, userId, userRole);
     
     if (!document) {
       throw new Error("Document not found");
     }
 
-    await documentRepository.softDelete(id);
+    // Check delete permission
+    if (userRole) {
+      const role = documentPermissionsService.getUserRole(userRole);
+      if (!documentPermissionsService.hasPermission({ role, category: document.category, permission: "delete" })) {
+        throw new Error("You do not have permission to delete this document type");
+      }
+    }
+
+    // Perform hard delete as required for HIPAA compliance
+    await documentRepository.hardDelete(id);
     
     await deleteS3Object(document.s3Key);
 
@@ -343,21 +384,37 @@ export class DocumentService {
     });
   }
 
-  async getDocumentsByBooking(bookingId: string, userId: string): Promise<Document[]> {
-    const documents = await documentRepository.findByBookingId(bookingId);
+  async getDocumentsByBooking(
+    bookingId: string, 
+    userId: string,
+    filters?: {
+      section?: DocumentSection;
+      category?: DocumentCategory;
+      userRole?: string;
+    }
+  ): Promise<Document[]> {
+    const documents = await documentRepository.findByBookingId(bookingId, filters);
     
     const accessibleDocuments = [];
     for (const doc of documents) {
-      const hasAccess = await this.verifyAccess(doc, userId);
+      const hasAccess = await this.verifyAccess(doc, userId, filters?.userRole);
       if (hasAccess) {
-        accessibleDocuments.push(doc);
+        // Check download permission based on role
+        if (filters?.userRole) {
+          const role = documentPermissionsService.getUserRole(filters.userRole);
+          if (documentPermissionsService.hasPermission({ role, category: doc.category, permission: "download" })) {
+            accessibleDocuments.push(doc);
+          }
+        } else {
+          accessibleDocuments.push(doc);
+        }
       }
     }
 
     return accessibleDocuments;
   }
 
-  private async verifyAccess(document: Document, userId: string): Promise<boolean> {
+  private async verifyAccess(document: Document, userId: string, _userRole?: string): Promise<boolean> {
     // Check if user is the document uploader
     if (document.uploadedById === userId) {
       return true;

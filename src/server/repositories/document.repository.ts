@@ -1,7 +1,7 @@
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { documents } from "@/server/db/schema/documents";
-import { type Document, type CreateDocumentInput } from "@/types/document";
+import { type Document, type CreateDocumentInput, type DocumentSection, type DocumentCategory } from "@/types/document";
 
 export class DocumentRepository {
   async create(data: CreateDocumentInput & { id: string; s3Key: string }): Promise<Document> {
@@ -11,7 +11,8 @@ export class DocumentRepository {
         id: data.id,
         bookingId: data.bookingId,
         uploadedBy: data.uploadedById,
-        documentType: this.mapCategoryToDocumentType(data.category),
+        section: data.section,
+        category: data.category,
         s3Key: data.s3Key,
         s3Bucket: process.env.AWS_S3_BUCKET_NAME!,
         fileName: data.fileName,
@@ -31,10 +32,29 @@ export class DocumentRepository {
     return document ? this.mapToDocument(document) : null;
   }
 
-  async findByBookingId(bookingId: string): Promise<Document[]> {
+  async findByBookingId(
+    bookingId: string,
+    filters?: {
+      section?: DocumentSection;
+      category?: DocumentCategory;
+    }
+  ): Promise<Document[]> {
+    const conditions = [eq(documents.bookingId, bookingId), isNull(documents.deletedAt)];
+    
+    if (filters?.section) {
+      conditions.push(eq(documents.section, filters.section));
+    }
+    
+    if (filters?.category) {
+      conditions.push(eq(documents.category, filters.category));
+    }
+    
     const results = await db.query.documents.findMany({
-      where: and(eq(documents.bookingId, bookingId), isNull(documents.deletedAt)),
+      where: and(...conditions),
       orderBy: (documents, { desc }) => [desc(documents.createdAt)],
+      with: {
+        uploadedBy: true,
+      },
     });
 
     return results.map(doc => this.mapToDocument(doc));
@@ -42,16 +62,22 @@ export class DocumentRepository {
 
   async update(
     id: string,
-    data: { fileName?: string; category?: Document["category"] }
+    data: { fileName?: string; section?: DocumentSection; category?: DocumentCategory }
   ): Promise<Document> {
-    const updateData: Record<string, unknown> = {};
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
     
     if (data.fileName !== undefined) {
       updateData.fileName = data.fileName;
     }
     
+    if (data.section !== undefined) {
+      updateData.section = data.section;
+    }
+    
     if (data.category !== undefined) {
-      updateData.documentType = this.mapCategoryToDocumentType(data.category);
+      updateData.category = data.category;
     }
 
     const [document] = await db
@@ -74,45 +100,19 @@ export class DocumentRepository {
     await db.delete(documents).where(eq(documents.id, id));
   }
 
-  private mapCategoryToDocumentType(
-    category: Document["category"]
-  ): "medical_report" | "test_result" | "prescription" | "insurance_card" | "referral_letter" | "other" {
-    const mapping: Record<Document["category"], typeof documents.documentType.enumValues[number]> = {
-      consent_form: "other",
-      brief: "referral_letter",
-      report: "medical_report",
-      dictation: "other",
-      other: "other",
-    };
-
-    return mapping[category];
-  }
-
-  private mapDocumentTypeToCategory(
-    documentType: typeof documents.documentType.enumValues[number]
-  ): Document["category"] {
-    const mapping: Record<typeof documentType, Document["category"]> = {
-      medical_report: "report",
-      test_result: "report",
-      prescription: "other",
-      insurance_card: "other",
-      referral_letter: "brief",
-      other: "other",
-    };
-
-    return mapping[documentType];
-  }
 
   private mapToDocument(dbDocument: {
     id: string;
     bookingId: string;
     uploadedBy: string;
-    documentType: typeof documents.documentType.enumValues[number];
+    section: DocumentSection;
+    category: DocumentCategory;
     s3Key: string;
     fileName: string;
     fileSize: number;
     mimeType: string;
     createdAt: Date;
+    updatedAt?: Date;
     deletedAt: Date | null;
   }): Document {
     return {
@@ -123,9 +123,10 @@ export class DocumentRepository {
       fileName: dbDocument.fileName,
       fileSize: dbDocument.fileSize,
       mimeType: dbDocument.mimeType,
-      category: this.mapDocumentTypeToCategory(dbDocument.documentType),
+      section: dbDocument.section,
+      category: dbDocument.category,
       createdAt: dbDocument.createdAt,
-      updatedAt: dbDocument.createdAt, // Schema doesn't have updatedAt, use createdAt
+      updatedAt: dbDocument.updatedAt || dbDocument.createdAt,
       deletedAt: dbDocument.deletedAt,
     };
   }

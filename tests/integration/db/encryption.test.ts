@@ -111,14 +111,17 @@ describe('Database Encryption', () => {
         id: crypto.randomUUID(),
         bookingId: booking.id,
         uploadedBy: user.id,
-        documentType: 'medical_report' as const,
+        section: 'ime_documents' as const,
+        category: 'final_report' as const,
         s3Key: 'sensitive/path/to/file.pdf',
         s3Bucket: 'medibytes-documents',
         fileName: 'patient-medical-report.pdf',
         fileSize: 1024000,
         mimeType: 'application/pdf',
         description: 'Confidential medical report',
+        metadata: {},
         createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       await db.insert(schema.documents).values(document);

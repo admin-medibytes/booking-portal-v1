@@ -202,29 +202,38 @@ describe("Schema Validation and Constraints", () => {
       const booking = generateTestBooking(org.id, user.id, null);
       await db.insert(schema.bookings).values(booking);
 
-      const validTypes = [
-        "medical_report",
-        "test_result",
-        "prescription",
-        "insurance_card",
-        "referral_letter",
-        "other",
+      const validCategories = [
+        "consent_form",
+        "document_brief",
+        "dictation",
+        "draft_report",
+        "final_report",
+      ];
+      
+      const validSections = [
+        "ime_documents",
+        "supplementary_documents",
       ];
 
-      for (const docType of validTypes) {
-        const document = {
-          id: crypto.randomUUID(),
-          bookingId: booking.id,
-          uploadedBy: user.id,
-          documentType: docType as any,
-          s3Key: "test/key",
-          s3Bucket: "test-bucket",
-          fileName: "test.pdf",
-          fileSize: 1024,
-          mimeType: "application/pdf",
-        };
+      for (const category of validCategories) {
+        for (const section of validSections) {
+          const document = {
+            id: crypto.randomUUID(),
+            bookingId: booking.id,
+            uploadedBy: user.id,
+            section: section as any,
+            category: category as any,
+            s3Key: "test/key",
+            s3Bucket: "test-bucket",
+            fileName: "test.pdf",
+            fileSize: 1024,
+            mimeType: "application/pdf",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
 
-        await expect(db.insert(schema.documents).values(document)).resolves.not.toThrow();
+          await expect(db.insert(schema.documents).values(document)).resolves.not.toThrow();
+        }
       }
     });
   });

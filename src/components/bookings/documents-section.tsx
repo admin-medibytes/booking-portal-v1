@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,12 +10,24 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { FileText, Upload, FileArchive, FileSpreadsheet, HeadphonesIcon, FileIcon, Download, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { FileText, Upload, FileArchive, FileSpreadsheet, HeadphonesIcon, FileIcon, Download, Loader2, Trash2, ArrowUpDown } from "lucide-react";
 import { DocumentUpload } from "@/components/documents/document-upload";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDownloadDocument } from "@/hooks/use-download-document";
+import { useDeleteDocument } from "@/hooks/use-delete-document";
+import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import type { Document, DocumentCategory } from "@/types/document";
+import { documentPermissionsService } from "@/server/services/document-permissions.service";
+import type { Document, DocumentCategory, DocumentSection } from "@/types/document";
 
 interface DocumentsSectionProps {
   bookingId: string;
@@ -54,42 +66,79 @@ function getDocumentIcon(document: Document) {
 function getCategoryLabel(category: DocumentCategory): string {
   const labels: Record<DocumentCategory, string> = {
     consent_form: "Consent Form",
-    brief: "Brief",
-    report: "Report",
+    document_brief: "Document Brief",
     dictation: "Dictation",
-    other: "Other",
+    draft_report: "Draft Report",
+    final_report: "Final Report",
   };
   return labels[category] || category;
 }
 
-function groupDocumentsByCategory(documents: Document[]) {
-  const grouped = documents.reduce((acc, doc) => {
-    if (!acc[doc.category]) {
-      acc[doc.category] = [];
-    }
-    acc[doc.category].push(doc);
-    return acc;
-  }, {} as Record<DocumentCategory, Document[]>);
+type SortOption = "date" | "name" | "category";
 
-  // Sort categories in a logical order
-  const categoryOrder: DocumentCategory[] = ["consent_form", "brief", "report", "dictation", "other"];
-  const sortedCategories = categoryOrder.filter((cat) => grouped[cat]);
-
-  return sortedCategories.map((category) => ({
-    category,
-    documents: grouped[category].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ),
-  }));
+function sortDocuments(documents: Document[], sortBy: SortOption): Document[] {
+  const sorted = [...documents];
+  
+  switch (sortBy) {
+    case "date":
+      return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    case "name":
+      return sorted.sort((a, b) => a.fileName.localeCompare(b.fileName));
+    case "category":
+      return sorted.sort((a, b) => a.category.localeCompare(b.category));
+    default:
+      return sorted;
+  }
 }
 
 export function DocumentsSection({ bookingId }: DocumentsSectionProps) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const { data: documents = [], isLoading, refetch } = useDocuments(bookingId);
+  const [activeTab, setActiveTab] = useState<DocumentSection>("ime_documents");
+  const [categoryFilter, setCategoryFilter] = useState<DocumentCategory | "all">("all");
+  const [sortBy, setSortBy] = useState<SortOption>("date");
+  const { user } = useAuth();
+  const { data: documents = [], isLoading, refetch } = useDocuments(bookingId, {
+    section: activeTab,
+  });
   const { downloadDocument, isDownloading, getProgress } = useDownloadDocument();
+  const { deleteDocument, isDeleting } = useDeleteDocument();
 
-  const documentCount = documents.length;
-  const groupedDocuments = groupDocumentsByCategory(documents);
+  const userRole = documentPermissionsService.getUserRole(user?.memberRole);
+
+  // Filter documents by category
+  const filteredDocuments = useMemo(() => {
+    if (categoryFilter === "all") return documents;
+    return documents.filter(doc => doc.category === categoryFilter);
+  }, [documents, categoryFilter]);
+
+  // Sort documents
+  const sortedDocuments = useMemo(() => {
+    return sortDocuments(filteredDocuments, sortBy);
+  }, [filteredDocuments, sortBy]);
+
+  // Count documents by category
+  const categoryCounts = useMemo(() => {
+    const counts: Record<DocumentCategory, number> = {
+      consent_form: 0,
+      document_brief: 0,
+      dictation: 0,
+      draft_report: 0,
+      final_report: 0,
+    };
+    documents.forEach(doc => {
+      counts[doc.category] = (counts[doc.category] || 0) + 1;
+    });
+    return counts;
+  }, [documents]);
+
+  // Get available categories for current tab
+  const availableCategories = useMemo(() => {
+    if (activeTab === "ime_documents") {
+      return Object.keys(categoryCounts) as DocumentCategory[];
+    } else {
+      return (Object.keys(categoryCounts) as DocumentCategory[]).filter(cat => cat !== "consent_form");
+    }
+  }, [activeTab, categoryCounts]);
 
   const handleUploadComplete = () => {
     refetch();
@@ -97,6 +146,25 @@ export function DocumentsSection({ bookingId }: DocumentsSectionProps) {
 
   const handleDownload = (doc: Document) => {
     downloadDocument(doc.id, doc.fileName);
+  };
+
+  const handleDelete = async (doc: Document) => {
+    if (confirm(`Are you sure you want to delete "${doc.fileName}"? This action cannot be undone.`)) {
+      await deleteDocument(doc.id);
+      refetch();
+    }
+  };
+
+  // const canUpload = (category: DocumentCategory) => {
+  //   return documentPermissionsService.hasPermission({ role: userRole, category, permission: "upload" });
+  // };
+
+  const canDownload = (category: DocumentCategory) => {
+    return documentPermissionsService.hasPermission({ role: userRole, category, permission: "download" });
+  };
+
+  const canDelete = (category: DocumentCategory) => {
+    return documentPermissionsService.hasPermission({ role: userRole, category, permission: "delete" });
   };
 
   if (isLoading) {
@@ -123,111 +191,193 @@ export function DocumentsSection({ bookingId }: DocumentsSectionProps) {
             <FileText className="w-5 h-5" />
             Documents
           </div>
-          <div className="flex items-center gap-3">
-            {documentCount > 0 && (
-              <span className="text-sm font-normal text-gray-500">
-                {documentCount} document{documentCount !== 1 ? "s" : ""}
-              </span>
-            )}
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Upload Documents</DialogTitle>
-                  <DialogDescription>
-                    Upload examination-related documents. Files are securely stored and accessible only to authorized users.
-                  </DialogDescription>
-                </DialogHeader>
-                <DocumentUpload
-                  bookingId={bookingId}
-                  onUploadComplete={handleUploadComplete}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Upload className="w-4 h-4 mr-2" />
+                Upload
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Upload Documents</DialogTitle>
+                <DialogDescription>
+                  Upload examination-related documents to {activeTab === "ime_documents" ? "IME Documents" : "Supplementary Documents"}.
+                </DialogDescription>
+              </DialogHeader>
+              <DocumentUpload
+                bookingId={bookingId}
+                section={activeTab}
+                userRole={user?.memberRole}
+                onUploadComplete={handleUploadComplete}
+              />
+            </DialogContent>
+          </Dialog>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {documentCount === 0 ? (
-          <div className="text-center py-8">
-            <Upload className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-gray-500 mb-2">No documents uploaded</p>
-            <p className="text-sm text-gray-400 mb-4">
-              Upload consent forms, briefs, reports, and other examination documents.
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => setUploadDialogOpen(true)}
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Upload Documents
-            </Button>
+        <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as DocumentSection)}>
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="ime_documents">IME Documents</TabsTrigger>
+            <TabsTrigger value="supplementary_documents">Supplementary Documents</TabsTrigger>
+          </TabsList>
+          
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as DocumentCategory | "all")}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {availableCategories.map(category => (
+                    <SelectItem key={category} value={category}>
+                      {getCategoryLabel(category)} ({categoryCounts[category] || 0})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpDown className="w-4 h-4" />
+                      Date
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="name">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpDown className="w-4 h-4" />
+                      Name
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="category">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpDown className="w-4 h-4" />
+                      Category
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="text-sm text-gray-500">
+              {filteredDocuments.length} document{filteredDocuments.length !== 1 ? "s" : ""}
+            </div>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {groupedDocuments.map(({ category, documents: categoryDocs }) => (
-              <div key={category}>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">
-                  {getCategoryLabel(category)} ({categoryDocs.length})
-                </h4>
-                <div className="space-y-2">
-                  {categoryDocs.map((doc) => {
-                    const { icon: DocIcon, color } = getDocumentIcon(doc);
-                    const downloading = isDownloading(doc.id);
-                    const progress = getProgress(doc.id);
-                    
-                    return (
-                      <div
-                        key={doc.id}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <DocIcon className={cn("w-5 h-5 flex-shrink-0", color)} />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">{doc.fileName}</p>
-                            <p className="text-xs text-gray-500">
-                              {formatBytes(doc.fileSize)} • Uploaded {new Date(doc.createdAt).toLocaleDateString()}
-                            </p>
-                            {downloading && (
-                              <div className="mt-2 space-y-1">
-                                <Progress value={progress} className="h-1" />
-                                <p className="text-xs text-gray-500">{progress}% downloaded</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="flex-shrink-0 ml-2"
-                          onClick={() => handleDownload(doc)}
-                          disabled={downloading}
-                        >
-                          {downloading ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Downloading
-                            </>
-                          ) : (
-                            <>
-                              <Download className="w-4 h-4 mr-2" />
-                              Download
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
+
+          <TabsContent value={activeTab}>
+            {sortedDocuments.length === 0 ? (
+              <div className="text-center py-8">
+                <Upload className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-gray-500 mb-2">No documents uploaded</p>
+                <p className="text-sm text-gray-400 mb-4">
+                  Upload consent forms, briefs, reports, and other examination documents.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setUploadDialogOpen(true)}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Documents
+                </Button>
               </div>
-            ))}
-          </div>
-        )}
+            ) : (
+              <div className="space-y-6">
+                {availableCategories.map((category) => {
+                  const categoryDocs = sortedDocuments.filter(doc => doc.category === category);
+                  if (categoryDocs.length === 0 && categoryFilter !== "all") return null;
+                  
+                  return (
+                    <div key={category}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="text-sm font-medium text-gray-700">
+                          {getCategoryLabel(category)}
+                        </h4>
+                        <Badge variant="secondary" className="text-xs">
+                          {categoryDocs.length}
+                        </Badge>
+                      </div>
+                      {categoryDocs.length > 0 ? (
+                        <div className="space-y-2">
+                          {categoryDocs.map((doc) => {
+                            const { icon: DocIcon, color } = getDocumentIcon(doc);
+                            const downloading = isDownloading(doc.id);
+                            const progress = getProgress(doc.id);
+                            
+                            return (
+                              <div
+                                key={doc.id}
+                                className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <DocIcon className={cn("w-5 h-5 flex-shrink-0", color)} />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium truncate">{doc.fileName}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {formatBytes(doc.fileSize)} • Uploaded {new Date(doc.createdAt).toLocaleDateString()}
+                                      {doc.uploadedBy && ` by ${doc.uploadedBy.name}`}
+                                    </p>
+                                    {downloading && (
+                                      <div className="mt-2 space-y-1">
+                                        <Progress value={progress} className="h-1" />
+                                        <p className="text-xs text-gray-500">{progress}% downloaded</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {canDownload(doc.category) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="flex-shrink-0"
+                                      onClick={() => handleDownload(doc)}
+                                      disabled={downloading}
+                                    >
+                                      {downloading ? (
+                                        <>
+                                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                          Downloading
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Download className="w-4 h-4 mr-2" />
+                                          Download
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
+                                  {canDelete(doc.category) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="flex-shrink-0"
+                                      onClick={() => handleDelete(doc)}
+                                      disabled={isDeleting(doc.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-400 italic">No {getCategoryLabel(category).toLowerCase()} uploaded</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
