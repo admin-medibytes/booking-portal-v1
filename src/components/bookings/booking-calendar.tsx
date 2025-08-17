@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Link from "next/link";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   format,
   startOfMonth,
@@ -9,35 +8,112 @@ import {
   startOfWeek,
   endOfWeek,
   addDays,
+  subDays,
   addMonths,
   subMonths,
+  addWeeks,
+  subWeeks,
   isSameMonth,
   isSameDay,
+  isToday,
+  startOfDay,
+  parseISO,
+  setHours,
+  eachDayOfInterval,
 } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { BookingWithSpecialist } from "@/types/booking";
 import { cn } from "@/lib/utils";
+import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import type { BookingWithSpecialist } from "@/types/booking";
+import { BookingDetailsPopover } from "./booking-details-popover";
 
 interface BookingCalendarProps {
   bookings: BookingWithSpecialist[];
+  onEventSelect?: (booking: BookingWithSpecialist) => void;
 }
 
-type ViewType = "month" | "week" | "day";
+type ViewType = "month" | "week" | "day" | "agenda";
 
-export function BookingCalendar({ bookings }: BookingCalendarProps) {
+export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>("month");
+  const [selectedBooking, setSelectedBooking] = useState<BookingWithSpecialist | null>(null);
+
+  // Navigation functions
+  const navigatePrevious = useCallback(() => {
+    if (viewType === "month") {
+      setCurrentDate((prev) => subMonths(prev, 1));
+    } else if (viewType === "week") {
+      setCurrentDate((prev) => subWeeks(prev, 1));
+    } else if (viewType === "day" || viewType === "agenda") {
+      setCurrentDate((prev) => subDays(prev, 1));
+    }
+  }, [viewType]);
+
+  const navigateNext = useCallback(() => {
+    if (viewType === "month") {
+      setCurrentDate((prev) => addMonths(prev, 1));
+    } else if (viewType === "week") {
+      setCurrentDate((prev) => addWeeks(prev, 1));
+    } else if (viewType === "day" || viewType === "agenda") {
+      setCurrentDate((prev) => addDays(prev, 1));
+    }
+  }, [viewType]);
+
+  const navigateToday = useCallback(() => {
+    setCurrentDate(new Date());
+  }, []);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case "m":
+          setViewType("month");
+          break;
+        case "w":
+          setViewType("week");
+          break;
+        case "d":
+          setViewType("day");
+          break;
+        case "a":
+          setViewType("agenda");
+          break;
+      }
+    };
+
+    window.addEventListener("keypress", handleKeyPress);
+    return () => window.removeEventListener("keypress", handleKeyPress);
+  }, []);
+
+  // Get header title based on view
+  const headerTitle = useMemo(() => {
+    switch (viewType) {
+      case "month":
+        return format(currentDate, "MMMM yyyy");
+      case "week":
+        const weekStart = startOfWeek(currentDate);
+        const weekEnd = endOfWeek(currentDate);
+        if (isSameMonth(weekStart, weekEnd)) {
+          return format(weekStart, "MMMM d") + " - " + format(weekEnd, "d, yyyy");
+        }
+        return format(weekStart, "MMM d") + " - " + format(weekEnd, "MMM d, yyyy");
+      case "day":
+      case "agenda":
+        return format(currentDate, "EEEE, MMMM d, yyyy");
+    }
+  }, [currentDate, viewType]);
 
   // Group bookings by date
   const bookingsByDate = useMemo(() => {
     const grouped: Record<string, BookingWithSpecialist[]> = {};
-    
+
     bookings.forEach((booking) => {
-      if (booking.examDate) {
-        const dateKey = format(new Date(booking.examDate), "yyyy-MM-dd");
+      const appointmentDate = booking.examDate;
+      if (appointmentDate) {
+        const dateKey = format(new Date(appointmentDate), "yyyy-MM-dd");
         if (!grouped[dateKey]) {
           grouped[dateKey] = [];
         }
@@ -45,192 +121,512 @@ export function BookingCalendar({ bookings }: BookingCalendarProps) {
       }
     });
 
+    // Sort bookings within each day by time
+    Object.keys(grouped).forEach((dateKey) => {
+      grouped[dateKey].sort((a, b) => {
+        const timeA = a.examDate ? new Date(a.examDate).getTime() : 0;
+        const timeB = b.examDate ? new Date(b.examDate).getTime() : 0;
+        return timeA - timeB;
+      });
+    });
+
     return grouped;
   }, [bookings]);
 
-  // Generate calendar days for month view
+  const handleBookingClick = (booking: BookingWithSpecialist, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedBooking(booking);
+    onEventSelect?.(booking);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Calendar Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <h2 className="text-xl font-bold sm:text-2xl">{headerTitle}</h2>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={navigatePrevious}>
+              <ChevronLeft className="w-4 h-4" />
+              <span className="sr-only">Previous</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={navigateToday}>
+              Today
+            </Button>
+            <Button variant="outline" size="sm" onClick={navigateNext}>
+              <ChevronRight className="w-4 h-4" />
+              <span className="sr-only">Next</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* View Toggle */}
+        <div className="flex gap-1 p-1 overflow-x-auto rounded-md bg-muted">
+          {(["month", "week", "day", "agenda"] as const).map((view) => (
+            <Button
+              key={view}
+              variant={viewType === view ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewType(view)}
+              className="flex-shrink-0 capitalize"
+            >
+              {view}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Calendar Views */}
+      {viewType === "month" && (
+        <MonthView
+          currentDate={currentDate}
+          bookingsByDate={bookingsByDate}
+          onBookingClick={handleBookingClick}
+        />
+      )}
+
+      {viewType === "week" && (
+        <WeekView
+          currentDate={currentDate}
+          bookingsByDate={bookingsByDate}
+          onBookingClick={handleBookingClick}
+        />
+      )}
+
+      {viewType === "day" && (
+        <DayView
+          currentDate={currentDate}
+          bookingsByDate={bookingsByDate}
+          onBookingClick={handleBookingClick}
+        />
+      )}
+
+      {viewType === "agenda" && (
+        <AgendaView
+          currentDate={currentDate}
+          bookings={bookings}
+          onBookingClick={handleBookingClick}
+        />
+      )}
+
+      {/* Booking Details Popover */}
+      {selectedBooking && (
+        <BookingDetailsPopover booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
+      )}
+    </div>
+  );
+}
+
+// Month View Component
+interface MonthViewProps {
+  currentDate: Date;
+  bookingsByDate: Record<string, BookingWithSpecialist[]>;
+  onBookingClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
+}
+
+function MonthView({ currentDate, bookingsByDate, onBookingClick }: MonthViewProps) {
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
     const startDate = startOfWeek(monthStart);
     const endDate = endOfWeek(monthEnd);
 
-    const days = [];
-    let day = startDate;
-
-    while (day <= endDate) {
-      days.push(day);
-      day = addDays(day, 1);
-    }
-
-    return days;
+    return eachDayOfInterval({ start: startDate, end: endDate });
   }, [currentDate]);
 
-  const navigatePrevious = () => {
-    setCurrentDate(subMonths(currentDate, 1));
-  };
-
-  const navigateNext = () => {
-    setCurrentDate(addMonths(currentDate, 1));
-  };
-
-  const navigateToday = () => {
-    setCurrentDate(new Date());
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors = {
-      active: "bg-blue-100 text-blue-800",
-      closed: "bg-gray-100 text-gray-800",
-      archived: "bg-gray-100 text-gray-500",
-    };
-    return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800";
-  };
-
   return (
-    <div className="space-y-4">
-      {/* Calendar Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold">
-            {format(currentDate, "MMMM yyyy")}
-          </h2>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={navigatePrevious}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={navigateToday}>
-              Today
-            </Button>
-            <Button variant="outline" size="sm" onClick={navigateNext}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+    <div className="overflow-hidden border rounded-lg">
+      {/* Weekday Headers */}
+      <div className="grid grid-cols-7 bg-muted">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+          <div
+            key={day}
+            className="p-1 text-xs font-medium text-center border-r sm:p-2 sm:text-sm text-muted-foreground last:border-r-0"
+          >
+            <span className="hidden sm:inline">{day}</span>
+            <span className="sm:hidden">{day.substring(0, 1)}</span>
           </div>
-        </div>
-        
-        {/* View Toggle */}
-        <div className="flex gap-2">
-          <Button
-            variant={viewType === "month" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewType("month")}
-          >
-            Month
-          </Button>
-          <Button
-            variant={viewType === "week" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewType("week")}
-          >
-            Week
-          </Button>
-          <Button
-            variant={viewType === "day" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewType("day")}
-          >
-            Day
-          </Button>
-        </div>
+        ))}
       </div>
 
-      {/* Calendar Grid */}
-      {viewType === "month" && (
-        <div className="border rounded-lg overflow-hidden">
-          {/* Weekday Headers */}
-          <div className="grid grid-cols-7 bg-gray-50 border-b">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-              <div
-                key={day}
-                className="p-2 text-center text-sm font-medium text-gray-700 border-r last:border-r-0"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
+      {/* Calendar Days */}
+      <div className="grid grid-cols-7">
+        {calendarDays.map((day, index) => {
+          const dateKey = format(day, "yyyy-MM-dd");
+          const dayBookings = bookingsByDate[dateKey] || [];
+          const isCurrentMonth = isSameMonth(day, currentDate);
+          const isToday = isSameDay(day, new Date());
 
-          {/* Calendar Days */}
-          <div className="grid grid-cols-7">
-            {calendarDays.map((day, index) => {
+          return (
+            <div
+              key={index}
+              className={cn(
+                "min-h-[80px] sm:min-h-[120px] p-1 sm:p-2 border-r border-b last:border-r-0",
+                !isCurrentMonth && "bg-muted/30",
+                isToday && "bg-blue-50 dark:bg-blue-950/20"
+              )}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span
+                  className={cn(
+                    "text-sm font-medium",
+                    !isCurrentMonth && "text-muted-foreground",
+                    isToday && "text-blue-600 dark:text-blue-400"
+                  )}
+                >
+                  {format(day, "d")}
+                </span>
+                {dayBookings.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    {dayBookings.length}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Booking Items */}
+              <div className="space-y-1">
+                <div className="hidden sm:block">
+                  {dayBookings.slice(0, 3).map((booking) => (
+                    <BookingItem
+                      key={booking.id}
+                      booking={booking}
+                      view="month"
+                      onClick={onBookingClick}
+                    />
+                  ))}
+                  {dayBookings.length > 3 && (
+                    <p className="text-xs text-center text-muted-foreground">
+                      +{dayBookings.length - 3} more
+                    </p>
+                  )}
+                </div>
+                <div className="sm:hidden">
+                  {dayBookings.slice(0, 1).map((booking) => (
+                    <BookingItem
+                      key={booking.id}
+                      booking={booking}
+                      view="month"
+                      onClick={onBookingClick}
+                    />
+                  ))}
+                  {dayBookings.length > 1 && (
+                    <p className="text-xs text-center text-muted-foreground">
+                      +{dayBookings.length - 1}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Week View Component
+interface WeekViewProps {
+  currentDate: Date;
+  bookingsByDate: Record<string, BookingWithSpecialist[]>;
+  onBookingClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
+}
+
+function WeekView({ currentDate, bookingsByDate, onBookingClick }: WeekViewProps) {
+  const weekDays = useMemo(() => {
+    const start = startOfWeek(currentDate);
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  }, [currentDate]);
+
+  const businessHours = Array.from({ length: 11 }, (_, i) => i + 8); // 8am to 6pm
+
+  return (
+    <div className="overflow-hidden border rounded-lg">
+      {/* Time column and day headers */}
+      <div className="grid grid-cols-8 bg-muted">
+        <div className="p-2 text-sm font-medium border-r text-muted-foreground">Time</div>
+        {weekDays.map((day) => (
+          <div
+            key={day.toISOString()}
+            className={cn(
+              "p-2 text-center border-r last:border-r-0",
+              isToday(day) && "bg-blue-50 dark:bg-blue-950/20"
+            )}
+          >
+            <div className="text-sm font-medium">{format(day, "EEE")}</div>
+            <div
+              className={cn(
+                "text-lg",
+                isToday(day) && "text-blue-600 dark:text-blue-400 font-semibold"
+              )}
+            >
+              {format(day, "d")}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Time slots grid */}
+      <div className="grid grid-cols-8 max-h-[600px] overflow-y-auto">
+        {businessHours.map((hour) => (
+          <React.Fragment key={hour}>
+            {/* Hour label */}
+            <div className="sticky left-0 p-2 text-sm border-b border-r text-muted-foreground bg-background">
+              {format(setHours(new Date(), hour), "h a")}
+            </div>
+
+            {/* Day slots */}
+            {weekDays.map((day) => {
               const dateKey = format(day, "yyyy-MM-dd");
               const dayBookings = bookingsByDate[dateKey] || [];
-              const isCurrentMonth = isSameMonth(day, currentDate);
-              const isToday = isSameDay(day, new Date());
+              const hourBookings = dayBookings.filter((booking) => {
+                if (!booking.examDate) return false;
+                const bookingDate = new Date(booking.examDate);
+                return bookingDate.getHours() === hour;
+              });
 
               return (
                 <div
-                  key={index}
-                  className={cn(
-                    "min-h-[120px] p-2 border-r border-b last:border-r-0",
-                    !isCurrentMonth && "bg-gray-50",
-                    isToday && "bg-blue-50"
-                  )}
+                  key={`${day.toISOString()}-${hour}`}
+                  className="p-1 border-r border-b last:border-r-0 relative min-h-[60px]"
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span
-                      className={cn(
-                        "text-sm font-medium",
-                        !isCurrentMonth && "text-gray-400",
-                        isToday && "text-blue-600"
-                      )}
-                    >
-                      {format(day, "d")}
-                    </span>
-                    {dayBookings.length > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {dayBookings.length}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Booking Cards */}
-                  <div className="space-y-1">
-                    {dayBookings.slice(0, 2).map((booking) => (
-                      <Card
-                        key={booking.id}
-                        className={cn(
-                          "p-1 cursor-pointer hover:shadow-sm transition-shadow",
-                          getStatusColor(booking.status)
-                        )}
-                      >
-                        <Link href={`/bookings/${booking.id}`}>
-                          <div className="text-xs">
-                            <p className="font-medium truncate">
-                              {booking.patientFirstName} {booking.patientLastName[0]}.
-                            </p>
-                            <p className="text-gray-600">
-                              {booking.examDate && format(new Date(booking.examDate), "h:mm a")}
-                            </p>
-                          </div>
-                        </Link>
-                      </Card>
-                    ))}
-                    {dayBookings.length > 2 && (
-                      <p className="text-xs text-gray-500 text-center">
-                        +{dayBookings.length - 2} more
-                      </p>
-                    )}
-                  </div>
+                  {hourBookings.map((booking) => (
+                    <BookingItem
+                      key={booking.id}
+                      booking={booking}
+                      view="week"
+                      onClick={onBookingClick}
+                    />
+                  ))}
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {/* Week View - Simplified for now */}
-      {viewType === "week" && (
-        <div className="border rounded-lg p-4">
-          <p className="text-center text-gray-500">Week view coming soon...</p>
-        </div>
-      )}
-
-      {/* Day View - Simplified for now */}
-      {viewType === "day" && (
-        <div className="border rounded-lg p-4">
-          <p className="text-center text-gray-500">Day view coming soon...</p>
-        </div>
-      )}
+          </React.Fragment>
+        ))}
+      </div>
     </div>
   );
+}
+
+// Day View Component
+interface DayViewProps {
+  currentDate: Date;
+  bookingsByDate: Record<string, BookingWithSpecialist[]>;
+  onBookingClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
+}
+
+function DayView({ currentDate, bookingsByDate, onBookingClick }: DayViewProps) {
+  const dateKey = format(currentDate, "yyyy-MM-dd");
+  const dayBookings = bookingsByDate[dateKey] || [];
+  const businessHours = Array.from({ length: 11 }, (_, i) => i + 8); // 8am to 6pm
+
+  return (
+    <div className="overflow-hidden border rounded-lg">
+      {/* Day header */}
+      <div className="p-4 border-b bg-muted">
+        <h3 className="text-lg font-semibold">{format(currentDate, "EEEE, MMMM d, yyyy")}</h3>
+        <p className="text-sm text-muted-foreground">
+          {dayBookings.length} booking{dayBookings.length !== 1 ? "s" : ""} scheduled
+        </p>
+      </div>
+
+      {/* Hourly slots */}
+      <div className="max-h-[600px] overflow-y-auto">
+        {businessHours.map((hour) => {
+          const hourBookings = dayBookings.filter((booking) => {
+            if (!booking.examDate) return false;
+            const bookingDate = new Date(booking.examDate);
+            return bookingDate.getHours() === hour;
+          });
+
+          return (
+            <div key={hour} className="grid grid-cols-12 border-b last:border-b-0">
+              {/* Time label */}
+              <div className="col-span-2 p-3 text-sm border-r text-muted-foreground">
+                {format(setHours(new Date(), hour), "h:mm a")}
+              </div>
+
+              {/* Booking slot */}
+              <div className="col-span-10 p-2 min-h-[80px]">
+                {hourBookings.map((booking) => (
+                  <BookingItem
+                    key={booking.id}
+                    booking={booking}
+                    view="day"
+                    onClick={onBookingClick}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Agenda View Component
+interface AgendaViewProps {
+  currentDate: Date;
+  bookings: BookingWithSpecialist[];
+  onBookingClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
+}
+
+function AgendaView({ currentDate, bookings, onBookingClick }: AgendaViewProps) {
+  const agendaBookings = useMemo(() => {
+    const startDate = startOfDay(currentDate);
+    const endDate = addDays(startDate, 30);
+
+    return bookings
+      .filter((booking) => {
+        const bookingDate = booking.examDate ? new Date(booking.examDate) : null;
+        return bookingDate && bookingDate >= startDate && bookingDate <= endDate;
+      })
+      .sort((a, b) => {
+        const dateA = a.examDate ? new Date(a.examDate).getTime() : 0;
+        const dateB = b.examDate ? new Date(b.examDate).getTime() : 0;
+        return dateA - dateB;
+      });
+  }, [currentDate, bookings]);
+
+  // Group bookings by date for agenda view
+  const groupedBookings = useMemo(() => {
+    const grouped: Record<string, BookingWithSpecialist[]> = {};
+
+    agendaBookings.forEach((booking) => {
+      if (!booking.examDate) return;
+      const dateKey = format(new Date(booking.examDate), "yyyy-MM-dd");
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(booking);
+    });
+
+    return grouped;
+  }, [agendaBookings]);
+
+  if (agendaBookings.length === 0) {
+    return (
+      <div className="p-8 border rounded-lg">
+        <div className="flex flex-col items-center justify-center text-center">
+          <Calendar className="w-12 h-12 mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-medium">No bookings found</h3>
+          <p className="text-muted-foreground">
+            There are no bookings scheduled for the next 30 days.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden border rounded-lg">
+      <div className="p-4 border-b bg-muted">
+        <h3 className="text-lg font-semibold">Next 30 Days</h3>
+        <p className="text-sm text-muted-foreground">
+          {agendaBookings.length} booking{agendaBookings.length !== 1 ? "s" : ""} scheduled
+        </p>
+      </div>
+
+      <div className="divide-y">
+        {Object.entries(groupedBookings).map(([dateKey, dayBookings]) => {
+          const date = parseISO(dateKey);
+
+          return (
+            <div key={dateKey} className="p-4">
+              <h4 className="sticky top-0 mb-3 text-sm font-medium text-muted-foreground bg-background">
+                {format(date, "EEEE, MMMM d, yyyy")}
+              </h4>
+              <div className="space-y-2">
+                {dayBookings.map((booking) => (
+                  <BookingItem
+                    key={booking.id}
+                    booking={booking}
+                    view="agenda"
+                    onClick={onBookingClick}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Booking Item Component
+interface BookingItemProps {
+  booking: BookingWithSpecialist;
+  view: ViewType;
+  onClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
+}
+
+function BookingItem({ booking, view, onClick }: BookingItemProps) {
+  const appointmentDate = booking.examDate ? new Date(booking.examDate) : null;
+  const timeString = appointmentDate ? format(appointmentDate, "h:mm a") : "";
+
+  // For now, we'll use a default status since currentProgress isn't available
+  const statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+
+  if (view === "month") {
+    return (
+      <div
+        className={cn(
+          "p-1 rounded text-xs cursor-pointer hover:opacity-80 transition-opacity",
+          statusColor
+        )}
+        onClick={(e) => onClick(booking, e)}
+      >
+        <div className="font-medium truncate">
+          {timeString} - {booking.patientFirstName} {booking.patientLastName}
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "week") {
+    return (
+      <div
+        className={cn(
+          "p-1 rounded text-xs cursor-pointer hover:opacity-80 transition-opacity w-full",
+          statusColor
+        )}
+        onClick={(e) => onClick(booking, e)}
+      >
+        <div className="font-medium truncate">
+          {booking.patientFirstName} {booking.patientLastName}
+        </div>
+        <div className="text-xs opacity-75">{booking.specialist?.name || "Unassigned"}</div>
+      </div>
+    );
+  }
+
+  if (view === "day" || view === "agenda") {
+    return (
+      <div
+        className={cn("p-3 rounded-md cursor-pointer hover:shadow-md transition-all", statusColor)}
+        onClick={(e) => onClick(booking, e)}
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-medium">{timeString}</span>
+              <Badge variant="outline" className="text-xs">
+                {booking.examLocation || "In-Person"}
+              </Badge>
+            </div>
+            <div className="font-medium">
+              {booking.patientFirstName} {booking.patientLastName}
+            </div>
+            <div className="text-sm opacity-75">
+              with {booking.specialist?.name || "Unassigned"} (
+              {booking.specialist?.specialty || "N/A"})
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }

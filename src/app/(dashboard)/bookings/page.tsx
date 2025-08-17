@@ -4,24 +4,20 @@ import { useState, useEffect } from "react";
 import { useBookings } from "@/hooks/use-bookings";
 import { BookingList } from "@/components/bookings/booking-list";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
+import { BookingFilters, type FilterState } from "@/components/bookings/booking-filters";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Calendar, List, Plus, Search, Loader2 } from "lucide-react";
-import type { BookingFilters } from "@/types/booking";
+import { Calendar, List, Plus, Loader2 } from "lucide-react";
+import type { BookingFilters as BookingFiltersType } from "@/types/booking";
 import { startOfMonth, endOfMonth } from "date-fns";
+import { useSpecialists } from "@/hooks/use-specialists";
+import { useRouter } from "next/navigation";
 
 type ViewType = "calendar" | "list";
 
 export default function BookingsPage() {
+  const router = useRouter();
   const [view, setView] = useState<ViewType>("list");
-  const [filters, setFilters] = useState<BookingFilters>({
+  const [filters, setFilters] = useState<BookingFiltersType>({
     page: 1,
     limit: 20,
   });
@@ -42,47 +38,26 @@ export default function BookingsPage() {
 
   // Fetch bookings data
   const { data, isLoading, error } = useBookings(filters);
+  const { data: specialists } = useSpecialists();
 
-  const handleSearch = (searchTerm: string) => {
-    // This would typically update a search filter
-    // For now, we'll implement this when we have search support in the API
-    console.log("Search:", searchTerm);
-  };
+  const handleFiltersChange = (filterState: FilterState) => {
+    // Map filter state to booking filters
+    const newFilters: BookingFiltersType = {
+      ...filters,
+      search: filterState.search || undefined,
+      status: filterState.status || undefined,
+      specialistIds: filterState.specialistIds.length > 0 ? filterState.specialistIds : undefined,
+      page: 1, // Reset to first page when filters change
+    };
 
-  const handleStatusFilter = (status: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      status: status === "all" ? undefined : status,
-      page: 1, // Reset to first page when filtering
-    }));
-  };
-
-  const handleDateRangeFilter = (range: string) => {
-    const now = new Date();
-    let startDate: Date | undefined;
-    let endDate: Date | undefined;
-
-    switch (range) {
-      case "today":
-        startDate = new Date(now.setHours(0, 0, 0, 0));
-        endDate = new Date(now.setHours(23, 59, 59, 999));
-        break;
-      case "this-month":
-        startDate = startOfMonth(now);
-        endDate = endOfMonth(now);
-        break;
-      case "all":
-      default:
-        startDate = undefined;
-        endDate = undefined;
+    // For calendar view, adjust date range based on current view
+    if (view === "calendar") {
+      const now = new Date();
+      newFilters.startDate = startOfMonth(now);
+      newFilters.endDate = endOfMonth(now);
     }
 
-    setFilters((prev) => ({
-      ...prev,
-      startDate,
-      endDate,
-      page: 1,
-    }));
+    setFilters(newFilters);
   };
 
   if (error) {
@@ -105,70 +80,39 @@ export default function BookingsPage() {
             Manage patient appointments and referrals
           </p>
         </div>
-        <Button className="inline-flex items-center">
+        <Button className="inline-flex items-center" onClick={() => router.push("/bookings/new")}>
           <Plus className="w-4 h-4 mr-2" />
           New Booking
         </Button>
       </div>
 
       {/* Filters and View Toggle */}
-      <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-1 gap-4">
-          {/* Search */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute w-4 h-4 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
-            <Input
-              type="text"
-              placeholder="Search bookings..."
-              className="pl-10"
-              onChange={(e) => handleSearch(e.target.value)}
-            />
+      <div className="space-y-4 mb-6">
+        <div className="flex items-center justify-between">
+          <BookingFilters 
+            specialists={specialists || []} 
+            onFiltersChange={handleFiltersChange}
+          />
+          
+          {/* View Toggle */}
+          <div className="flex gap-2 ml-4">
+            <Button
+              variant={view === "list" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleViewChange("list")}
+            >
+              <List className="w-4 h-4 mr-2" />
+              List
+            </Button>
+            <Button
+              variant={view === "calendar" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleViewChange("calendar")}
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Calendar
+            </Button>
           </div>
-
-          {/* Status Filter */}
-          <Select onValueChange={handleStatusFilter} defaultValue="all">
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
-              <SelectItem value="archived">Archived</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Date Range Filter */}
-          <Select onValueChange={handleDateRangeFilter} defaultValue="all">
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Date range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Dates</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="this-month">This Month</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* View Toggle */}
-        <div className="flex gap-2">
-          <Button
-            variant={view === "list" ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleViewChange("list")}
-          >
-            <List className="w-4 h-4 mr-2" />
-            List
-          </Button>
-          <Button
-            variant={view === "calendar" ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleViewChange("calendar")}
-          >
-            <Calendar className="w-4 h-4 mr-2" />
-            Calendar
-          </Button>
         </div>
       </div>
 

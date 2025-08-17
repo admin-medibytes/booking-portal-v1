@@ -29,8 +29,10 @@ export interface BookingFilters {
   startDate?: Date;
   endDate?: Date;
   specialistId?: string;
+  specialistIds?: string[];
   organizationId?: string;
   referrerId?: string;
+  search?: string;
   page?: number;
   limit?: number;
 }
