@@ -90,8 +90,10 @@ export const generateTestSpecialist = (
 ) => ({
   id: crypto.randomUUID(),
   userId,
-  acuityCalendarId: Math.floor(Math.random() * 100000),
-  specialty: "cardiology" as const,
+  name: "Dr. Test Specialist",
+  acuityCalendarId: String(Math.floor(Math.random() * 100000)),
+  specialty: "cardiology",
+  location: null,
   isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),

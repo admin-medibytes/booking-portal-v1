@@ -93,10 +93,14 @@ describe("Schema Validation and Constraints", () => {
       await db.insert(schema.users).values([user1, user2]);
 
       const calendarId = 12345;
-      const specialist1 = generateTestSpecialist(user1.id, { acuityCalendarId: calendarId });
+      const specialist1 = generateTestSpecialist(user1.id, {
+        acuityCalendarId: calendarId.toString(),
+      });
       await db.insert(schema.specialists).values(specialist1);
 
-      const specialist2 = generateTestSpecialist(user2.id, { acuityCalendarId: calendarId });
+      const specialist2 = generateTestSpecialist(user2.id, {
+        acuityCalendarId: calendarId.toString(),
+      });
 
       // Check for unique constraint violation
       // Error might be wrapped by drizzle-orm
@@ -177,8 +181,8 @@ describe("Schema Validation and Constraints", () => {
           sql`
             INSERT INTO bookings (id, organization_id, referrer_id, status, patient_first_name, patient_last_name, patient_date_of_birth, patient_phone, examination_type, exam_location)
             VALUES (${bookingId}, ${org.id}, ${user.id}, 'invalid_status', ${encrypt(
-            "John"
-          )}, ${encrypt("Doe")}, '1990-01-01', ${encrypt("+1234567890")}, 'General', 'Hospital')
+              "John"
+            )}, ${encrypt("Doe")}, '1990-01-01', ${encrypt("+1234567890")}, 'General', 'Hospital')
           `
         );
         expect.fail("Expected query to fail with enum constraint violation");
@@ -263,8 +267,9 @@ describe("Schema Validation and Constraints", () => {
 
       const specialist = {
         userId: user.id,
-        acuityCalendarId: 12345,
-        specialty: "cardiology" as const,
+        name: "Dr. Test",
+        acuityCalendarId: "12345",
+        specialty: "cardiology",
       };
 
       await db.insert(schema.specialists).values(specialist);

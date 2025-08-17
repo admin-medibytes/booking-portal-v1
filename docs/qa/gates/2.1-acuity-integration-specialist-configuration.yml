@@ -1,0 +1,92 @@
+# Required fields (keep these first)
+schema: 1
+story: "2.1"
+story_title: "Acuity Integration & Specialist Configuration"
+gate: "FAIL"
+status_reason: "No test coverage (0%) and critical security vulnerability (webhook rate limiting missing) prevent production deployment"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-08-17T20:45:00Z"
+
+# Always present but only active when WAIVED
+waiver: { active: false }
+
+# Issues - Use fixed severity: low | medium | high
+top_issues:
+  - id: "TEST-001"
+    severity: high
+    finding: "No tests implemented (0% coverage) despite complete functionality"
+    suggested_action: "Implement all planned unit and integration tests before deployment"
+    suggested_owner: dev
+  - id: "SEC-001"
+    severity: high  
+    finding: "Webhook endpoint lacks rate limiting - DoS vulnerability"
+    suggested_action: "Add rate limiting middleware to /webhooks/acuity endpoint"
+    suggested_owner: dev
+  - id: "TECH-001"
+    severity: medium
+    finding: "Circuit breaker pattern not implemented for API resilience"
+    suggested_action: "Implement circuit breaker to handle Acuity API failures gracefully"
+    suggested_owner: dev
+
+# Risk summary (from risk-profile task)
+risk_summary:
+  totals:
+    critical: 2 # score 9
+    high: 3 # score 6
+    medium: 3 # score 4
+    low: 2 # score 2-3
+  highest:
+    id: SEC-001
+    score: 9
+    title: 'Webhook signature validation bypass'
+  recommendations:
+    must_fix:
+      - 'Implement HMAC-SHA256 webhook signature validation'
+      - 'Add authorization checks on all API endpoints handling PHI'
+      - 'Implement proper Acuity API error handling'
+    monitor:
+      - 'API rate limit usage (alert at 80%)'
+      - 'Webhook processing success rates'
+      - 'Failed authorization attempts'
+
+# Extended fields
+quality_score: 20  # 100 - (20*2 high issues) - (10*4 CONCERNS) = 20
+expires: "2025-08-31T00:00:00Z"
+
+evidence:
+  tests_reviewed: 0  # No tests exist
+  risks_identified: 11
+  trace:
+    ac_covered: []  # No ACs have test coverage
+    ac_gaps: [1, 2, 3, 4, 5, 6, 7]  # All ACs lack test coverage
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: CONCERNS
+    notes: 'Missing rate limiting on webhook endpoint'
+  performance:
+    status: PASS
+    notes: 'Caching and rate limits properly implemented'
+  reliability:
+    status: PASS
+    notes: 'Error handling and circuit breaker pattern in place'
+  maintainability:
+    status: CONCERNS
+    notes: 'Test coverage at 0%, target is 80%'
+
+recommendations:
+  immediate:  # Must fix before production
+    - action: "Implement unit tests for acuity.service.ts"
+      refs: ["src/server/services/acuity.service.ts"]
+    - action: "Add integration tests for webhook security"
+      refs: ["src/server/routes/webhooks.routes.ts"]
+    - action: "Add rate limiting to webhook endpoint"
+      refs: ["src/server/routes/webhooks.routes.ts:27"]
+    - action: "Implement circuit breaker pattern"
+      refs: ["src/server/services/acuity.service.ts:157-261"]
+  future:  # Can be addressed later
+    - action: "Add distributed locking for cache refresh"
+      refs: ["src/lib/redis.ts:96-134"]
+    - action: "Create API documentation"
+      refs: ["src/server/routes/specialists.routes.ts"]

@@ -161,6 +161,86 @@ export class BookingService {
           : null,
     };
   }
+
+  // Find booking by Acuity appointment ID
+  async findByAcuityAppointmentId(acuityAppointmentId: string) {
+    const result = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.acuityAppointmentId, parseInt(acuityAppointmentId, 10)))
+      .limit(1);
+
+    return result[0] || null;
+  }
+
+  // Update booking status
+  async updateBookingStatus(bookingId: string, status: "active" | "closed" | "archived") {
+    const [updated] = await db
+      .update(bookings)
+      .set({
+        status,
+        updatedAt: new Date(),
+        ...(status === "closed" ? { completedAt: new Date() } : {}),
+        ...(status === "archived" ? { cancelledAt: new Date() } : {}),
+      })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+
+    return updated;
+  }
+
+  // Update booking exam date
+  async updateBookingExamDate(bookingId: string, examDate: Date) {
+    const [updated] = await db
+      .update(bookings)
+      .set({
+        examDate,
+        updatedAt: new Date(),
+      })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+
+    return updated;
+  }
+
+  // Sync booking with Acuity appointment
+  async syncWithAcuityAppointment(bookingId: string, acuityAppointment: {
+    datetime: string;
+    appointmentTypeID: number;
+    duration: string;
+    price: string;
+  }) {
+    const [updated] = await db
+      .update(bookings)
+      .set({
+        examDate: new Date(acuityAppointment.datetime),
+        updatedAt: new Date(),
+        metadata: {
+          ...(await this.getBookingMetadata(bookingId)),
+          lastAcuitySync: new Date().toISOString(),
+          acuityData: {
+            appointmentTypeId: acuityAppointment.appointmentTypeID,
+            duration: acuityAppointment.duration,
+            price: acuityAppointment.price,
+          },
+        },
+      })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+
+    return updated;
+  }
+
+  // Helper to get existing metadata
+  private async getBookingMetadata(bookingId: string): Promise<Record<string, unknown>> {
+    const [booking] = await db
+      .select({ metadata: bookings.metadata })
+      .from(bookings)
+      .where(eq(bookings.id, bookingId))
+      .limit(1);
+
+    return (booking?.metadata as Record<string, unknown>) || {};
+  }
 }
 
 export const bookingService = new BookingService();
