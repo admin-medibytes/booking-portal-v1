@@ -1,9 +1,11 @@
 import { bookingRepository } from "@/server/repositories/booking.repository";
 import { db } from "@/server/db";
 import { specialists, members, teamMembers, bookings, users } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { User } from "@/types/user";
 import type { BookingWithSpecialist, BookingFilters } from "@/types/booking";
+import { acuityService } from "@/server/services/acuity.service";
+import DOMPurify from "isomorphic-dompurify";
 
 // BookingFilters is imported from types/booking.ts
 
@@ -240,6 +242,141 @@ export class BookingService {
       .limit(1);
 
     return (booking?.metadata as Record<string, unknown>) || {};
+  }
+
+  // Create a new booking
+  async createBooking(data: {
+    specialistId: string;
+    appointmentDateTime: Date;
+    examineeName: string;
+    examineePhone: string;
+    examineeEmail?: string | null;
+    appointmentType: "in_person" | "telehealth";
+    notes?: string | null;
+    referrerId: string;
+  }) {
+    // Sanitize all string inputs
+    const sanitizedData = {
+      ...data,
+      examineeName: DOMPurify.sanitize(data.examineeName),
+      examineePhone: DOMPurify.sanitize(data.examineePhone),
+      examineeEmail: data.examineeEmail ? DOMPurify.sanitize(data.examineeEmail) : null,
+      notes: data.notes ? DOMPurify.sanitize(data.notes) : null,
+    };
+
+    // Validate specialist exists
+    const [specialist] = await db
+      .select()
+      .from(specialists)
+      .where(and(
+        eq(specialists.id, sanitizedData.specialistId),
+        eq(specialists.isActive, true)
+      ))
+      .limit(1);
+
+    if (!specialist) {
+      throw new Error("Specialist not found or inactive");
+    }
+
+    // Begin transaction
+    const booking = await db.transaction(async (tx) => {
+      // Re-check availability with database lock
+      const isAvailable = await this.checkTimeSlotAvailability(
+        sanitizedData.specialistId,
+        sanitizedData.appointmentDateTime,
+        tx
+      );
+
+      if (!isAvailable) {
+        throw new Error("Time slot not available");
+      }
+
+      // Get user's organization ID through members table
+      const [member] = await tx
+        .select()
+        .from(members)
+        .where(eq(members.userId, sanitizedData.referrerId))
+        .limit(1);
+      
+      if (!member?.organizationId) {
+        throw new Error("User organization not found");
+      }
+
+      // Create booking in database
+      const [newBooking] = await tx
+        .insert(bookings)
+        .values({
+          organizationId: member.organizationId,
+          specialistId: sanitizedData.specialistId,
+          referrerId: sanitizedData.referrerId,
+          examDate: sanitizedData.appointmentDateTime,
+          patientFirstName: sanitizedData.examineeName.split(" ")[0] || "",
+          patientLastName: sanitizedData.examineeName.split(" ").slice(1).join(" ") || "",
+          patientDateOfBirth: new Date("1970-01-01"), // Placeholder - should be collected in form
+          patientPhone: sanitizedData.examineePhone,
+          patientEmail: sanitizedData.examineeEmail,
+          examinationType: "Independent Medical Examination",
+          examLocation: sanitizedData.appointmentType,
+          status: "active",
+          metadata: {
+            notes: sanitizedData.notes,
+            createdVia: "portal",
+            appointmentType: sanitizedData.appointmentType,
+          },
+        })
+        .returning();
+
+      // Create Acuity appointment
+      try {
+        const acuityAppointment = await acuityService.createAppointment({
+          datetime: sanitizedData.appointmentDateTime.toISOString(),
+          appointmentTypeID: 1, // TODO: Get from specialist configuration
+          calendarID: parseInt(specialist.acuityCalendarId, 10),
+          firstName: sanitizedData.examineeName.split(" ")[0] || "",
+          lastName: sanitizedData.examineeName.split(" ").slice(1).join(" ") || "",
+          phone: sanitizedData.examineePhone,
+          email: sanitizedData.examineeEmail || "",
+          notes: sanitizedData.notes || "",
+        });
+
+        // Update booking with Acuity ID
+        const [updatedBooking] = await tx
+          .update(bookings)
+          .set({
+            acuityAppointmentId: acuityAppointment.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(bookings.id, newBooking.id))
+          .returning();
+
+        return updatedBooking;
+      } catch (error) {
+        console.error("Failed to create Acuity appointment:", error);
+        throw new Error("Failed to sync with scheduling system");
+      }
+    });
+
+    return booking;
+  }
+
+  // Check if a time slot is available
+  private async checkTimeSlotAvailability(
+    specialistId: string,
+    dateTime: Date,
+    tx: Parameters<Parameters<typeof db.transaction>[0]>[0]
+  ): Promise<boolean> {
+    // Check for existing bookings at the same time
+    const existingBookings = await tx
+      .select()
+      .from(bookings)
+      .where(and(
+        eq(bookings.specialistId, specialistId),
+        eq(bookings.examDate, dateTime),
+        eq(bookings.status, "active")
+      ))
+      .limit(1);
+
+    return existingBookings.length === 0;
   }
 }
 

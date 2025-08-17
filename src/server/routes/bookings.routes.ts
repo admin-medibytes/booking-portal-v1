@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { bookingService } from "@/server/services/booking.service";
 import { authMiddleware, requireAuth } from "@/server/middleware/auth.middleware";
+import { bookingCreateRateLimit } from "@/server/middleware/rate-limit.middleware";
 import type { BookingFilters } from "@/types/booking";
 import { type } from "arktype";
 
@@ -18,6 +19,17 @@ const bookingFiltersSchema = type({
   "specialistId?": "string.uuid",
   "page?": "string.integer",
   "limit?": "string.integer<=100",
+});
+
+// Validation schema for creating a booking
+const createBookingSchema = type({
+  specialistId: "string.uuid",
+  appointmentDateTime: "string.date",
+  examineeName: "string>0",
+  examineePhone: "string>0",
+  "examineeEmail?": "string.email|null",
+  appointmentType: "'in_person'|'telehealth'",
+  "notes?": "string|null",
 });
 
 // GET /api/bookings - List bookings with role-based filtering
@@ -122,6 +134,67 @@ bookingsRoutes.get("/:id", async (c) => {
     return c.json(
       {
         error: "Failed to fetch booking",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      500
+    );
+  }
+});
+
+// POST /api/bookings - Create a new booking
+bookingsRoutes.post("/", bookingCreateRateLimit, async (c) => {
+  try {
+    const authContext = c.get("auth");
+    const user = authContext?.user;
+    if (!user) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    // Get request body
+    const body = await c.req.json();
+
+    // Validate request body
+    const validationResult = createBookingSchema(body);
+    if (validationResult instanceof type.errors) {
+      return c.json(
+        {
+          error: "Invalid request body",
+          details: validationResult[0].message,
+        },
+        400
+      );
+    }
+
+    // Create booking
+    const booking = await bookingService.createBooking({
+      ...validationResult,
+      appointmentDateTime: new Date(validationResult.appointmentDateTime),
+      referrerId: user.id,
+    });
+
+    return c.json({
+      success: true,
+      id: booking.id,
+      message: "Booking created successfully",
+    }, 201);
+  } catch (error) {
+    console.error("Error creating booking:", error);
+
+    if (error instanceof Error) {
+      if (error.message.includes("Specialist not found")) {
+        return c.json({ error: "Specialist not found" }, 404);
+      }
+      if (error.message.includes("Time slot not available")) {
+        return c.json({ error: "Time slot is no longer available" }, 409);
+      }
+      if (error.message.includes("Acuity")) {
+        return c.json({ error: "Failed to sync with scheduling system" }, 503);
+      }
+    }
+
+    return c.json(
+      {
+        error: "Failed to create booking",
         message: error instanceof Error ? error.message : "Unknown error",
       },
       500
