@@ -12,6 +12,11 @@ export enum ErrorCode {
   INVALID_INPUT = 'INVALID_INPUT',
   MISSING_REQUIRED_FIELD = 'MISSING_REQUIRED_FIELD',
   
+  // Authentication & Authorization errors
+  AUTHENTICATION_REQUIRED = 'AUTHENTICATION_REQUIRED',
+  INSUFFICIENT_PERMISSIONS = 'INSUFFICIENT_PERMISSIONS',
+  ACCOUNT_BANNED = 'ACCOUNT_BANNED',
+  
   // Business logic errors
   ENTITY_NOT_FOUND = 'ENTITY_NOT_FOUND',
   UNAUTHORIZED_ACCESS = 'UNAUTHORIZED_ACCESS',
@@ -166,9 +171,23 @@ export class NotFoundError extends AppError {
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message: string = 'Unauthorized access') {
-    super(ErrorCode.UNAUTHORIZED_ACCESS, message, 401);
+  constructor(message: string = 'Unauthorized') {
+    super(ErrorCode.AUTHENTICATION_REQUIRED, message, 401);
     this.name = 'UnauthorizedError';
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message: string = 'Forbidden') {
+    super(ErrorCode.INSUFFICIENT_PERMISSIONS, message, 403);
+    this.name = 'ForbiddenError';
+  }
+}
+
+export class BannedError extends AppError {
+  constructor(message: string = 'You have been banned from this application') {
+    super(ErrorCode.ACCOUNT_BANNED, message, 403);
+    this.name = 'BannedError';
   }
 }
 

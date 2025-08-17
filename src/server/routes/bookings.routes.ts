@@ -34,7 +34,8 @@ const createBookingSchema = type({
 
 // Validation schema for updating progress
 const updateProgressSchema = type({
-  progress: "'scheduled'|'rescheduled'|'cancelled'|'no-show'|'generating-report'|'report-generated'|'payment-received'",
+  progress:
+    "'scheduled'|'rescheduled'|'cancelled'|'no-show'|'generating-report'|'report-generated'|'payment-received'",
   "notes?": "string|null",
 });
 
@@ -178,11 +179,14 @@ bookingsRoutes.post("/", bookingCreateRateLimit, async (c) => {
       referrerId: user.id,
     });
 
-    return c.json({
-      success: true,
-      id: booking.id,
-      message: "Booking created successfully",
-    }, 201);
+    return c.json(
+      {
+        success: true,
+        id: booking.id,
+        message: "Booking created successfully",
+      },
+      201
+    );
   } catch (error) {
     console.error("Error creating booking:", error);
 
@@ -240,7 +244,10 @@ bookingsRoutes.post("/:id/progress", async (c) => {
 
     // Get user's organization role if any
     const organizationRole = authContext.session?.activeOrganizationId
-      ? await bookingService.getUserOrganizationRole(user.id, authContext.session.activeOrganizationId)
+      ? await bookingService.getUserOrganizationRole(
+          user.id,
+          authContext.session.activeOrganizationId
+        )
       : undefined;
 
     // Update booking progress

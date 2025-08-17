@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
-import { HTTPException } from "hono/http-exception";
 import { type, type Type } from "arktype";
+import { ValidationError } from "@/server/utils/errors";
 
 declare module "hono" {
   interface ContextVariableMap {
@@ -31,26 +31,21 @@ export const validateMiddleware = <T>(
       const result = schema(data);
 
       if (result instanceof type.errors) {
-        throw new HTTPException(400, {
-          message: "Validation failed",
-          cause: {
-            errors: result.map((error) => ({
-              path: error.path,
-              message: error.message,
-            })),
-          },
-        });
+        const firstError = result[0];
+        throw new ValidationError(
+          `Validation failed: ${firstError.message}`,
+          firstError.path.join('.'),
+          data
+        );
       }
 
       c.set("validatedData", result);
       await next();
     } catch (error) {
-      if (error instanceof HTTPException) {
+      if (error instanceof ValidationError) {
         throw error;
       }
 
-      throw new HTTPException(400, {
-        message: "Invalid request data",
-      });
+      throw new ValidationError("Invalid request data");
     }
   });

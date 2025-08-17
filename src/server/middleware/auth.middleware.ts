@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
-import { HTTPException } from "hono/http-exception";
 import { auth } from "@/lib/auth";
 import type { Session } from "@/lib/auth";
+import { UnauthorizedError, ForbiddenError, BannedError } from "@/server/utils/errors";
 
 // Extend the Hono Context with auth types
 declare module "hono" {
@@ -47,9 +47,9 @@ export const authMiddleware = createMiddleware(async (c, next) => {
  */
 export const requireAuth = createMiddleware(async (c, next) => {
   const authContext = c.get("auth");
-  
+
   if (!authContext?.user) {
-    throw new HTTPException(401, { message: "Unauthorized" });
+    throw new UnauthorizedError();
   }
 
   await next();
@@ -64,13 +64,13 @@ export const requireRole = (role: string) =>
     const authContext = c.get("auth");
 
     if (!authContext?.user) {
-      throw new HTTPException(401, { message: "Unauthorized" });
+      throw new UnauthorizedError();
     }
 
     const userRoles = authContext.user.role?.split(",").map((r) => r.trim()) || [];
-    
+
     if (!userRoles.includes(role)) {
-      throw new HTTPException(403, { message: "Forbidden: Insufficient permissions" });
+      throw new ForbiddenError("Forbidden: Insufficient permissions");
     }
 
     await next();
@@ -90,7 +90,7 @@ export const requireOrgPermission = (permissions: Record<string, string[]>) =>
     const authContext = c.get("auth");
 
     if (!authContext?.user) {
-      throw new HTTPException(401, { message: "Unauthorized" });
+      throw new UnauthorizedError();
     }
 
     // Check if user has required permissions in their active organization
@@ -102,9 +102,7 @@ export const requireOrgPermission = (permissions: Record<string, string[]>) =>
     });
 
     if (!hasPermission) {
-      throw new HTTPException(403, { 
-        message: "Forbidden: Insufficient organization permissions" 
-      });
+      throw new ForbiddenError("Forbidden: Insufficient organization permissions");
     }
 
     await next();
@@ -118,7 +116,7 @@ export const checkBanned = createMiddleware(async (c, next) => {
 
   if (authContext?.user?.banned) {
     const banReason = authContext.user.banReason || "You have been banned from this application";
-    throw new HTTPException(403, { message: banReason });
+    throw new BannedError(banReason);
   }
 
   await next();
