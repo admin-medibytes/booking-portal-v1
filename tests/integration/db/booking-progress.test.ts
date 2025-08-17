@@ -36,7 +36,7 @@ describe('Booking Progress Tracking', () => {
       await db.insert(schema.bookingProgress).values({
         bookingId: booking.id,
         fromStatus: null,
-        toStatus: 'scheduling',
+        toStatus: 'scheduled',
         changedBy: user.id,
         reason: 'Booking created',
         metadata: { source: 'web_portal' },
@@ -46,7 +46,7 @@ describe('Booking Progress Tracking', () => {
       await db.transaction(async (tx) => {
         await tx.update(schema.bookings)
           .set({ 
-            status: 'scheduled',
+            status: 'active',
             scheduledAt: new Date(),
             examDate: new Date(Date.now() + 86400000),
           })
@@ -54,7 +54,7 @@ describe('Booking Progress Tracking', () => {
 
         await tx.insert(schema.bookingProgress).values({
           bookingId: booking.id,
-          fromStatus: 'scheduling',
+          fromStatus: 'scheduled',
           toStatus: 'scheduled',
           changedBy: user.id,
           reason: 'Appointment scheduled',
@@ -74,11 +74,11 @@ describe('Booking Progress Tracking', () => {
       expect(progress).toHaveLength(2);
       expect(progress[1]).toMatchObject({
         fromStatus: null,
-        toStatus: 'scheduling',
+        toStatus: 'scheduled',
         reason: 'Booking created',
       });
       expect(progress[0]).toMatchObject({
-        fromStatus: 'scheduling',
+        fromStatus: 'scheduled',
         toStatus: 'scheduled',
         reason: 'Appointment scheduled',
       });
@@ -92,7 +92,7 @@ describe('Booking Progress Tracking', () => {
       await db.insert(schema.organizations).values(org);
 
       const booking = generateTestBooking(org.id, user.id, null, {
-        status: 'scheduled',
+        status: 'active',
         scheduledAt: new Date(),
       });
       await db.insert(schema.bookings).values(booking);
@@ -101,7 +101,7 @@ describe('Booking Progress Tracking', () => {
       await db.transaction(async (tx) => {
         await tx.update(schema.bookings)
           .set({ 
-            status: 'cancelled',
+            status: 'closed',
             cancelledAt: new Date(),
           })
           .where(eq(schema.bookings.id, booking.id));
@@ -128,7 +128,7 @@ describe('Booking Progress Tracking', () => {
         },
       });
 
-      expect(booking_result?.status).toBe('cancelled');
+      expect(booking_result?.status).toBe('closed');
       expect(booking_result?.cancelledAt).toBeInstanceOf(Date);
       expect(booking_result?.progress[0]).toMatchObject({
         toStatus: 'cancelled',
@@ -148,7 +148,7 @@ describe('Booking Progress Tracking', () => {
 
       const examDate = new Date(Date.now() - 86400000); // Yesterday
       const booking = generateTestBooking(org.id, user.id, specialist.id, {
-        status: 'scheduled',
+        status: 'active',
         scheduledAt: new Date(Date.now() - 172800000), // 2 days ago
         examDate,
       });
@@ -157,13 +157,13 @@ describe('Booking Progress Tracking', () => {
       // Mark as no-show
       await db.transaction(async (tx) => {
         await tx.update(schema.bookings)
-          .set({ status: 'no_show' })
+          .set({ status: 'closed' })
           .where(eq(schema.bookings.id, booking.id));
 
         await tx.insert(schema.bookingProgress).values({
           bookingId: booking.id,
           fromStatus: 'scheduled',
-          toStatus: 'no_show',
+          toStatus: 'no-show',
           changedBy: adminUser.id,
           reason: 'Patient did not attend appointment',
           metadata: { 
@@ -177,7 +177,7 @@ describe('Booking Progress Tracking', () => {
       const progress = await db.query.bookingProgress.findFirst({
         where: and(
           eq(schema.bookingProgress.bookingId, booking.id),
-          eq(schema.bookingProgress.toStatus, 'no_show')
+          eq(schema.bookingProgress.toStatus, 'no-show')
         ),
       });
 
@@ -196,7 +196,7 @@ describe('Booking Progress Tracking', () => {
       await db.insert(schema.specialists).values(specialist);
 
       const booking = generateTestBooking(org.id, user.id, specialist.id, {
-        status: 'scheduled',
+        status: 'active',
         scheduledAt: new Date(Date.now() - 86400000),
         examDate: new Date(),
       });
@@ -206,7 +206,7 @@ describe('Booking Progress Tracking', () => {
       await db.transaction(async (tx) => {
         await tx.update(schema.bookings)
           .set({ 
-            status: 'completed',
+            status: 'closed',
             completedAt: new Date(),
           })
           .where(eq(schema.bookings.id, booking.id));
@@ -214,7 +214,7 @@ describe('Booking Progress Tracking', () => {
         await tx.insert(schema.bookingProgress).values({
           bookingId: booking.id,
           fromStatus: 'scheduled',
-          toStatus: 'completed',
+          toStatus: 'report-generated',
           changedBy: specialist.userId,
           reason: 'Examination completed successfully',
           metadata: { 
@@ -229,12 +229,12 @@ describe('Booking Progress Tracking', () => {
         where: eq(schema.bookings.id, booking.id),
         with: {
           progress: {
-            where: eq(schema.bookingProgress.toStatus, 'completed'),
+            where: eq(schema.bookingProgress.toStatus, 'report-generated'),
           },
         },
       });
 
-      expect(completedBooking?.status).toBe('completed');
+      expect(completedBooking?.status).toBe('closed');
       expect(completedBooking?.completedAt).toBeInstanceOf(Date);
       expect(completedBooking?.progress[0]?.metadata).toHaveProperty('reportGenerated', true);
     });
@@ -273,7 +273,7 @@ describe('Booking Progress Tracking', () => {
       await db.insert(schema.bookingProgress).values({
         bookingId: booking.id,
         fromStatus: 'scheduled',
-        toStatus: 'scheduled',
+        toStatus: 'rescheduled',
         changedBy: user.id,
         reason: 'Appointment rescheduled',
         metadata: complexMetadata,

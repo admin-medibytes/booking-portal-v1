@@ -1,5 +1,5 @@
 import { db } from "./index";
-import { users, organizations, members } from "./schema";
+import { organizations, members } from "./schema";
 import { auth } from "@/lib/auth";
 import crypto from "crypto";
 
@@ -34,7 +34,7 @@ async function seed() {
 
     if (result?.user) {
       console.log("✅ Created admin user:", result.user.email);
-      
+
       // Add user to organization as owner
       await db.insert(members).values({
         id: crypto.randomUUID(),
@@ -45,7 +45,7 @@ async function seed() {
       });
 
       console.log("✅ Added admin to organization as owner");
-      
+
       console.log("\n🎉 Seed completed successfully!");
       console.log("\n📧 Login credentials:");
       console.log("   Email: admin@medibytes.com");

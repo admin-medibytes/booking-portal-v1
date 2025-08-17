@@ -108,7 +108,7 @@ export const generateTestBooking = (
   organizationId,
   referrerId,
   specialistId,
-  status: "scheduling" as const,
+  status: "active" as const,
   patientFirstName: "John",
   patientLastName: "Doe",
   patientDateOfBirth: new Date("1990-01-01"),

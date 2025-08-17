@@ -11,13 +11,13 @@ export const metadata: Metadata = {
 };
 
 interface AcceptInvitationPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function AcceptInvitationPage({ params }: AcceptInvitationPageProps) {
-  const invitationId = params.id;
+  const { id: invitationId } = await params;
 
   // Fetch invitation details
   const invitation = await db

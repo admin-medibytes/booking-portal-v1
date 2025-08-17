@@ -36,7 +36,7 @@ describe("Schema Validation and Constraints", () => {
         organizationId: "non-existent-org-id",
         referrerId: user.id,
         specialistId: null,
-        status: "scheduling" as const,
+        status: "active" as const,
         patientFirstName: "John",
         patientLastName: "Doe",
         patientDateOfBirth: new Date("1990-01-01"),
@@ -151,7 +151,7 @@ describe("Schema Validation and Constraints", () => {
       await db.insert(schema.users).values(user);
       await db.insert(schema.organizations).values(org);
 
-      const validStatuses = ["scheduling", "scheduled", "completed", "no_show", "cancelled"];
+      const validStatuses = ["active", "closed", "archived"];
 
       for (const status of validStatuses) {
         const booking = generateTestBooking(org.id, user.id, null, {
@@ -252,7 +252,7 @@ describe("Schema Validation and Constraints", () => {
 
       expect(retrieved).toBeDefined();
       expect(retrieved?.id).toBeDefined();
-      expect(retrieved?.status).toBe("scheduling");
+      expect(retrieved?.status).toBe("active");
       expect(retrieved?.createdAt).toBeInstanceOf(Date);
       expect(retrieved?.updatedAt).toBeInstanceOf(Date);
     });
@@ -295,7 +295,7 @@ describe("Schema Validation and Constraints", () => {
       await db
         .update(schema.bookings)
         .set({
-          status: "scheduled",
+          status: "active",
           scheduledAt,
           examDate: new Date(Date.now() + 86400000), // Tomorrow
         })
@@ -306,7 +306,7 @@ describe("Schema Validation and Constraints", () => {
       await db
         .update(schema.bookings)
         .set({
-          status: "completed",
+          status: "closed",
           completedAt,
         })
         .where(eq(schema.bookings.id, booking.id));
