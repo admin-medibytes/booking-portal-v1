@@ -161,15 +161,35 @@ export async function getPresignedUrl(key: string, expiresIn = 300): Promise<str
   }
 }
 
-export async function downloadObject(key: string): Promise<ReadableStream | null> {
+export async function downloadObject(
+  key: string,
+  range?: { start: number; end: number }
+): Promise<{
+  stream: ReadableStream | null;
+  contentLength?: number;
+  contentRange?: string;
+  acceptRanges?: string;
+}> {
   const params: GetObjectCommandInput = {
     Bucket: BUCKET_NAME,
     Key: key,
   };
 
+  // Add range header if provided
+  if (range) {
+    params.Range = `bytes=${range.start}-${range.end}`;
+  }
+
   try {
     const response = await s3Client.send(new GetObjectCommand(params));
-    return response.Body?.transformToWebStream() || null;
+    const stream = response.Body?.transformToWebStream() || null;
+    
+    return {
+      stream,
+      contentLength: response.ContentLength,
+      contentRange: response.ContentRange,
+      acceptRanges: response.AcceptRanges,
+    };
   } catch (error) {
     console.error("Error downloading from S3:", error);
     throw new Error("Failed to download document");

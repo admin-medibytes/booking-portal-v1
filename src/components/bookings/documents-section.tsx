@@ -9,9 +9,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { FileText, Upload, FileArchive, FileSpreadsheet, HeadphonesIcon, FileIcon } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { FileText, Upload, FileArchive, FileSpreadsheet, HeadphonesIcon, FileIcon, Download, Loader2 } from "lucide-react";
 import { DocumentUpload } from "@/components/documents/document-upload";
 import { useDocuments } from "@/hooks/use-documents";
+import { useDownloadDocument } from "@/hooks/use-download-document";
 import { cn } from "@/lib/utils";
 import type { Document, DocumentCategory } from "@/types/document";
 
@@ -84,12 +86,17 @@ function groupDocumentsByCategory(documents: Document[]) {
 export function DocumentsSection({ bookingId }: DocumentsSectionProps) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const { data: documents = [], isLoading, refetch } = useDocuments(bookingId);
+  const { downloadDocument, isDownloading, getProgress } = useDownloadDocument();
 
   const documentCount = documents.length;
   const groupedDocuments = groupDocumentsByCategory(documents);
 
   const handleUploadComplete = () => {
     refetch();
+  };
+
+  const handleDownload = (doc: Document) => {
+    downloadDocument(doc.id, doc.fileName);
   };
 
   if (isLoading) {
@@ -171,30 +178,47 @@ export function DocumentsSection({ bookingId }: DocumentsSectionProps) {
                 <div className="space-y-2">
                   {categoryDocs.map((doc) => {
                     const { icon: DocIcon, color } = getDocumentIcon(doc);
+                    const downloading = isDownloading(doc.id);
+                    const progress = getProgress(doc.id);
+                    
                     return (
                       <div
                         key={doc.id}
                         className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <DocIcon className={cn("w-5 h-5 flex-shrink-0", color)} />
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium truncate">{doc.fileName}</p>
                             <p className="text-xs text-gray-500">
                               {formatBytes(doc.fileSize)} • Uploaded {new Date(doc.createdAt).toLocaleDateString()}
                             </p>
+                            {downloading && (
+                              <div className="mt-2 space-y-1">
+                                <Progress value={progress} className="h-1" />
+                                <p className="text-xs text-gray-500">{progress}% downloaded</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="flex-shrink-0"
-                          onClick={() => {
-                            // Download functionality will be implemented in a future story
-                            window.open(`/api/documents/${doc.id}`, "_blank");
-                          }}
+                          className="flex-shrink-0 ml-2"
+                          onClick={() => handleDownload(doc)}
+                          disabled={downloading}
                         >
-                          Download
+                          {downloading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Downloading
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-2" />
+                              Download
+                            </>
+                          )}
                         </Button>
                       </div>
                     );

@@ -1,17 +1,30 @@
 import { Hono } from "hono";
 import { type } from "arktype";
 import { documentService } from "@/server/services/document.service";
-import { authMiddleware, requireAuth } from "@/server/middleware/auth.middleware";
+import { authMiddleware, requireAuth, checkImpersonation } from "@/server/middleware/auth.middleware";
 import { validateMiddleware } from "@/server/middleware/validate.middleware";
-import { documentUploadRateLimit } from "@/server/middleware/rate-limit.middleware";
+import { documentUploadRateLimit, createRateLimiter } from "@/server/middleware/rate-limit.middleware";
 import { env } from "@/lib/env";
 
 const documentsRoutes = new Hono();
 
 documentsRoutes.use("*", authMiddleware);
 documentsRoutes.use("*", requireAuth);
+documentsRoutes.use("*", checkImpersonation);
 
 const MAX_FILE_SIZE = parseInt(env.S3_UPLOAD_MAX_SIZE || "104857600");
+
+// Create download rate limiter - 100 downloads per hour per user
+const documentDownloadRateLimit = createRateLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 100, // 100 downloads per hour
+  keyPrefix: "document-download",
+  skip: (c) => {
+    const authContext = c.get("auth");
+    const userRoles = authContext?.user?.role?.split(",").map((r) => r.trim()) || [];
+    return userRoles.includes("admin");
+  },
+});
 
 const uploadDocumentSchema = type({
   bookingId: "string",
@@ -68,43 +81,103 @@ documentsRoutes.post(
   }
 );
 
-documentsRoutes.get("/:id", async (c) => {
-  try {
-    const authContext = c.get("auth");
-    const user = authContext?.user;
-    if (!user) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
+documentsRoutes.get(
+  "/:id",
+  documentDownloadRateLimit,
+  async (c) => {
+    try {
+      const authContext = c.get("auth");
+      const user = authContext?.user;
+      const session = authContext?.session;
+      
+      // Enhanced session validation
+      if (!user || !session) {
+        return c.json({ error: "Unauthorized", redirect: "/login" }, 401);
+      }
+      
+      // Check for expired session
+      if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+        return c.json({ error: "Session expired", redirect: "/login" }, 401);
+      }
 
-    const documentId = c.req.param("id");
-    const { stream, document } = await documentService.downloadDocument(
-      documentId,
-      user.id
-    );
+      const documentId = c.req.param("id");
+      const ipAddress = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown";
+      const userAgent = c.req.header("user-agent") || "unknown";
+      const rangeHeader = c.req.header("range");
+      
+      // Parse range header if present
+      let range: { start: number; end: number } | undefined;
+      if (rangeHeader) {
+        const matches = rangeHeader.match(/bytes=(\d+)-(\d*)?/);
+        if (matches) {
+          const start = parseInt(matches[1], 10);
+          const end = matches[2] ? parseInt(matches[2], 10) : undefined;
+          range = { start, end: end || start + 1024 * 1024 - 1 }; // Default 1MB chunks
+        }
+      }
+      
+      // Get download with comprehensive permission validation
+      const downloadResult = await documentService.downloadDocument(
+        documentId,
+        user.id,
+        {
+          impersonatedUserId: session.impersonatedBy || undefined,
+          ipAddress,
+          userAgent,
+          range,
+        }
+      );
+      
+      const { stream, document, contentLength, contentRange, acceptRanges } = downloadResult;
 
-    if (!stream) {
-      return c.json({ error: "Document not found" }, 404);
-    }
+      if (!stream) {
+        return c.json({ error: "Document not found" }, 404);
+      }
 
-    c.header("Content-Type", document.mimeType);
-    c.header("Content-Disposition", `attachment; filename="${document.fileName}"`);
-    c.header("Content-Length", document.fileSize.toString());
+      // Set secure headers
+      c.header("Content-Type", document.mimeType);
+      c.header("Content-Disposition", `attachment; filename="${sanitizeFilename(document.fileName)}"`);
+      c.header("Cache-Control", "private, no-cache, no-store, must-revalidate");
+      c.header("X-Content-Type-Options", "nosniff");
+      c.header("X-Frame-Options", "DENY");
+      
+      // Set range headers if applicable
+      if (acceptRanges) {
+        c.header("Accept-Ranges", acceptRanges);
+      }
+      
+      if (contentRange) {
+        c.status(206); // Partial Content
+        c.header("Content-Range", contentRange);
+        c.header("Content-Length", contentLength?.toString() || "0");
+      } else {
+        c.header("Content-Length", document.fileSize.toString());
+      }
 
-    return c.body(stream);
-  } catch (error) {
-    console.error("Document download error:", error);
-    
-    if (error instanceof Error && error.message === "Document not found") {
-      return c.json({ error: "Document not found" }, 404);
+      return c.body(stream);
+    } catch (error) {
+      console.error("Document download error:", error);
+      
+      if (error instanceof Error) {
+        // Handle specific error cases without exposing internals
+        switch (error.message) {
+          case "Document not found":
+            return c.json({ error: "Document not found" }, 404);
+          case "Access denied":
+            return c.json({ error: "Access denied" }, 403);
+          case "Session expired":
+            return c.json({ error: "Session expired", redirect: "/login" }, 401);
+          default:
+            // Log error details but don't expose them
+            console.error("Unexpected download error:", error.stack);
+            return c.json({ error: "Failed to download document" }, 500);
+        }
+      }
+      
+      return c.json({ error: "Failed to download document" }, 500);
     }
-    
-    if (error instanceof Error && error.message === "Access denied") {
-      return c.json({ error: "Access denied" }, 403);
-    }
-    
-    return c.json({ error: "Failed to download document" }, 500);
   }
-});
+);
 
 documentsRoutes.delete("/:id", async (c) => {
   try {
@@ -153,5 +226,15 @@ documentsRoutes.get("/booking/:bookingId", async (c) => {
     return c.json({ error: "Failed to fetch documents" }, 500);
   }
 });
+
+// Helper function to sanitize filenames
+function sanitizeFilename(filename: string): string {
+  // Remove any path traversal attempts and special characters
+  return filename
+    .replace(/[\/\\]/g, "_") // Replace slashes
+    .replace(/\.\.+/g, ".") // Remove multiple dots
+    .replace(/[^a-zA-Z0-9._-]/g, "_") // Keep only safe characters
+    .slice(0, 255); // Limit length
+}
 
 export { documentsRoutes };

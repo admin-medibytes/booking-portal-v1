@@ -46,10 +46,10 @@ async function testS3Integration() {
 
     // Test 4: Download
     console.log("\n📥 Test 4: Downloading document...");
-    const stream = await downloadObject(testKey);
-    if (stream) {
+    const downloadResult = await downloadObject(testKey);
+    if (downloadResult.stream) {
       const chunks: Uint8Array[] = [];
-      const reader = stream.getReader();
+      const reader = downloadResult.stream.getReader();
       
       while (true) {
         const { done, value } = await reader.read();

@@ -141,34 +141,132 @@ export class DocumentService {
     return document;
   }
 
-  async downloadDocument(id: string, userId: string): Promise<{
+  async downloadDocument(
+    id: string,
+    userId: string,
+    context?: {
+      impersonatedUserId?: string;
+      ipAddress?: string;
+      userAgent?: string;
+      range?: { start: number; end: number };
+    }
+  ): Promise<{
     stream: ReadableStream | null;
     document: Document;
+    contentLength?: number;
+    contentRange?: string;
+    acceptRanges?: string;
   }> {
-    const document = await this.getDocument(id, userId);
+    const startTime = Date.now();
     
-    if (!document) {
-      throw new Error("Document not found");
-    }
-
-    const stream = await downloadObject(document.s3Key);
-    
-    if (!stream) {
-      throw new Error("Failed to download document");
-    }
-
+    // First log access attempt
     await auditService.log({
-      action: "document.downloaded",
+      action: "document.accessed",
       userId,
+      impersonatedUserId: context?.impersonatedUserId,
       resourceType: "document",
       resourceId: id,
       metadata: {
-        bookingId: document.bookingId,
-        fileName: document.fileName,
+        attempt: true,
       },
+      ipAddress: context?.ipAddress,
+      userAgent: context?.userAgent,
     });
+    
+    try {
+      // Comprehensive permission validation
+      const document = await documentRepository.findById(id);
+      
+      if (!document) {
+        // Log failed access attempt
+        await auditService.log({
+          action: "document.access_denied",
+          userId,
+          impersonatedUserId: context?.impersonatedUserId,
+          resourceType: "document",
+          resourceId: id,
+          metadata: {
+            reason: "Document not found",
+          },
+          ipAddress: context?.ipAddress,
+          userAgent: context?.userAgent,
+        });
+        throw new Error("Document not found");
+      }
 
-    return { stream, document };
+      const hasAccess = await this.verifyAccess(document, userId);
+      if (!hasAccess) {
+        // Log access denied
+        await auditService.log({
+          action: "document.access_denied",
+          userId,
+          impersonatedUserId: context?.impersonatedUserId,
+          resourceType: "document",
+          resourceId: id,
+          metadata: {
+            bookingId: document.bookingId,
+            fileName: document.fileName,
+            reason: "Insufficient permissions",
+          },
+          ipAddress: context?.ipAddress,
+          userAgent: context?.userAgent,
+        });
+        throw new Error("Access denied");
+      }
+
+      // Stream the document - never expose S3 URLs
+      const downloadResult = await downloadObject(document.s3Key, context?.range);
+      
+      if (!downloadResult.stream) {
+        throw new Error("Failed to download document");
+      }
+
+      // Log successful download
+      const downloadDuration = Date.now() - startTime;
+      await auditService.log({
+        action: "document.downloaded",
+        userId,
+        impersonatedUserId: context?.impersonatedUserId,
+        resourceType: "document",
+        resourceId: id,
+        metadata: {
+          bookingId: document.bookingId,
+          fileName: document.fileName,
+          fileSize: document.fileSize,
+          downloadDuration,
+          mimeType: document.mimeType,
+          category: document.category,
+        },
+        ipAddress: context?.ipAddress,
+        userAgent: context?.userAgent,
+      });
+
+      return { 
+        stream: downloadResult.stream, 
+        document,
+        contentLength: downloadResult.contentLength,
+        contentRange: downloadResult.contentRange,
+        acceptRanges: downloadResult.acceptRanges,
+      };
+    } catch (error) {
+      // Log failed download attempt with reason
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      await auditService.log({
+        action: "document.download_failed",
+        userId,
+        impersonatedUserId: context?.impersonatedUserId,
+        resourceType: "document",
+        resourceId: id,
+        metadata: {
+          failureReason: errorMessage,
+          downloadDuration: Date.now() - startTime,
+        },
+        ipAddress: context?.ipAddress,
+        userAgent: context?.userAgent,
+      });
+      
+      throw error;
+    }
   }
 
   async getPresignedDownloadUrl(id: string, userId: string): Promise<string> {
