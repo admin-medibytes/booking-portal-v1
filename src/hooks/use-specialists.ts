@@ -12,8 +12,8 @@ export function useSpecialists() {
   return useQuery({
     queryKey: queryKeys.list(),
     queryFn: async () => {
-      const response = await apiClient.get<Specialist[]>("/api/specialists");
-      return response;
+      const response = await apiClient.get<{ success: boolean; data: Specialist[] }>("/api/specialists");
+      return response.data || [];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -23,8 +23,8 @@ export function useSpecialist(id: string) {
   return useQuery({
     queryKey: queryKeys.detail(id),
     queryFn: async () => {
-      const response = await apiClient.get<Specialist>(`/api/specialists/${id}`);
-      return response;
+      const response = await apiClient.get<{ success: boolean; data: Specialist }>(`/api/specialists/${id}`);
+      return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!id,
