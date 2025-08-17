@@ -95,7 +95,6 @@ export function BookingDetailClient({
         <div className="space-y-6">
           <DocumentsSection
             bookingId={currentBooking.id}
-            documents={currentBooking.documents}
           />
         </div>
       </div>

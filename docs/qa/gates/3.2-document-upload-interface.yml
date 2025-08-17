@@ -1,0 +1,20 @@
+schema: 1
+story: '3.2'
+gate: CONCERNS
+status_reason: 'Implementation complete with strong UI/UX but missing test coverage and rate limit user feedback.'
+reviewer: 'Quinn'
+updated: '2025-08-17T10:30:00Z'
+top_issues:
+  - id: 'TEST-001'
+    severity: high
+    finding: 'No test coverage for upload functionality'
+    suggested_action: 'Implement unit tests for upload hooks and component tests'
+  - id: 'UX-001'
+    severity: medium
+    finding: 'Rate limit quota not displayed proactively'
+    suggested_action: 'Show remaining uploads (X/50) before hitting limit'
+  - id: 'SEC-001'
+    severity: low
+    finding: 'Download endpoint opens in new tab without auth check'
+    suggested_action: 'Verify download endpoint validates permissions'
+waiver: { active: false }
