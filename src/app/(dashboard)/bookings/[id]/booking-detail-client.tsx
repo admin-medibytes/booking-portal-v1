@@ -9,7 +9,6 @@ import { BookingProgressTracker } from "@/components/bookings/booking-progress-t
 import { BookingProgressUpdate } from "@/components/bookings/booking-progress-update";
 import { DocumentsSection } from "@/components/bookings/documents-section";
 import { useBookingWithDetails } from "@/hooks/use-booking";
-import { useUpdateProgress } from "@/hooks/use-update-progress";
 import type { BookingWithDetails } from "@/hooks/use-booking";
 
 interface BookingDetailClientProps {
@@ -33,7 +32,6 @@ interface BookingDetailClientProps {
 
 export function BookingDetailClient({
   booking: initialBooking,
-  session: _session,
   canUpdateProgress,
 }: BookingDetailClientProps) {
   const router = useRouter();
@@ -41,7 +39,6 @@ export function BookingDetailClient({
 
   // Use client-side query for real-time updates
   const { data: booking, isLoading } = useBookingWithDetails(initialBooking.id);
-  const _updateProgress = useUpdateProgress();
 
   const currentBooking = booking || initialBooking;
 

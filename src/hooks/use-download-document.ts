@@ -34,6 +34,13 @@ export function useDownloadDocument() {
           return;
         }
         
+        if (response.status === 403) {
+          // Access denied
+          const data = await response.json();
+          toast.error(data.message || "You don't have permission to download this document");
+          return;
+        }
+        
         if (response.status === 429) {
           // Rate limit exceeded
           const data = await response.json();
@@ -92,16 +99,18 @@ export function useDownloadDocument() {
 
       // Clear progress
       setDownloadProgress((prev) => {
-        const { [documentId]: _, ...rest } = prev;
-        return rest;
+        const newProgress = { ...prev };
+        delete newProgress[documentId];
+        return newProgress;
       });
 
       toast.success("Document downloaded successfully");
     } catch (error) {
       // Clear progress on error
       setDownloadProgress((prev) => {
-        const { [documentId]: _, ...rest } = prev;
-        return rest;
+        const newProgress = { ...prev };
+        delete newProgress[documentId];
+        return newProgress;
       });
 
       console.error("Download error:", error);

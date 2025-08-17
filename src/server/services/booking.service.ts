@@ -1,7 +1,7 @@
 import { bookingRepository } from "@/server/repositories/booking.repository";
 import { db } from "@/server/db";
 import { specialists, members, teamMembers, bookings, users, bookingProgress } from "@/server/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import type { User } from "@/types/user";
 import type { BookingWithSpecialist, BookingFilters } from "@/types/booking";
 import { acuityService } from "@/server/services/acuity.service";
@@ -131,7 +131,7 @@ export class BookingService {
     return false;
   }
 
-  private async getSpecialistByUserId(userId: string) {
+  async getSpecialistByUserId(userId: string) {
     const result = await db
       .select()
       .from(specialists)
@@ -141,7 +141,7 @@ export class BookingService {
     return result[0];
   }
 
-  private async getUserOrgMembership(userId: string) {
+  async getUserOrgMembership(userId: string) {
     const result = await db.select().from(members).where(eq(members.userId, userId)).limit(1);
 
     if (!result[0]) return null;
@@ -154,6 +154,32 @@ export class BookingService {
       role: result[0].role,
       teamIds: userTeams.map((tm) => tm.teamId),
     };
+  }
+
+  async getBookingForAccess(bookingId: string) {
+    // Get booking without access checks for internal use
+    const result = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.id, bookingId))
+      .limit(1);
+    
+    return result[0];
+  }
+
+  async isUserInTeams(userId: string, teamIds: string[]): Promise<boolean> {
+    if (teamIds.length === 0) return false;
+    
+    const result = await db
+      .select()
+      .from(teamMembers)
+      .where(and(
+        eq(teamMembers.userId, userId),
+        inArray(teamMembers.teamId, teamIds)
+      ))
+      .limit(1);
+    
+    return result.length > 0;
   }
 
   async getUserOrganizationRole(userId: string, organizationId: string): Promise<string | undefined> {

@@ -21,12 +21,26 @@ export function useDeleteDocument() {
     },
     onError: (error: unknown, documentId) => {
       deletingDocuments.delete(documentId);
+      
+      // Handle specific error types
+      if (error instanceof Error && 'status' in error) {
+        const statusError = error as Error & { status: number };
+        if (statusError.status === 403) {
+          toast.error("Permission denied", {
+            description: "You don't have permission to delete this document",
+          });
+          return;
+        }
+      }
+      
       const errorMessage = error instanceof Error 
         ? error.message 
         : typeof error === 'object' && error !== null && 'response' in error
         ? (error as {response?: {data?: {error?: string}}}).response?.data?.error || "Failed to delete document"
         : "Failed to delete document";
-      toast.error(errorMessage);
+      toast.error("Delete failed", {
+        description: errorMessage,
+      });
     },
   });
 

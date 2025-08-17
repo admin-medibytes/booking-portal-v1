@@ -19,8 +19,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Upload, FileArchive, FileSpreadsheet, HeadphonesIcon, FileIcon, Download, Loader2, Trash2, ArrowUpDown } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { FileText, Upload, FileArchive, FileSpreadsheet, HeadphonesIcon, FileIcon, Download, Loader2, Trash2, ArrowUpDown, Info } from "lucide-react";
 import { DocumentUpload } from "@/components/documents/document-upload";
+import { DocumentPermissionsMatrix } from "@/components/documents/document-permissions-matrix";
 import { useDocuments } from "@/hooks/use-documents";
 import { useDownloadDocument } from "@/hooks/use-download-document";
 import { useDeleteDocument } from "@/hooks/use-delete-document";
@@ -91,8 +98,28 @@ function sortDocuments(documents: Document[], sortBy: SortOption): Document[] {
   }
 }
 
+function getRolePermissionText(memberRole?: string): string {
+  switch (memberRole) {
+    case "referrer":
+      return "As a referrer, you can upload and manage consent forms and document briefs. You can view final reports (PDF only).";
+    case "specialist":
+      return "As a specialist, you can manage dictations, drafts, and final reports. You can view document briefs.";
+    case "owner":
+    case "manager":
+      return "As an organization owner/manager, you have full access to all documents for bookings in your organization.";
+    case "team_lead":
+      return "As a team lead, you can access all documents for bookings created by your team members.";
+    case "admin":
+      return "As an admin, you can access documents when impersonating a referrer.";
+    default:
+      return "Your access to documents is determined by your role in the organization.";
+  }
+}
+
+
 export function DocumentsSection({ bookingId }: DocumentsSectionProps) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DocumentSection>("ime_documents");
   const [categoryFilter, setCategoryFilter] = useState<DocumentCategory | "all">("all");
   const [sortBy, setSortBy] = useState<SortOption>("date");
@@ -184,14 +211,41 @@ export function DocumentsSection({ bookingId }: DocumentsSectionProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Documents
-          </div>
-          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+    <TooltipProvider>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Documents
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" className="max-w-md">
+                  <div className="space-y-2">
+                    <p className="font-medium">Document Access Permissions</p>
+                    <p className="text-sm">{getRolePermissionText(user?.memberRole)}</p>
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground">
+                        Access is role-based and automatically determined by your relationship to the booking.
+                      </p>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => setPermissionsDialogOpen(true)}
+                      >
+                        View full permissions matrix
+                      </Button>
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline">
                 <Upload className="w-4 h-4 mr-2" />
@@ -380,5 +434,18 @@ export function DocumentsSection({ bookingId }: DocumentsSectionProps) {
         </Tabs>
       </CardContent>
     </Card>
+    
+    <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Document Access Permissions</DialogTitle>
+          <DialogDescription>
+            Understand how different roles can interact with various document types.
+          </DialogDescription>
+        </DialogHeader>
+        <DocumentPermissionsMatrix />
+      </DialogContent>
+    </Dialog>
+    </TooltipProvider>
   );
 }

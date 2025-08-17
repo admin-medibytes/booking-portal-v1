@@ -34,7 +34,7 @@ export default async function BookingDetailPage({ params }: BookingDetailPagePro
       }
     );
     booking = response.booking;
-  } catch (_error) {
+  } catch {
     notFound();
   }
 

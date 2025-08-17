@@ -130,11 +130,12 @@ documentsRoutes.get(
       }
       
       // Get download with comprehensive permission validation
+      const impersonatedUserId = session.impersonatedBy || undefined;
       const downloadResult = await documentService.downloadDocument(
         documentId,
         user.id,
         {
-          impersonatedUserId: session.impersonatedBy || undefined,
+          impersonatedUserId,
           ipAddress,
           userAgent,
           range,
@@ -190,7 +191,10 @@ documentsRoutes.get(
           case "Document not found":
             return c.json({ error: "Document not found" }, 404);
           case "Access denied":
-            return c.json({ error: "Access denied" }, 403);
+            return c.json({ 
+              error: "Access denied", 
+              message: "You do not have permission to access this document" 
+            }, 403);
           case "Session expired":
             return c.json({ error: "Session expired", redirect: "/login" }, 401);
           default:
@@ -217,7 +221,12 @@ documentsRoutes.delete("/:id", async (c) => {
     const memberRole = 'user' in authContext && authContext.user && 'memberRole' in authContext.user
       ? (authContext.user as {memberRole?: string}).memberRole
       : undefined;
-    await documentService.deleteDocument(documentId, user.id, memberRole);
+    const session = authContext?.session;
+    const impersonatedUserId = session?.impersonatedBy || undefined;
+    await documentService.deleteDocument(documentId, user.id, {
+      userRole: memberRole,
+      impersonatedUserId,
+    });
 
     return c.json({ message: "Document deleted successfully" });
   } catch (error) {
@@ -228,7 +237,17 @@ documentsRoutes.delete("/:id", async (c) => {
     }
     
     if (error instanceof Error && error.message === "Access denied") {
-      return c.json({ error: "Access denied" }, 403);
+      return c.json({ 
+        error: "Access denied", 
+        message: "You do not have permission to delete this document" 
+      }, 403);
+    }
+    
+    if (error instanceof Error && error.message.includes("do not have permission")) {
+      return c.json({ 
+        error: "Permission denied", 
+        message: error.message 
+      }, 403);
     }
     
     return c.json({ error: "Failed to delete document" }, 500);
@@ -249,6 +268,8 @@ documentsRoutes.get("/booking/:bookingId", async (c) => {
     const memberRole = 'user' in authContext && authContext.user && 'memberRole' in authContext.user
       ? (authContext.user as {memberRole?: string}).memberRole
       : undefined;
+    const session = authContext?.session;
+    const impersonatedUserId = session?.impersonatedBy || undefined;
     
     const documents = await documentService.getDocumentsByBooking(
       bookingId,
@@ -257,12 +278,21 @@ documentsRoutes.get("/booking/:bookingId", async (c) => {
         section,
         category,
         userRole: memberRole,
+        impersonatedUserId,
       }
     );
 
     return c.json({ data: documents });
   } catch (error) {
     console.error("Document list error:", error);
+    
+    if (error instanceof Error && error.message === "Access denied") {
+      return c.json({ 
+        error: "Access denied", 
+        message: "You do not have permission to view documents for this booking" 
+      }, 403);
+    }
+    
     return c.json({ error: "Failed to fetch documents" }, 500);
   }
 });

@@ -10,15 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const acceptInvitationSchema = type({
-  password: "string>=8",
-  confirmPassword: "string>=8",
-  firstName: "string>=1",
-  lastName: "string>=1",
-  jobTitle: "string>=2",
-});
-
-type AcceptInvitationFormData = typeof acceptInvitationSchema.infer;
+type AcceptInvitationFormData = {
+  password: string;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+  jobTitle: string;
+};
 
 interface AcceptInvitationFormProps {
   invitation: {

@@ -146,14 +146,23 @@ export class DocumentService {
     }
   }
 
-  async getDocument(id: string, userId: string, userRole?: string): Promise<Document | null> {
+  async getDocument(
+    id: string, 
+    userId: string, 
+    context?: {
+      userRole?: string;
+      impersonatedUserId?: string;
+    }
+  ): Promise<Document | null> {
     const document = await documentRepository.findById(id);
     
     if (!document) {
       return null;
     }
 
-    const hasAccess = await this.verifyAccess(document, userId, userRole);
+    // For impersonation, check access as the impersonated user
+    const effectiveUserId = context?.impersonatedUserId || userId;
+    const hasAccess = await this.verifyAccess(document, effectiveUserId, context?.userRole);
     if (!hasAccess) {
       throw new Error("Access denied");
     }
@@ -161,6 +170,7 @@ export class DocumentService {
     await auditService.log({
       action: "document.accessed",
       userId,
+      impersonatedUserId: context?.impersonatedUserId,
       resourceType: "document",
       resourceId: id,
       metadata: {
@@ -226,7 +236,9 @@ export class DocumentService {
         throw new Error("Document not found");
       }
 
-      const hasAccess = await this.verifyAccess(document, userId, context?.userRole);
+      // For impersonation, check access as the impersonated user
+      const effectiveUserId = context?.impersonatedUserId || userId;
+      const hasAccess = await this.verifyAccess(document, effectiveUserId, context?.userRole);
       if (!hasAccess) {
         // Log access denied
         await auditService.log({
@@ -301,8 +313,15 @@ export class DocumentService {
     }
   }
 
-  async getPresignedDownloadUrl(id: string, userId: string): Promise<string> {
-    const document = await this.getDocument(id, userId);
+  async getPresignedDownloadUrl(
+    id: string, 
+    userId: string,
+    context?: {
+      userRole?: string;
+      impersonatedUserId?: string;
+    }
+  ): Promise<string> {
+    const document = await this.getDocument(id, userId, context);
     
     if (!document) {
       throw new Error("Document not found");
@@ -313,6 +332,7 @@ export class DocumentService {
     await auditService.log({
       action: "document.presigned_url_generated",
       userId,
+      impersonatedUserId: context?.impersonatedUserId,
       resourceType: "document", 
       resourceId: id,
       metadata: {
@@ -327,9 +347,13 @@ export class DocumentService {
   async updateDocument(
     id: string,
     userId: string,
-    data: UpdateDocumentInput
+    data: UpdateDocumentInput,
+    context?: {
+      userRole?: string;
+      impersonatedUserId?: string;
+    }
   ): Promise<Document> {
-    const document = await this.getDocument(id, userId);
+    const document = await this.getDocument(id, userId, context);
     
     if (!document) {
       throw new Error("Document not found");
@@ -340,6 +364,7 @@ export class DocumentService {
     await auditService.log({
       action: "document.updated",
       userId,
+      impersonatedUserId: context?.impersonatedUserId,
       resourceType: "document",
       resourceId: id,
       metadata: {
@@ -351,16 +376,23 @@ export class DocumentService {
     return updated;
   }
 
-  async deleteDocument(id: string, userId: string, userRole?: string): Promise<void> {
-    const document = await this.getDocument(id, userId, userRole);
+  async deleteDocument(
+    id: string, 
+    userId: string, 
+    context?: {
+      userRole?: string;
+      impersonatedUserId?: string;
+    }
+  ): Promise<void> {
+    const document = await this.getDocument(id, userId, context);
     
     if (!document) {
       throw new Error("Document not found");
     }
 
     // Check delete permission
-    if (userRole) {
-      const role = documentPermissionsService.getUserRole(userRole);
+    if (context?.userRole) {
+      const role = documentPermissionsService.getUserRole(context.userRole);
       if (!documentPermissionsService.hasPermission({ role, category: document.category, permission: "delete" })) {
         throw new Error("You do not have permission to delete this document type");
       }
@@ -374,6 +406,7 @@ export class DocumentService {
     await auditService.log({
       action: "document.deleted",
       userId,
+      impersonatedUserId: context?.impersonatedUserId,
       resourceType: "document",
       resourceId: id,
       metadata: {
@@ -391,13 +424,17 @@ export class DocumentService {
       section?: DocumentSection;
       category?: DocumentCategory;
       userRole?: string;
+      impersonatedUserId?: string;
     }
   ): Promise<Document[]> {
     const documents = await documentRepository.findByBookingId(bookingId, filters);
     
+    // For impersonation, check access as the impersonated user
+    const effectiveUserId = filters?.impersonatedUserId || userId;
+    
     const accessibleDocuments = [];
     for (const doc of documents) {
-      const hasAccess = await this.verifyAccess(doc, userId, filters?.userRole);
+      const hasAccess = await this.verifyAccess(doc, effectiveUserId, filters?.userRole);
       if (hasAccess) {
         // Check download permission based on role
         if (filters?.userRole) {
@@ -414,30 +451,67 @@ export class DocumentService {
     return accessibleDocuments;
   }
 
-  private async verifyAccess(document: Document, userId: string, _userRole?: string): Promise<boolean> {
+  private async verifyAccess(document: Document, userId: string, userRole?: string): Promise<boolean> {
     // Check if user is the document uploader
     if (document.uploadedById === userId) {
       return true;
     }
 
     try {
-      // For now, use the booking service to check access
-      // This leverages the existing access control logic in booking service
-      const systemUser = { id: userId, role: 'user' as const };
-      const booking = await bookingService.getBookingById(document.bookingId, systemUser);
-      
-      // If user has access to the booking, they have access to its documents
-      return !!booking;
+      // Use role-based access checks
+      const hasRoleBasedAccess = await this.checkRoleBasedAccess(document.bookingId, userId, userRole);
+      return hasRoleBasedAccess;
     } catch (error) {
-      // If access is denied or booking not found, return false
-      if (error instanceof Error && (error.name === 'AccessDeniedError' || error.name === 'BookingNotFoundError')) {
-        return false;
-      }
-      
-      // For other errors, log and deny access
+      // For errors, log and deny access
       console.error("Error verifying document access:", error);
       return false;
     }
+  }
+
+  async checkRoleBasedAccess(bookingId: string, userId: string, userRole?: string): Promise<boolean> {
+    // Get booking details to check relationships
+    const booking = await bookingService.getBookingForAccess(bookingId);
+    if (!booking) {
+      return false;
+    }
+
+    // 1. Referrers see all documents for their own bookings
+    if (booking.referrerId === userId) {
+      return true;
+    }
+
+    // 2. Specialists see documents only for assigned bookings
+    const specialistData = await bookingService.getSpecialistByUserId(userId);
+    if (specialistData && booking.specialistId === specialistData.id) {
+      return true;
+    }
+
+    // 3. Organization owners/managers see documents for their organization
+    const orgMembership = await bookingService.getUserOrgMembership(userId);
+    if (orgMembership && booking.organizationId === orgMembership.organizationId) {
+      if (orgMembership.role === 'owner' || orgMembership.role === 'manager') {
+        return true;
+      }
+
+      // 4. Team leads see documents for their team members' bookings
+      if (orgMembership.role === 'team_lead' && orgMembership.teamIds.length > 0) {
+        // Check if the booking's referrer is in the team lead's teams
+        const isTeamMember = await bookingService.isUserInTeams(booking.referrerId, orgMembership.teamIds);
+        if (isTeamMember) {
+          return true;
+        }
+      }
+    }
+
+    // 5. Admins see all documents when impersonating referrers
+    // This is handled at the route level with impersonation context
+    // The userRole check here is for non-impersonated admin access
+    if (userRole === 'admin') {
+      // Admins don't have blanket access unless impersonating
+      return false;
+    }
+
+    return false;
   }
 
   private async cleanupFailedUpload(s3Key: string): Promise<void> {

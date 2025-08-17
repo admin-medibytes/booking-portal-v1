@@ -11,11 +11,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
-const forgotPasswordSchema = type({
-  email: "string.email",
-});
-
-type ForgotPasswordFormData = typeof forgotPasswordSchema.infer;
+type ForgotPasswordFormData = {
+  email: string;
+};
 
 export function ForgotPasswordForm() {
   const [error, setError] = useState<string | null>(null);
