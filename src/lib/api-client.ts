@@ -33,30 +33,46 @@ class ApiClient {
 
     if (!response.ok) {
       let errorMessage = "Request failed";
-      try {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const error = await response.json();
-          errorMessage = error.error || error.message || errorMessage;
-        } else {
-          // If response is not JSON (like HTML), use status text
-          errorMessage = `${response.status} ${response.statusText}`;
+
+      // Handle specific status codes
+      if (response.status === 401) {
+        errorMessage = "Authentication required. Please log in.";
+      } else if (response.status === 403) {
+        errorMessage = "You don't have permission to access this resource.";
+      } else {
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const error = await response.json();
+            errorMessage = error.error || error.message || errorMessage;
+          } else {
+            // If response is not JSON (like HTML), provide a clear message
+            errorMessage = `Server returned ${response.status} ${response.statusText}. Expected JSON response but received ${contentType || "unknown content type"}.`;
+          }
+        } catch {
+          errorMessage = `Server returned ${response.status} ${response.statusText}`;
         }
-      } catch {
-        errorMessage = `${response.status} ${response.statusText}`;
       }
+
       const error = new Error(errorMessage) as Error & { status: number };
       error.status = response.status;
       throw error;
     }
-
     // Check if response is JSON before parsing
     const contentType = response.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
-      throw new Error("Invalid response format: expected JSON");
+      // For successful responses, we still expect JSON
+      throw new Error(
+        `Invalid response format: expected JSON but received ${contentType || "unknown content type"}`
+      );
     }
 
-    return response.json();
+    const json = await response.json();
+
+    console.log("content type", contentType);
+    console.log("response", json);
+
+    return json;
   }
 
   get<T>(endpoint: string, options?: ApiRequestOptions) {

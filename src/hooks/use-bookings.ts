@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { apiClient } from "@/lib/api-client";
 import type { BookingListResponse, BookingWithSpecialist, BookingFilters } from "@/types/booking";
 
@@ -19,6 +20,9 @@ export function useBookings(filters?: BookingFilters) {
       const response = await apiClient.get<BookingListResponse>("/bookings", {
         params: filters as Record<string, string | number | boolean | undefined>,
       });
+
+      console.log("use bookings", response);
+
       return response;
     },
     staleTime: 30 * 1000, // 30 seconds as per requirements

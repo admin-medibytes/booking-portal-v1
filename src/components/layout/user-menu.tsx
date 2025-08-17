@@ -55,7 +55,6 @@ export function UserMenu({ user }: UserMenuProps) {
           className="relative w-10 h-10 border-2 rounded-full shadow-sm hover:shadow-xl hover:cursor-pointer hover:border hover:border-primary"
         >
           <Avatar className="w-10 h-10">
-            <AvatarImage src={user.image || undefined} alt={user.name} />
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
         </Button>
