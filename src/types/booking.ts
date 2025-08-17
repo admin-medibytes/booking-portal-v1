@@ -14,6 +14,11 @@ export interface BookingWithSpecialist extends Booking {
   } | null;
 }
 
+export interface BookingWithProgress extends BookingWithSpecialist {
+  progress: BookingProgress[];
+  currentProgress?: string;
+}
+
 export interface BookingListResponse {
   bookings: BookingWithSpecialist[];
   pagination: {

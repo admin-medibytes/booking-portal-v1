@@ -1,10 +1,11 @@
 import { bookingRepository } from "@/server/repositories/booking.repository";
 import { db } from "@/server/db";
-import { specialists, members, teamMembers, bookings, users } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { specialists, members, teamMembers, bookings, users, bookingProgress } from "@/server/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import type { User } from "@/types/user";
 import type { BookingWithSpecialist, BookingFilters } from "@/types/booking";
 import { acuityService } from "@/server/services/acuity.service";
+import { auditService } from "@/server/services/audit.service";
 import DOMPurify from "isomorphic-dompurify";
 
 // BookingFilters is imported from types/booking.ts
@@ -25,7 +26,18 @@ export class BookingService {
       throw error;
     }
 
-    return this.formatBookingResponse(bookingData);
+    // Get progress history
+    const progressHistory = await this.getBookingProgressHistory(bookingId);
+
+    // Get current progress from latest entry or default
+    const currentProgress = progressHistory[0]?.toStatus || "scheduled";
+
+    return {
+      ...this.formatBookingResponse(bookingData),
+      progress: progressHistory,
+      currentProgress,
+      documents: [], // Placeholder for future document implementation
+    };
   }
 
   async getBookingsForUser(user: Pick<User, "id" | "role">, filters?: BookingFilters) {
@@ -142,6 +154,26 @@ export class BookingService {
       role: result[0].role,
       teamIds: userTeams.map((tm) => tm.teamId),
     };
+  }
+
+  async getUserOrganizationRole(userId: string, organizationId: string): Promise<string | undefined> {
+    const result = await db
+      .select()
+      .from(members)
+      .where(and(eq(members.userId, userId), eq(members.organizationId, organizationId)))
+      .limit(1);
+
+    return result[0]?.role;
+  }
+
+  async isUserSpecialist(userId: string, specialistId: string): Promise<boolean> {
+    const specialist = await db
+      .select()
+      .from(specialists)
+      .where(and(eq(specialists.id, specialistId), eq(specialists.userId, userId)))
+      .limit(1);
+
+    return specialist.length > 0;
   }
 
   private formatBookingResponse(bookingData: {
@@ -377,6 +409,148 @@ export class BookingService {
       .limit(1);
 
     return existingBookings.length === 0;
+  }
+
+  // Get booking progress history
+  private async getBookingProgressHistory(bookingId: string) {
+    const progressEntries = await db
+      .select({
+        id: bookingProgress.id,
+        bookingId: bookingProgress.bookingId,
+        fromStatus: bookingProgress.fromStatus,
+        toStatus: bookingProgress.toStatus,
+        reason: bookingProgress.reason,
+        metadata: bookingProgress.metadata,
+        createdAt: bookingProgress.createdAt,
+        changedBy: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(bookingProgress)
+      .leftJoin(users, eq(bookingProgress.changedBy, users.id))
+      .where(eq(bookingProgress.bookingId, bookingId))
+      .orderBy(desc(bookingProgress.createdAt));
+
+    return progressEntries;
+  }
+
+  // Update booking progress with validation and audit logging
+  async updateBookingProgress(
+    bookingId: string,
+    newProgress: string,
+    context: {
+      userId: string;
+      userRole: "user" | "admin" | null;
+      organizationRole?: string;
+      notes?: string | null;
+      impersonatedUserId?: string;
+    }
+  ) {
+    // Validate state transitions
+    const validTransitions: Record<string, string[]> = {
+      scheduled: ["rescheduled", "cancelled", "no-show", "generating-report"],
+      rescheduled: ["cancelled", "no-show", "generating-report"],
+      cancelled: [],
+      "no-show": [],
+      "generating-report": ["report-generated"],
+      "report-generated": ["payment-received"],
+      "payment-received": [],
+    };
+
+    // Get current booking
+    const bookingData = await bookingRepository.findByIdWithSpecialist(bookingId);
+    if (!bookingData) {
+      const error = new Error("Booking not found");
+      error.name = "BookingNotFoundError";
+      throw error;
+    }
+
+    // Check access
+    const hasAccess = await this.userHasAccessToBooking(
+      { id: context.userId, role: context.userRole },
+      bookingData.booking
+    );
+    if (!hasAccess) {
+      const error = new Error("Access denied");
+      error.name = "AccessDeniedError";
+      throw error;
+    }
+
+    // Additional check for specialists - can only update their own bookings
+    if (context.organizationRole === "specialist") {
+      const specialistData = await this.getSpecialistByUserId(context.userId);
+      if (!specialistData || specialistData.id !== bookingData.booking.specialistId) {
+        const error = new Error("Specialists can only update their own bookings");
+        error.name = "AccessDeniedError";
+        throw error;
+      }
+    }
+
+    // Get current progress
+    const progressHistory = await this.getBookingProgressHistory(bookingId);
+    const currentProgress = progressHistory[0]?.toStatus || "scheduled";
+
+    // Validate transition
+    const allowedTransitions = validTransitions[currentProgress] || [];
+    if (!allowedTransitions.includes(newProgress)) {
+      const error = new Error(
+        `Invalid transition from ${currentProgress} to ${newProgress}`
+      );
+      error.name = "InvalidTransitionError";
+      throw error;
+    }
+
+    // Update in transaction
+    await db.transaction(async (tx) => {
+      // Create progress entry
+      await tx.insert(bookingProgress).values({
+        bookingId,
+        fromStatus: currentProgress as "scheduled" | "rescheduled" | "cancelled" | "no-show" | "generating-report" | "report-generated" | "payment-received" | null,
+        toStatus: newProgress as "scheduled" | "rescheduled" | "cancelled" | "no-show" | "generating-report" | "report-generated" | "payment-received",
+        changedBy: context.userId,
+        reason: context.notes,
+        metadata: context.impersonatedUserId
+          ? { impersonatedUserId: context.impersonatedUserId }
+          : {},
+      });
+
+      // Update booking timestamps based on progress
+      const updateData: Partial<typeof bookings.$inferInsert> = {
+        updatedAt: new Date(),
+      };
+
+      if (newProgress === "cancelled") {
+        updateData.cancelledAt = new Date();
+        updateData.status = "closed";
+      } else if (newProgress === "payment-received") {
+        updateData.completedAt = new Date();
+        updateData.status = "closed";
+      }
+
+      await tx
+        .update(bookings)
+        .set(updateData)
+        .where(eq(bookings.id, bookingId));
+    });
+
+    // Create audit log
+    await auditService.log({
+      userId: context.userId,
+      impersonatedUserId: context.impersonatedUserId,
+      action: "booking.progress.updated",
+      resourceType: "booking",
+      resourceId: bookingId,
+      metadata: {
+        previousProgress: currentProgress,
+        newProgress,
+        notes: context.notes,
+      },
+    });
+
+    // Return updated booking with details
+    return this.getBookingById(bookingId, { id: context.userId, role: context.userRole });
   }
 }
 

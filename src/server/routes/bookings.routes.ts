@@ -32,6 +32,12 @@ const createBookingSchema = type({
   "notes?": "string|null",
 });
 
+// Validation schema for updating progress
+const updateProgressSchema = type({
+  progress: "'scheduled'|'rescheduled'|'cancelled'|'no-show'|'generating-report'|'report-generated'|'payment-received'",
+  "notes?": "string|null",
+});
+
 // GET /api/bookings - List bookings with role-based filtering
 bookingsRoutes.get("/", async (c) => {
   try {
@@ -195,6 +201,84 @@ bookingsRoutes.post("/", bookingCreateRateLimit, async (c) => {
     return c.json(
       {
         error: "Failed to create booking",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      500
+    );
+  }
+});
+
+// POST /api/bookings/:id/progress - Update booking progress
+bookingsRoutes.post("/:id/progress", async (c) => {
+  try {
+    const authContext = c.get("auth");
+    const user = authContext?.user;
+    if (!user) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const bookingId = c.req.param("id");
+    const body = await c.req.json();
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(bookingId)) {
+      return c.json({ error: "Invalid booking ID format" }, 400);
+    }
+
+    // Validate request body
+    const validationResult = updateProgressSchema(body);
+    if (validationResult instanceof type.errors) {
+      return c.json(
+        {
+          error: "Invalid request body",
+          details: validationResult[0].message,
+        },
+        400
+      );
+    }
+
+    // Get user's organization role if any
+    const organizationRole = authContext.session?.activeOrganizationId
+      ? await bookingService.getUserOrganizationRole(user.id, authContext.session.activeOrganizationId)
+      : undefined;
+
+    // Update booking progress
+    const booking = await bookingService.updateBookingProgress(
+      bookingId,
+      validationResult.progress,
+      {
+        userId: user.id,
+        userRole: user.role as "user" | "admin" | null,
+        organizationRole,
+        notes: validationResult.notes,
+        impersonatedUserId: authContext.session?.impersonatedBy || undefined,
+      }
+    );
+
+    return c.json({
+      success: true,
+      booking,
+      message: "Progress updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating booking progress:", error);
+
+    if (error instanceof Error) {
+      if (error.name === "BookingNotFoundError") {
+        return c.json({ error: "Booking not found" }, 404);
+      }
+      if (error.name === "AccessDeniedError") {
+        return c.json({ error: "Access denied" }, 403);
+      }
+      if (error.name === "InvalidTransitionError") {
+        return c.json({ error: error.message }, 400);
+      }
+    }
+
+    return c.json(
+      {
+        error: "Failed to update booking progress",
         message: error instanceof Error ? error.message : "Unknown error",
       },
       500
