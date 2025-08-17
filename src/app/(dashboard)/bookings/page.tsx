@@ -24,7 +24,7 @@ export default function BookingsPage() {
     if (urlView && ["calendar", "list"].includes(urlView)) {
       return urlView;
     }
-    const savedView = localStorage.getItem("bookings-view") as ViewType;
+    const savedView = typeof window !== 'undefined' ? localStorage.getItem("bookings-view") as ViewType : null;
     if (savedView && ["calendar", "list"].includes(savedView)) {
       return savedView;
     }
