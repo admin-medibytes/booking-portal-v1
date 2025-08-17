@@ -79,3 +79,9 @@ export const apiGeneralRateLimit = createRateLimiter({
   max: 100, // 100 requests per minute
   keyPrefix: "api-general",
 });
+
+export const documentUploadRateLimit = createRateLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50, // 50 document uploads per hour
+  keyPrefix: "document-upload",
+});

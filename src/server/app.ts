@@ -11,6 +11,7 @@ import publicRoutes from './routes/public.routes'
 import userRoutes from './routes/user.routes'
 import { bookingsRoutes } from './routes/bookings.routes'
 import { specialistsRoutes } from './routes/specialists.routes'
+import { documentsRoutes } from './routes/documents.routes'
 
 const app = new Hono().basePath('/api')
 
@@ -34,6 +35,9 @@ app.route('/bookings', bookingsRoutes)
 
 // Mount specialists routes (authenticated)
 app.route('/specialists', specialistsRoutes)
+
+// Mount documents routes (authenticated)
+app.route('/documents', documentsRoutes)
 
 app.get('/health', async (c) => {
   const dbHealth = await healthCheck();
