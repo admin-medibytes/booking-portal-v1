@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { BookingDetailClient } from "./booking-detail-client";
-import { apiClient } from "@/lib/api-client";
 import { bookingService } from "@/server/services/booking.service";
 import type { BookingWithDetails } from "@/hooks/use-booking";
 
@@ -25,15 +24,19 @@ export default async function BookingDetailPage({ params }: BookingDetailPagePro
   // Fetch booking data server-side
   let booking: BookingWithDetails | null = null;
   try {
-    const response = await apiClient.get<{ success: boolean; booking: BookingWithDetails }>(
-      `/bookings/${id}`,
-      {
-        headers: {
-          cookie: (await headers()).get("cookie") || "",
-        },
-      }
-    );
-    booking = response.booking;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/bookings/${id}`, {
+      headers: {
+        cookie: (await headers()).get("cookie") || "",
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch booking');
+    }
+    
+    const data = await response.json() as { success: boolean; booking: BookingWithDetails };
+    booking = data.booking;
   } catch {
     notFound();
   }

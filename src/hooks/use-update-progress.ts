@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import { bookingsClient } from "@/lib/hono-client";
+import { handleApiResponse } from "@/lib/hono-utils";
 import { bookingKeys } from "./use-bookings";
 import { bookingDetailKeys } from "./use-booking";
 
@@ -14,11 +15,10 @@ export function useUpdateProgress() {
 
   return useMutation({
     mutationFn: async ({ bookingId, progress, notes }: UpdateProgressParams) => {
-      const response = await apiClient.post(`/bookings/${bookingId}/progress`, {
-        progress,
-        notes,
+      const response = bookingsClient[bookingId].progress.$post({
+        json: { progress, notes },
       });
-      return response;
+      return await handleApiResponse(response);
     },
     onSuccess: (data, variables) => {
       // Invalidate and refetch booking lists

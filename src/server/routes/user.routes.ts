@@ -6,26 +6,23 @@ import { eq, and } from "drizzle-orm";
 import { hashPassword } from "@/lib/crypto";
 import { logger } from "@/server/utils/logger";
 import { authMiddleware, requireAuth } from "@/server/middleware/auth.middleware";
-import { validateMiddleware } from "@/server/middleware/validate.middleware";
-
-const app = new Hono();
-
-// Apply auth middleware to all routes
-app.use("*", authMiddleware);
-app.use("*", requireAuth);
+import { arktypeValidator } from "@/server/middleware/validate.middleware";
 
 const setInitialPasswordSchema = type({
   newPassword: "string>=8",
 });
 
-// Set initial password for first-time users
-app.post(
-  "/set-initial-password",
-  validateMiddleware(setInitialPasswordSchema),
-  async (c) => {
+const app = new Hono()
+
+  // Apply auth middleware to all routes
+  .use("*", authMiddleware)
+  .use("*", requireAuth)
+
+  // Set initial password for first-time users
+  .post("/set-initial-password", arktypeValidator("json", setInitialPasswordSchema), async (c) => {
     const auth = c.get("auth");
     const user = auth.user;
-    const { newPassword } = c.get("validatedData") as { newPassword: string };
+    const { newPassword } = c.req.valid("json");
 
     if (!user) {
       return c.json({ error: "Unauthorized" }, 401);
@@ -47,12 +44,7 @@ app.post(
           password: hashedPassword,
           updatedAt: new Date(),
         })
-        .where(
-          and(
-            eq(accounts.userId, user.id),
-            eq(accounts.providerId, "credential")
-          )
-        );
+        .where(and(eq(accounts.userId, user.id), eq(accounts.providerId, "credential")));
 
       // Mark user as initialized
       await db
@@ -73,7 +65,6 @@ app.post(
       logger.error("Failed to set initial password", error as Error);
       return c.json({ error: "Failed to set password" }, 500);
     }
-  }
-);
+  });
 
 export default app;

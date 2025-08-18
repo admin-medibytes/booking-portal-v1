@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { apiClient } from "@/lib/api-client";
+import { bookingsClient } from "@/lib/hono-client";
 import type { BookingListResponse, BookingWithSpecialist, BookingFilters } from "@/types/booking";
 
 // Query key factory for consistent cache management
@@ -17,13 +17,18 @@ export function useBookings(filters?: BookingFilters) {
   return useQuery({
     queryKey: bookingKeys.list(filters),
     queryFn: async () => {
-      const response = await apiClient.get<BookingListResponse>("/bookings", {
-        params: filters as Record<string, string | number | boolean | undefined>,
+      const res = await bookingsClient.$get({
+        query: filters as Record<string, string | number | boolean | undefined>,
       });
-
-      console.log("use bookings", response);
-
-      return response;
+      
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || 'Failed to fetch bookings');
+      }
+      
+      const data = await res.json() as BookingListResponse;
+      console.log("Done fetching with use bookings");
+      return data;
     },
     staleTime: 30 * 1000, // 30 seconds as per requirements
     gcTime: 5 * 60 * 1000, // 5 minutes cache time
@@ -35,10 +40,15 @@ export function useBooking(id: string) {
   return useQuery({
     queryKey: bookingKeys.detail(id),
     queryFn: async () => {
-      const response = await apiClient.get<{ success: boolean; booking: BookingWithSpecialist }>(
-        `/bookings/${id}`
-      );
-      return response.booking;
+      const res = await bookingsClient[id].$get();
+      
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || 'Failed to fetch booking');
+      }
+      
+      const data = await res.json() as { success: boolean; booking: BookingWithSpecialist };
+      return data.booking;
     },
     enabled: !!id,
     staleTime: 30 * 1000, // 30 seconds
@@ -52,10 +62,18 @@ export function useUpdateBookingStatus() {
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const response = await apiClient.patch(`/bookings/${id}/status`, { status });
-      return response;
+      const res = await bookingsClient[id].status.$patch({
+        json: { status },
+      });
+      
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || 'Failed to update booking status');
+      }
+      
+      return await res.json();
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate and refetch booking lists
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists() });
       // Invalidate specific booking detail
@@ -70,10 +88,16 @@ export function useCancelBooking() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiClient.post(`/bookings/${id}/cancel`);
-      return response;
+      const res = await bookingsClient[id].cancel.$post();
+      
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || 'Failed to cancel booking');
+      }
+      
+      return await res.json();
     },
-    onSuccess: (data, id) => {
+    onSuccess: (_data, id) => {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists() });
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(id) });
@@ -87,10 +111,18 @@ export function useRescheduleBooking() {
 
   return useMutation({
     mutationFn: async ({ id, date }: { id: string; date: Date }) => {
-      const response = await apiClient.post(`/bookings/${id}/reschedule`, { date });
-      return response;
+      const res = await bookingsClient[id].reschedule.$post({
+        json: { date },
+      });
+      
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || 'Failed to reschedule booking');
+      }
+      
+      return await res.json();
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists() });
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(variables.id) });

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import { documentsClient } from "@/lib/hono-client";
+import { handleApiResponse, ApiError } from "@/lib/hono-utils";
 import type { Document, DocumentSection, DocumentCategory } from "@/types/document";
 import { documentKeys } from "./use-upload-document";
 import { toast } from "sonner";
@@ -19,19 +20,19 @@ export function useDocuments(bookingId: string, options?: UseDocumentsOptions) {
   return useQuery({
     queryKey: [...documentKeys.list(bookingId), { section, category }],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (section) params.append("section", section);
-      if (category) params.append("category", category);
-      
-      const queryString = params.toString();
-      const url = `/documents/booking/${bookingId}${queryString ? `?${queryString}` : ""}`;
-      
       try {
-        const response = await apiClient.get<DocumentsResponse>(url);
-        return response.data;
+        const query: Record<string, string> = {};
+        if (section) query.section = section;
+        if (category) query.category = category;
+        
+        const response = documentsClient.booking[bookingId].$get({
+          query,
+        });
+        const result = await handleApiResponse<DocumentsResponse>(response);
+        return result.data;
       } catch (error) {
         // Handle 403 errors specifically
-        if (error instanceof Error && 'status' in error && error.status === 403) {
+        if (error instanceof ApiError && error.status === 403) {
           // Don't throw, return empty array and show toast
           toast.error("You don't have permission to view documents for this booking");
           return [];
@@ -45,7 +46,7 @@ export function useDocuments(bookingId: string, options?: UseDocumentsOptions) {
     gcTime: 5 * 60 * 1000, // 5 minutes
     retry: (failureCount, error) => {
       // Don't retry on 403 errors
-      if (error instanceof Error && 'status' in error && error.status === 403) {
+      if (error instanceof ApiError && error.status === 403) {
         return false;
       }
       // Default retry logic for other errors

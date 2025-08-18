@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import { bookingsClient } from "@/lib/hono-client";
+import { handleApiResponse } from "@/lib/hono-utils";
 import type { BookingWithSpecialist, BookingProgress } from "@/types/booking";
 
 export interface BookingWithDetails extends BookingWithSpecialist {
@@ -28,10 +29,9 @@ export function useBookingWithDetails(id: string) {
   return useQuery({
     queryKey: bookingDetailKeys.detail(id),
     queryFn: async () => {
-      const response = await apiClient.get<{ success: boolean; booking: BookingWithDetails }>(
-        `/bookings/${id}`
-      );
-      return response.booking;
+      const response = bookingsClient[id].$get();
+      const data = await handleApiResponse<{ success: boolean; booking: BookingWithDetails }>(response);
+      return data.booking;
     },
     enabled: !!id,
     staleTime: 30 * 1000, // 30 seconds

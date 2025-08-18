@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import { authClient } from "@/lib/hono-client";
 
 interface User {
   id: string;
@@ -18,8 +18,8 @@ export function useAuth() {
     queryKey: ["auth", "session"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get<{data: AuthResponse}>("/auth/session");
-        return response.data;
+        const result = await authClient.session.get() as {data: AuthResponse};
+        return result.data;
       } catch {
         return { user: null };
       }

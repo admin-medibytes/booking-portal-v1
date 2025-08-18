@@ -1,51 +1,92 @@
-import { createMiddleware } from "hono/factory";
-import { type, type Type } from "arktype";
-import { ValidationError } from "@/server/utils/errors";
+import { type } from "arktype";
+import type { Type, ArkErrors } from "arktype";
+import type { Context, MiddlewareHandler, Env, ValidationTargets, TypedResponse } from "hono";
+import { validator } from "hono/validator";
 
-declare module "hono" {
-  interface ContextVariableMap {
-    validatedData: unknown;
-  }
-}
+export type Hook<T, E extends Env, P extends string, O = {}> = (
+  result: { success: false; data: unknown; errors: ArkErrors } | { success: true; data: T },
+  c: Context<E, P>
+) => Response | Promise<Response> | void | Promise<Response | void> | TypedResponse<O>;
 
-export const validateMiddleware = <T>(
-  schema: Type<T>,
-  source: "body" | "query" | "params" = "body"
-) =>
-  createMiddleware(async (c, next) => {
-    try {
-      let data: unknown;
+type HasUndefined<T> = undefined extends T ? true : false;
 
-      switch (source) {
-        case "body":
-          data = await c.req.json();
-          break;
-        case "query":
-          data = c.req.query();
-          break;
-        case "params":
-          data = c.req.param();
-          break;
+const RESTRICTED_DATA_FIELDS = {
+  header: ["cookie"],
+};
+
+export const arktypeValidator = <
+  T extends Type,
+  Target extends keyof ValidationTargets,
+  E extends Env,
+  P extends string,
+  I = T["inferIn"],
+  O = T["infer"],
+  V extends {
+    in: HasUndefined<I> extends true ? { [K in Target]?: I } : { [K in Target]: I };
+    out: { [K in Target]: O };
+  } = {
+    in: HasUndefined<I> extends true ? { [K in Target]?: I } : { [K in Target]: I };
+    out: { [K in Target]: O };
+  },
+>(
+  target: Target,
+  schema: T,
+  hook?: Hook<T["infer"], E, P>
+): MiddlewareHandler<E, P, V> =>
+  // @ts-expect-error not typed well
+  validator(target, (value, c) => {
+    const out = schema(value);
+
+    const hasErrors = out instanceof type.errors;
+
+    if (hook) {
+      const hookResult = hook(
+        hasErrors ? { success: false, data: value, errors: out } : { success: true, data: out },
+        c
+      );
+      if (hookResult) {
+        if (hookResult instanceof Response || hookResult instanceof Promise) {
+          return hookResult;
+        }
+        if ("response" in hookResult) {
+          return hookResult.response;
+        }
       }
-
-      const result = schema(data);
-
-      if (result instanceof type.errors) {
-        const firstError = result[0];
-        throw new ValidationError(
-          `Validation failed: ${firstError.message}`,
-          firstError.path.join('.'),
-          data
-        );
-      }
-
-      c.set("validatedData", result);
-      await next();
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        throw error;
-      }
-
-      throw new ValidationError("Invalid request data");
     }
+
+    if (hasErrors) {
+      return c.json(
+        {
+          success: false,
+          errors:
+            target in RESTRICTED_DATA_FIELDS
+              ? out.map((error) => {
+                  const restrictedFields =
+                    RESTRICTED_DATA_FIELDS[target as keyof typeof RESTRICTED_DATA_FIELDS] || [];
+
+                  if (
+                    error &&
+                    typeof error === "object" &&
+                    "data" in error &&
+                    typeof error.data === "object" &&
+                    error.data !== null &&
+                    !Array.isArray(error.data)
+                  ) {
+                    const dataCopy = { ...(error.data as Record<string, unknown>) };
+                    for (const field of restrictedFields) {
+                      delete dataCopy[field];
+                    }
+
+                    error.data = dataCopy;
+                  }
+
+                  return error;
+                })
+              : out,
+        },
+        400
+      );
+    }
+
+    return out;
   });

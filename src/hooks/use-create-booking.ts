@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import { bookingsClient } from "@/lib/hono-client";
+import { handleApiResponse } from "@/lib/hono-utils";
 import { bookingKeys } from "./use-bookings";
 import { toast } from "sonner";
 
@@ -24,7 +25,10 @@ export function useCreateBooking() {
 
   return useMutation<CreateBookingResponse, Error, CreateBookingData>({
     mutationFn: async (data) => {
-      return apiClient.post<CreateBookingResponse>("/api/bookings", data);
+      const response = bookingsClient.$post({
+        json: data,
+      });
+      return await handleApiResponse<CreateBookingResponse>(response);
     },
     onSuccess: (data) => {
       // Invalidate booking queries to refresh the list

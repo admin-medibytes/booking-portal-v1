@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar, ChevronLeft, ChevronRight, Clock } from "lucide-react";
-import { apiClient } from "@/lib/api-client";
+import { specialistsClient } from "@/lib/hono-client";
+import { handleApiResponse } from "@/lib/hono-utils";
 import { cn } from "@/lib/utils";
 
 interface TimeSlot {
@@ -36,13 +37,13 @@ export function TimeSlotPicker({ specialistId, onSelect, selectedDateTime }: Tim
 
   const { data: availability, isLoading, error } = useQuery({
     queryKey: ["specialist-availability", specialistId, format(weekStart, "yyyy-MM-dd")],
-    queryFn: () => {
+    queryFn: async () => {
       const startDate = format(weekStart, "yyyy-MM-dd");
       const endDate = format(addDays(weekStart, 6), "yyyy-MM-dd");
-      return apiClient.get<AvailabilityResponse>(
-        `/api/specialists/${specialistId}/availability`,
-        { params: { startDate, endDate } }
-      );
+      const response = specialistsClient[specialistId].availability.$get({
+        query: { startDate, endDate }
+      });
+      return await handleApiResponse<AvailabilityResponse>(response);
     },
   });
 

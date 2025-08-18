@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import { specialistsClient } from "@/lib/hono-client";
 import type { Specialist } from "@/types/specialist";
 
 export const queryKeys = {
@@ -12,8 +12,8 @@ export function useSpecialists() {
   return useQuery({
     queryKey: queryKeys.list(),
     queryFn: async () => {
-      const response = await apiClient.get<{ success: boolean; data: Specialist[] }>("/api/specialists");
-      return response.data || [];
+      const data = await specialistsClient.list() as { success: boolean; data: Specialist[] };
+      return data.data || [];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -23,8 +23,8 @@ export function useSpecialist(id: string) {
   return useQuery({
     queryKey: queryKeys.detail(id),
     queryFn: async () => {
-      const response = await apiClient.get<{ success: boolean; data: Specialist }>(`/api/specialists/${id}`);
-      return response.data;
+      const data = await specialistsClient.get(id) as { success: boolean; data: Specialist };
+      return data.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!id,

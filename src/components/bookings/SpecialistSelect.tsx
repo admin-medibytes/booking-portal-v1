@@ -7,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Video, User } from "lucide-react";
-import { apiClient } from "@/lib/api-client";
+import { specialistsClient } from "@/lib/hono-client";
+import { handleApiResponse } from "@/lib/hono-utils";
 import type { Specialist } from "@/types/booking";
 
 interface SpecialistSelectProps {
@@ -18,7 +19,10 @@ interface SpecialistSelectProps {
 export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSelectProps) {
   const { data: specialists, isLoading, error } = useQuery({
     queryKey: ["specialists"],
-    queryFn: () => apiClient.get<Specialist[]>("/api/specialists"),
+    queryFn: async () => {
+      const response = specialistsClient.$get();
+      return await handleApiResponse<Specialist[]>(response);
+    },
   });
 
   if (isLoading) {
