@@ -42,12 +42,15 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
   
   // Initialize filter state from URL
   const [filters, setFilters] = useState<FilterState>(() => {
-    const status = searchParams.get("status") as "active" | "closed" | null;
+    const urlStatus = searchParams.get("status");
+    // Convert "all" to null, validate other values
+    const status = urlStatus === "all" || !urlStatus ? null : 
+                   (["active", "closed"].includes(urlStatus) ? urlStatus as "active" | "closed" : null);
     const specialistIds = searchParams.get("specialists")?.split(",").filter(Boolean) || [];
     const search = searchParams.get("search") || "";
     
     return {
-      status: status || null,
+      status,
       specialistIds,
       search,
     };
@@ -108,7 +111,8 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
 
   // Handle status filter change
   const handleStatusChange = (value: string) => {
-    const newStatus = value as "active" | "closed" | null;
+    // Convert "all" to null, otherwise keep the value
+    const newStatus = value === "all" ? null : value as "active" | "closed";
     const newFilters = { ...filters, status: newStatus };
     setFilters(newFilters);
     updateUrl(newFilters);

@@ -17,8 +17,14 @@ export function useBookings(filters?: BookingFilters) {
   return useQuery({
     queryKey: bookingKeys.list(filters),
     queryFn: async () => {
+      // Filter out any "all" status before sending to backend
+      const cleanedFilters = filters ? {
+        ...filters,
+        status: filters.status === "all" ? undefined : filters.status
+      } : undefined;
+      
       const res = await bookingsClient.$get({
-        query: filters as Record<string, string | number | boolean | undefined>,
+        query: cleanedFilters as Record<string, string | number | boolean | undefined>,
       });
       
       if (!res.ok) {

@@ -35,11 +35,13 @@ export default function BookingsPage() {
   const [filters, setFilters] = useState<BookingFiltersType>(() => {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
+    const urlStatus = searchParams.get("status");
     
     return {
       page,
       limit,
-      status: searchParams.get("status") || undefined,
+      // Convert "all" from URL to undefined
+      status: urlStatus === "all" ? undefined : urlStatus || undefined,
       specialistIds: searchParams.get("specialists")?.split(",").filter(Boolean),
       search: searchParams.get("search") || undefined,
     };
