@@ -17,14 +17,14 @@ type ViewType = "calendar" | "list";
 export default function BookingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // Initialize view from URL or localStorage
   const [view, setView] = useState<ViewType>(() => {
     const urlView = searchParams.get("view") as ViewType;
     if (urlView && ["calendar", "list"].includes(urlView)) {
       return urlView;
     }
-    const savedView = typeof window !== 'undefined' ? localStorage.getItem("bookings-view") as ViewType : null;
+    const savedView = localStorage.getItem("bookings-view") as ViewType;
     if (savedView && ["calendar", "list"].includes(savedView)) {
       return savedView;
     }
@@ -35,13 +35,11 @@ export default function BookingsPage() {
   const [filters, setFilters] = useState<BookingFiltersType>(() => {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
-    const urlStatus = searchParams.get("status");
-    
+
     return {
       page,
       limit,
-      // Convert "all" from URL to undefined
-      status: urlStatus === "all" ? undefined : urlStatus || undefined,
+      status: searchParams.get("status") || undefined,
       specialistIds: searchParams.get("specialists")?.split(",").filter(Boolean),
       search: searchParams.get("search") || undefined,
     };
@@ -51,7 +49,7 @@ export default function BookingsPage() {
   const handleViewChange = (newView: ViewType) => {
     setView(newView);
     localStorage.setItem("bookings-view", newView);
-    
+
     const params = new URLSearchParams(searchParams.toString());
     params.set("view", newView);
     router.push(`?${params.toString()}`);
@@ -85,7 +83,7 @@ export default function BookingsPage() {
   const handlePageChange = (newPage: number) => {
     const newFilters = { ...filters, page: newPage };
     setFilters(newFilters);
-    
+
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", newPage.toString());
     router.push(`?${params.toString()}`);
@@ -94,7 +92,7 @@ export default function BookingsPage() {
   const handlePageSizeChange = (newSize: number) => {
     const newFilters = { ...filters, limit: newSize, page: 1 };
     setFilters(newFilters);
-    
+
     const params = new URLSearchParams(searchParams.toString());
     params.set("limit", newSize.toString());
     params.set("page", "1");
@@ -117,9 +115,7 @@ export default function BookingsPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
-          <p className="mt-2 text-gray-600">
-            Manage patient appointments and referrals
-          </p>
+          <p className="mt-2 text-gray-600">Manage patient appointments and referrals</p>
         </div>
         <Button className="inline-flex items-center" onClick={() => router.push("/bookings/new")}>
           <Plus className="w-4 h-4 mr-2" />
@@ -130,17 +126,15 @@ export default function BookingsPage() {
       {/* Filters and View Toggle */}
       <div className="space-y-4 mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <BookingFilters 
-            specialists={specialists || []} 
-            onFiltersChange={handleFiltersChange}
-          />
-          
+          <BookingFilters specialists={specialists || []} onFiltersChange={handleFiltersChange} />
+
           {/* View Toggle */}
-          <div className="flex gap-2 flex-shrink-0">
+          <div className="flex flex-shrink-0">
             <Button
               variant={view === "list" ? "default" : "outline"}
               size="sm"
               onClick={() => handleViewChange("list")}
+              className="rounded-e-none"
             >
               <List className="w-4 h-4 mr-2" />
               List
@@ -149,6 +143,7 @@ export default function BookingsPage() {
               variant={view === "calendar" ? "default" : "outline"}
               size="sm"
               onClick={() => handleViewChange("calendar")}
+              className="rounded-s-none"
             >
               <Calendar className="w-4 h-4 mr-2" />
               Calendar
@@ -167,8 +162,8 @@ export default function BookingsPage() {
           <>
             {view === "list" ? (
               <div className="p-6">
-                <BookingListTable 
-                  bookings={data?.bookings || []} 
+                <BookingListTable
+                  bookings={data?.bookings || []}
                   totalCount={data?.pagination.total || 0}
                   currentPage={filters.page || 1}
                   pageSize={filters.limit || 20}

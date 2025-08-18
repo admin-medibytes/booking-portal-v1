@@ -5,7 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, X } from "lucide-react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Command,
   CommandEmpty,
@@ -14,11 +20,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
@@ -39,16 +41,20 @@ export interface FilterState {
 export function BookingFilters({ specialists = [], onFiltersChange }: BookingFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // Initialize filter state from URL
   const [filters, setFilters] = useState<FilterState>(() => {
     const urlStatus = searchParams.get("status");
     // Convert "all" to null, validate other values
-    const status = urlStatus === "all" || !urlStatus ? null : 
-                   (["active", "closed"].includes(urlStatus) ? urlStatus as "active" | "closed" : null);
+    const status =
+      urlStatus === "all" || !urlStatus
+        ? null
+        : ["active", "closed"].includes(urlStatus)
+          ? (urlStatus as "active" | "closed")
+          : null;
     const specialistIds = searchParams.get("specialists")?.split(",").filter(Boolean) || [];
     const search = searchParams.get("search") || "";
-    
+
     return {
       status,
       specialistIds,
@@ -60,35 +66,38 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
   const [searchInput, setSearchInput] = useState(filters.search);
 
   // Update URL when filters change
-  const updateUrl = useCallback((newFilters: FilterState) => {
-    const params = new URLSearchParams(searchParams.toString());
-    
-    // Status filter
-    if (newFilters.status) {
-      params.set("status", newFilters.status);
-    } else {
-      params.delete("status");
-    }
-    
-    // Specialist filter
-    if (newFilters.specialistIds.length > 0) {
-      params.set("specialists", newFilters.specialistIds.join(","));
-    } else {
-      params.delete("specialists");
-    }
-    
-    // Search filter
-    if (newFilters.search) {
-      params.set("search", newFilters.search);
-    } else {
-      params.delete("search");
-    }
-    
-    // Reset to page 1 when filters change
-    params.set("page", "1");
-    
-    router.push(`?${params.toString()}`);
-  }, [router, searchParams]);
+  const updateUrl = useCallback(
+    (newFilters: FilterState) => {
+      const params = new URLSearchParams(searchParams.toString());
+
+      // Status filter
+      if (newFilters.status) {
+        params.set("status", newFilters.status);
+      } else {
+        params.delete("status");
+      }
+
+      // Specialist filter
+      if (newFilters.specialistIds.length > 0) {
+        params.set("specialists", newFilters.specialistIds.join(","));
+      } else {
+        params.delete("specialists");
+      }
+
+      // Search filter
+      if (newFilters.search) {
+        params.set("search", newFilters.search);
+      } else {
+        params.delete("search");
+      }
+
+      // Reset to page 1 when filters change
+      params.set("page", "1");
+
+      router.push(`?${params.toString()}`);
+    },
+    [router, searchParams]
+  );
 
   // Create a stable debounced function
   const debouncedUpdateSearch = useMemo(
@@ -112,7 +121,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
   // Handle status filter change
   const handleStatusChange = (value: string) => {
     // Convert "all" to null, otherwise keep the value
-    const newStatus = value === "all" ? null : value as "active" | "closed";
+    const newStatus = value === "all" ? null : (value as "active" | "closed");
     const newFilters = { ...filters, status: newStatus };
     setFilters(newFilters);
     updateUrl(newFilters);
@@ -122,9 +131,9 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
   // Handle specialist selection
   const handleSpecialistToggle = (specialistId: string) => {
     const newSpecialistIds = filters.specialistIds.includes(specialistId)
-      ? filters.specialistIds.filter(id => id !== specialistId)
+      ? filters.specialistIds.filter((id) => id !== specialistId)
       : [...filters.specialistIds, specialistId];
-    
+
     const newFilters = { ...filters, specialistIds: newSpecialistIds };
     setFilters(newFilters);
     updateUrl(newFilters);
@@ -148,20 +157,20 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
   const hasActiveFilters = filters.status || filters.specialistIds.length > 0 || filters.search;
 
   // Get selected specialists' names for display
-  const selectedSpecialists = specialists.filter(s => filters.specialistIds.includes(s.id));
+  const selectedSpecialists = specialists.filter((s) => filters.specialistIds.includes(s.id));
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-4">
         {/* Search Input */}
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+        <div className="relative flex-1 min-w-[325px] max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search by examinee name..."
+            placeholder="Search by examinee name, email or phone"
             value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-9 pr-9"
+            className="pl-9 pr-3 bg-background"
           />
           {searchInput && (
             <button
@@ -173,23 +182,17 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
           )}
         </div>
 
-        {/* Status Toggle */}
-        <ToggleGroup
-          type="single"
-          value={filters.status || "all"}
-          onValueChange={handleStatusChange}
-          className="bg-muted p-1 rounded-md"
-        >
-          <ToggleGroupItem value="all" aria-label="All bookings">
-            All
-          </ToggleGroupItem>
-          <ToggleGroupItem value="active" aria-label="Active bookings">
-            Active
-          </ToggleGroupItem>
-          <ToggleGroupItem value="closed" aria-label="Closed bookings">
-            Closed
-          </ToggleGroupItem>
-        </ToggleGroup>
+        {/* Status Dropdown */}
+        <Select value={filters.status || "all"} onValueChange={handleStatusChange}>
+          <SelectTrigger className="w-[180px] bg-background hover:bg-accent">
+            <SelectValue placeholder="Select status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Bookings</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="closed">Closed</SelectItem>
+          </SelectContent>
+        </Select>
 
         {/* Specialist Multi-Select */}
         <Popover open={open} onOpenChange={setOpen}>
@@ -203,8 +206,8 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
               {selectedSpecialists.length === 0
                 ? "Select specialists..."
                 : selectedSpecialists.length === 1
-                ? selectedSpecialists[0].name
-                : `${selectedSpecialists.length} specialists`}
+                  ? selectedSpecialists[0].name
+                  : `${selectedSpecialists.length} specialists`}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -223,7 +226,9 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          filters.specialistIds.includes(specialist.id) ? "opacity-100" : "opacity-0"
+                          filters.specialistIds.includes(specialist.id)
+                            ? "opacity-100"
+                            : "opacity-0"
                         )}
                       />
                       <div className="flex-1">
@@ -240,12 +245,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
 
         {/* Clear Filters Button */}
         {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClearFilters}
-            className="h-10"
-          >
+          <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-10">
             Clear filters
           </Button>
         )}
@@ -255,15 +255,11 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
       {(selectedSpecialists.length > 0 || filters.status || filters.search) && (
         <div className="flex flex-wrap gap-2">
           {filters.status && (
-            <Badge variant="secondary" className="capitalize">
+            <Badge variant="stone" className="capitalize">
               Status: {filters.status}
             </Badge>
           )}
-          {filters.search && (
-            <Badge variant="secondary">
-              Search: {filters.search}
-            </Badge>
-          )}
+          {filters.search && <Badge variant="stone">Search: {filters.search}</Badge>}
           {selectedSpecialists.map((specialist) => (
             <Badge key={specialist.id} variant="secondary">
               {specialist.name}
