@@ -1,7 +1,7 @@
 # Story: 404 Page Implementation
 
 ## Status
-Approved
+Done
 
 ## Story
 **As a** user (both logged in and anonymous),  
