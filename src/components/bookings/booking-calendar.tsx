@@ -133,6 +133,18 @@ export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProp
     return grouped;
   }, [bookings]);
 
+  // Calculate total bookings for the current month
+  const totalMonthBookings = useMemo(() => {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+
+    return bookings.filter((booking) => {
+      if (!booking.examDate) return false;
+      const bookingDate = new Date(booking.examDate);
+      return bookingDate >= monthStart && bookingDate <= monthEnd;
+    }).length;
+  }, [bookings, currentDate]);
+
   const handleBookingClick = (booking: BookingWithSpecialist, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedBooking(booking);
@@ -144,7 +156,14 @@ export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProp
       {/* Calendar Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          <h2 className="text-xl font-bold sm:text-2xl">{headerTitle}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold sm:text-2xl">{headerTitle}</h2>
+            {viewType === "month" && (
+              <Badge variant="secondary" className="text-sm border border-gray-200">
+                {totalMonthBookings} {totalMonthBookings === 1 ? "booking" : "bookings"}
+              </Badge>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={navigatePrevious}>
               <ChevronLeft className="w-4 h-4" />
@@ -250,7 +269,7 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick }: MonthViewPro
       </div>
 
       {/* Calendar Days */}
-      <div className="grid grid-cols-7">
+      <div className="grid grid-cols-7 ">
         {calendarDays.map((day, index) => {
           const dateKey = format(day, "yyyy-MM-dd");
           const dayBookings = bookingsByDate[dateKey] || [];
@@ -261,7 +280,7 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick }: MonthViewPro
             <div
               key={index}
               className={cn(
-                "min-h-[80px] sm:min-h-[120px] p-1 sm:p-2 border-r border-b last:border-r-0",
+                "min-h-[80px] sm:min-h-[150px] p-1 sm:p-2 border-r border-b last:border-r-0",
                 !isCurrentMonth && "bg-muted/30",
                 isToday && "bg-blue-50 dark:bg-blue-950/20"
               )}

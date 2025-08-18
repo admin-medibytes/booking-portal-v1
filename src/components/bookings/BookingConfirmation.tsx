@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, User, Calendar, Clock, Phone, Mail, FileText, MapPin, Video, AlertCircle } from "lucide-react";
 import { bookingsClient } from "@/lib/hono-client";
-import { handleApiResponse } from "@/lib/hono-utils";
+import { ApiError } from "@/lib/hono-utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Specialist } from "@/types/booking";
@@ -41,7 +41,7 @@ export function BookingConfirmation({
 
   const createBookingMutation = useMutation({
     mutationFn: async () => {
-      const response = bookingsClient.$post({
+      const response = await bookingsClient.$post({
         json: {
           specialistId: specialist.id,
           appointmentDateTime: dateTime.toISOString(),
@@ -52,7 +52,13 @@ export function BookingConfirmation({
           notes: examineeData.notes,
         },
       });
-      return await handleApiResponse<{ id: string }>(response);
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new ApiError(error || 'Failed to create booking', response.status);
+      }
+      
+      return await response.json() as { success: boolean; id: string; message: string };
     },
     onSuccess: (data) => {
       onConfirm(data.id);
