@@ -1,13 +1,14 @@
 import { db } from "@/server/db";
 import { auditLogs } from "@/server/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, or } from "drizzle-orm";
 
 interface AuditLogData {
   userId: string;
   impersonatedUserId?: string;
   action: string;
-  resourceType: string;
-  resourceId: string;
+  resourceType?: string;
+  resourceId?: string;
+  targetId?: string;
   metadata?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
@@ -19,8 +20,8 @@ export class AuditService {
       await db.insert(auditLogs).values({
         userId: data.userId,
         action: data.action,
-        entityType: data.resourceType,
-        entityId: data.resourceId,
+        entityType: data.resourceType || "user",
+        entityId: data.resourceId || data.targetId || "",
         changes: {
           ...data.metadata,
           impersonatedUserId: data.impersonatedUserId,
@@ -48,6 +49,15 @@ export class AuditService {
       .select()
       .from(auditLogs)
       .where(eq(auditLogs.userId, userId))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit);
+  }
+
+  async getUserAuditHistory(userId: string, limit = 50) {
+    return db
+      .select()
+      .from(auditLogs)
+      .where(or(eq(auditLogs.userId, userId), eq(auditLogs.entityId, userId)))
       .orderBy(desc(auditLogs.createdAt))
       .limit(limit);
   }

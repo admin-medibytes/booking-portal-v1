@@ -6,7 +6,7 @@ import { bookingDetailKeys } from "./use-booking";
 
 interface UpdateProgressParams {
   bookingId: string;
-  progress: string;
+  progress: "scheduled" | "rescheduled" | "cancelled" | "no-show" | "generating-report" | "report-generated" | "payment-received";
   notes?: string;
 }
 
@@ -15,7 +15,8 @@ export function useUpdateProgress() {
 
   return useMutation({
     mutationFn: async ({ bookingId, progress, notes }: UpdateProgressParams) => {
-      const response = bookingsClient[bookingId].progress.$post({
+      const response = bookingsClient[":id"].progress.$post({
+        param: { id: bookingId },
         json: { progress, notes },
       });
       return await handleApiResponse(response);

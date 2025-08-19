@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { type } from "arktype";
-import { logger } from "@/server/utils/logger";
 import { bookingService } from "@/server/services/booking.service";
 import { authMiddleware, requireAuth } from "@/server/middleware/auth.middleware";
 import { bookingCreateRateLimit } from "@/server/middleware/rate-limit.middleware";

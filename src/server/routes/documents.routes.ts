@@ -30,68 +30,75 @@ const documentDownloadRateLimit = createRateLimiter({
   },
 });
 
-const uploadDocumentSchema = type({
-  bookingId: "string",
-  section: "'ime_documents' | 'supplementary_documents'",
-  category: "'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report'",
-  fileName: "string",
-  fileSize: "number",
-  mimeType: "string",
-});
-
 const documentsRoutes = new Hono()
   .use("*", authMiddleware)
   .use("*", requireAuth)
   .use("*", checkImpersonation)
 
-  .post("/", documentUploadRateLimit, arktypeValidator("form", uploadDocumentSchema), async (c) => {
-    try {
-      const authContext = c.get("auth");
-      const user = authContext?.user;
-      if (!user) {
-        return c.json({ error: "Unauthorized" }, 401);
+  .post(
+    "/",
+    documentUploadRateLimit,
+    arktypeValidator(
+      "form",
+      type({
+        bookingId: "string",
+        section: "'ime_documents' | 'supplementary_documents'",
+        category:
+          "'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report'",
+        fileName: "string",
+        fileSize: "number",
+        mimeType: "string",
+      })
+    ),
+    async (c) => {
+      try {
+        const authContext = c.get("auth");
+        const user = authContext?.user;
+        if (!user) {
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+
+        const formData = await c.req.formData();
+        const file = formData.get("file") as File;
+        const metadata = JSON.parse(formData.get("metadata") as string);
+
+        if (!file) {
+          return c.json({ error: "No file provided" }, 400);
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+          return c.json(
+            { error: `File size exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes` },
+            400
+          );
+        }
+
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+        const memberRole =
+          "user" in authContext && authContext.user && "memberRole" in authContext.user
+            ? (authContext.user as { memberRole?: string }).memberRole
+            : undefined;
+
+        const document = await documentService.uploadDocument({
+          bookingId: metadata.bookingId,
+          uploadedById: user.id,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+          section: metadata.section,
+          category: metadata.category,
+          fileBuffer,
+          userRole: memberRole,
+        });
+
+        return c.json({ data: document });
+      } catch (error) {
+        console.error("Document upload error:", error);
+        return c.json({ error: "Failed to upload document" }, 500);
       }
-
-      const formData = await c.req.formData();
-      const file = formData.get("file") as File;
-      const metadata = JSON.parse(formData.get("metadata") as string);
-
-      if (!file) {
-        return c.json({ error: "No file provided" }, 400);
-      }
-
-      if (file.size > MAX_FILE_SIZE) {
-        return c.json(
-          { error: `File size exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes` },
-          400
-        );
-      }
-
-      const fileBuffer = Buffer.from(await file.arrayBuffer());
-
-      const memberRole =
-        "user" in authContext && authContext.user && "memberRole" in authContext.user
-          ? (authContext.user as { memberRole?: string }).memberRole
-          : undefined;
-
-      const document = await documentService.uploadDocument({
-        bookingId: metadata.bookingId,
-        uploadedById: user.id,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-        section: metadata.section,
-        category: metadata.category,
-        fileBuffer,
-        userRole: memberRole,
-      });
-
-      return c.json({ data: document });
-    } catch (error) {
-      console.error("Document upload error:", error);
-      return c.json({ error: "Failed to upload document" }, 500);
     }
-  })
+  )
 
   .get("/:id", documentDownloadRateLimit, async (c) => {
     try {
@@ -265,51 +272,63 @@ const documentsRoutes = new Hono()
     }
   })
 
-  .get("/booking/:bookingId", async (c) => {
-    try {
-      const authContext = c.get("auth");
-      const user = authContext?.user;
-      if (!user) {
-        return c.json({ error: "Unauthorized" }, 401);
+  .get(
+    "/booking/:bookingId",
+    arktypeValidator("param", type({ bookingId: "string" })),
+    arktypeValidator(
+      "query",
+      type({
+        section: "'ime_documents' | 'supplementary_documents' | undefined",
+        category:
+          "'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report' | undefined",
+      })
+    ),
+    async (c) => {
+      try {
+        const authContext = c.get("auth");
+        const user = authContext?.user;
+        if (!user) {
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+
+        const bookingId = c.req.param("bookingId");
+        const section = c.req.query("section") as
+          | "ime_documents"
+          | "supplementary_documents"
+          | undefined;
+        const category = c.req.query("category") as DocumentCategory | undefined;
+        const memberRole =
+          "user" in authContext && authContext.user && "memberRole" in authContext.user
+            ? (authContext.user as { memberRole?: string }).memberRole
+            : undefined;
+        const session = authContext?.session;
+        const impersonatedUserId = session?.impersonatedBy || undefined;
+
+        const documents = await documentService.getDocumentsByBooking(bookingId, user.id, {
+          section,
+          category,
+          userRole: memberRole,
+          impersonatedUserId,
+        });
+
+        return c.json({ data: documents });
+      } catch (error) {
+        console.error("Document list error:", error);
+
+        if (error instanceof Error && error.message === "Access denied") {
+          return c.json(
+            {
+              error: "Access denied",
+              message: "You do not have permission to view documents for this booking",
+            },
+            403
+          );
+        }
+
+        return c.json({ error: "Failed to fetch documents" }, 500);
       }
-
-      const bookingId = c.req.param("bookingId");
-      const section = c.req.query("section") as
-        | "ime_documents"
-        | "supplementary_documents"
-        | undefined;
-      const category = c.req.query("category") as DocumentCategory | undefined;
-      const memberRole =
-        "user" in authContext && authContext.user && "memberRole" in authContext.user
-          ? (authContext.user as { memberRole?: string }).memberRole
-          : undefined;
-      const session = authContext?.session;
-      const impersonatedUserId = session?.impersonatedBy || undefined;
-
-      const documents = await documentService.getDocumentsByBooking(bookingId, user.id, {
-        section,
-        category,
-        userRole: memberRole,
-        impersonatedUserId,
-      });
-
-      return c.json({ data: documents });
-    } catch (error) {
-      console.error("Document list error:", error);
-
-      if (error instanceof Error && error.message === "Access denied") {
-        return c.json(
-          {
-            error: "Access denied",
-            message: "You do not have permission to view documents for this booking",
-          },
-          403
-        );
-      }
-
-      return c.json({ error: "Failed to fetch documents" }, 500);
     }
-  });
+  );
 
 // Helper function to sanitize filenames
 function sanitizeFilename(filename: string): string {

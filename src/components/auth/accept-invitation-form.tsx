@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { type } from "arktype";
 import { useForm } from "@tanstack/react-form";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";

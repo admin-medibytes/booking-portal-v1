@@ -74,6 +74,8 @@ export class DocumentPermissionsService {
   getUserRole(memberRole: string | undefined): UserRole {
     // Map member roles to document permission roles
     switch (memberRole) {
+      case "admin":
+        return "admin";
       case "referrer":
         return "referrer";
       case "specialist":
@@ -93,13 +95,13 @@ export class DocumentPermissionsService {
     section: "ime_documents" | "supplementary_documents"
   ): DocumentCategory[] {
     const allCategories = this.getAllowedCategories(role, "upload");
-    
+
     if (section === "ime_documents") {
       // All categories are available in IME Documents
       return allCategories;
     } else {
       // Supplementary Documents excludes consent_form
-      return allCategories.filter(cat => cat !== "consent_form");
+      return allCategories.filter((cat) => cat !== "consent_form");
     }
   }
 }

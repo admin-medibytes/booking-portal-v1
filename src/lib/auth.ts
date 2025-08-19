@@ -79,15 +79,25 @@ export const auth = betterAuth({
     }),
 
     organization({
-      allowUserToCreateOrganization: false, // Only admins can create organizations
+      allowUserToCreateOrganization: async (user) => {
+        return user.role === "admin";
+      },
       teams: {
         enabled: true,
         defaultTeam: {
           enabled: true,
+          customCreateDefaultTeam: async (organization) => {
+            return {
+              id: crypto.randomUUID(),
+              name: "Default Team",
+              organizationId: organization.id,
+              createdAt: new Date(),
+            };
+          },
         },
+        allowRemovingAllTeams: false,
       },
       creatorRole: "owner",
-      membershipLimit: 100,
       invitationExpiresIn: 604800, // 7 days
       sendInvitationEmail: async ({ email, inviter, organization, id, invitation }) => {
         const inviteLink = `${env.APP_URL}/accept-invitation/${id}`;
@@ -99,6 +109,71 @@ export const auth = betterAuth({
           organizationName: organization.name,
           expiresAt: invitation.expiresAt,
         });
+      },
+      schema: {
+        organization: {
+          additionalFields: {
+            contactEmail: {
+              type: "string",
+              required: false,
+              input: true,
+            },
+            phone: {
+              type: "string",
+              required: false,
+              input: true,
+            },
+            address: {
+              type: "string",
+              required: false,
+              input: true,
+            },
+          },
+        },
+      },
+      organizationCreation: {
+        beforeCreate: async ({ organization, user }) => {
+          return {
+            data: {
+              ...organization,
+              metadata: {
+                ...organization.metadata,
+                createdBy: user.id,
+              },
+            },
+          };
+        },
+        afterCreate: async ({ organization, user }) => {
+          const { auditService } = await import("@/server/services/audit.service");
+          await auditService.log({
+            userId: user.id,
+            action: "organization.created",
+            resourceType: "organization",
+            resourceId: organization.id,
+            metadata: {
+              organizationName: organization.name,
+              organizationSlug: organization.slug,
+            },
+          });
+        },
+      },
+      organizationDeletion: {
+        beforeDelete: async () => {
+          return;
+        },
+        afterDelete: async ({ organization, user }) => {
+          const { auditService } = await import("@/server/services/audit.service");
+          await auditService.log({
+            userId: user.id,
+            action: "organization.deleted",
+            resourceType: "organization",
+            resourceId: organization.id,
+            metadata: {
+              organizationName: organization.name,
+              organizationSlug: organization.slug,
+            },
+          });
+        },
       },
     }),
 

@@ -8,7 +8,7 @@ import {
 } from "@/server/repositories/specialist.repository";
 import { acuityService } from "@/server/services/acuity.service";
 import { logger } from "@/server/utils/logger";
-import type { SyncSpecialistRequest, SpecialistAvailabilityResponse } from "@/types/acuity";
+import type { SpecialistAvailabilityResponse } from "@/types/acuity";
 
 // Helper function for role-based field filtering
 function getSpecialistFields(

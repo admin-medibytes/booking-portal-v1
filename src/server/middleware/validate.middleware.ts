@@ -3,7 +3,7 @@ import type { Type, ArkErrors } from "arktype";
 import type { Context, MiddlewareHandler, Env, ValidationTargets, TypedResponse } from "hono";
 import { validator } from "hono/validator";
 
-export type Hook<T, E extends Env, P extends string, O = {}> = (
+export type Hook<T, E extends Env, P extends string, O = object> = (
   result: { success: false; data: unknown; errors: ArkErrors } | { success: true; data: T },
   c: Context<E, P>
 ) => Response | Promise<Response> | void | Promise<Response | void> | TypedResponse<O>;

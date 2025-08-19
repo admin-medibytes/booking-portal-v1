@@ -12,12 +12,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle } from "lucide-react";
 import Link from "next/link";
 
-const resetPasswordSchema = type({
+const _resetPasswordSchema = type({
   newPassword: "string>=8",
   confirmPassword: "string>=8",
 });
 
-type ResetPasswordFormData = typeof resetPasswordSchema.infer;
+type ResetPasswordFormData = typeof _resetPasswordSchema.infer;
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -68,9 +68,8 @@ export function ResetPasswordForm() {
         setTimeout(() => {
           router.push("/login");
         }, 3000);
-      } catch (err) {
+      } catch (_err) {
         setError("An unexpected error occurred");
-        console.error(err);
       }
     },
   });
@@ -78,17 +77,14 @@ export function ResetPasswordForm() {
   if (success) {
     return (
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <div className="px-4 py-8 bg-white shadow sm:rounded-lg sm:px-10">
           <div className="text-center">
-            <CheckCircle className="mx-auto h-12 w-12 text-green-600 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Password reset successful</h3>
-            <p className="text-sm text-gray-600 mb-6">
+            <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-600" />
+            <h3 className="mb-2 text-lg font-medium text-gray-900">Password reset successful</h3>
+            <p className="mb-6 text-sm text-gray-600">
               Your password has been reset. Redirecting to sign in...
             </p>
-            <Link
-              href="/login"
-              className="text-sm font-medium text-blue-600 hover:text-blue-500"
-            >
+            <Link href="/login" className="text-sm font-medium text-blue-600 hover:text-blue-500">
               Go to sign in
             </Link>
           </div>
@@ -105,7 +101,7 @@ export function ResetPasswordForm() {
           e.stopPropagation();
           form.handleSubmit();
         }}
-        className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 space-y-6"
+        className="px-4 py-8 space-y-6 bg-white shadow sm:rounded-lg sm:px-10"
       >
         <div className="space-y-4">
           <form.Field

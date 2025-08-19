@@ -29,7 +29,9 @@ export function useBookingWithDetails(id: string) {
   return useQuery({
     queryKey: bookingDetailKeys.detail(id),
     queryFn: async () => {
-      const response = bookingsClient[id].$get();
+      const response = bookingsClient[":id"].$get({
+        param: { id }
+      });
       const data = await handleApiResponse<{ success: boolean; booking: BookingWithDetails }>(response);
       return data.booking;
     },

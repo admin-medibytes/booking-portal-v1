@@ -10,7 +10,9 @@ export function useDeleteDocument() {
   const mutation = useMutation({
     mutationFn: async (documentId: string) => {
       deletingDocuments.add(documentId);
-      const response = documentsClient[documentId].$delete();
+      const response = documentsClient[":id"].$delete({
+        param: { id: documentId }
+      });
       return await handleApiResponse<{ message: string }>(response);
     },
     onSuccess: (_, documentId) => {

@@ -306,7 +306,7 @@ export function GlobalSearch({ onResultClick }: GlobalSearchProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setIsOpen(true)}
-          className="pl-8 pr-16 transition-all duration-200 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-300"
+          className="pl-8 pr-16 bg-background"
         />
         <div className="absolute flex items-center gap-1 right-2 top-2">
           <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">

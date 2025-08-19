@@ -16,17 +16,17 @@ interface UseDocumentsOptions {
 
 export function useDocuments(bookingId: string, options?: UseDocumentsOptions) {
   const { section, category } = options || {};
-  
+
   return useQuery({
     queryKey: [...documentKeys.list(bookingId), { section, category }],
     queryFn: async () => {
       try {
-        const query: Record<string, string> = {};
-        if (section) query.section = section;
-        if (category) query.category = category;
-        
-        const response = documentsClient.booking[bookingId].$get({
-          query,
+        const response = documentsClient.booking[":bookingId"].$get({
+          param: { bookingId },
+          query: {
+            section,
+            category,
+          },
         });
         const result = await handleApiResponse<DocumentsResponse>(response);
         return result.data;
