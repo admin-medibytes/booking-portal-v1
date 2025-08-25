@@ -5,6 +5,7 @@ import { arktypeValidator } from "@/server/middleware/validate.middleware";
 import {
   specialistRepository,
   type UpdateSpecialistInputType,
+  type UpdatePositionsInputType,
 } from "@/server/repositories/specialist.repository";
 import { acuityService } from "@/server/services/acuity.service";
 import { logger } from "@/server/utils/logger";
@@ -18,24 +19,31 @@ function getSpecialistFields(
     userId: string;
     acuityCalendarId: string;
     name: string;
-    specialty: string;
     location: string | null;
+    position: number;
     isActive: boolean;
     createdAt: Date;
     updatedAt: Date;
   },
-  specialistUser: { id: string; email: string; firstName: string; lastName: string }
+  specialistUser: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    jobTitle: string;
+  }
 ) {
   const baseFields = {
     id: specialist.id,
     name: specialist.name,
-    specialty: specialist.specialty,
     location: specialist.location,
+    position: specialist.position,
     isActive: specialist.isActive,
     user: {
       id: specialistUser.id,
       firstName: specialistUser.firstName,
       lastName: specialistUser.lastName,
+      jobTitle: specialistUser.jobTitle,
     },
     createdAt: specialist.createdAt,
     updatedAt: specialist.updatedAt,
@@ -65,7 +73,6 @@ const syncSpecialistSchema = type({
 
 const updateSpecialistSchema = type({
   "name?": "string",
-  "specialty?": "string",
   "location?": "string | null",
   "isActive?": "boolean",
 });
@@ -224,7 +231,6 @@ const specialistsRoutes = new Hono()
           userId: data.userId,
           acuityCalendarId: data.acuityCalendarId,
           name: acuityCalendar.name,
-          specialty: "general_practice", // Default, should be updated via UI
           location: null, // Default to telehealth
           isActive: true,
         });
@@ -256,6 +262,70 @@ const specialistsRoutes = new Hono()
           {
             success: false,
             error: error instanceof Error ? error.message : "Failed to sync specialist",
+          },
+          500
+        );
+      }
+    }
+  )
+
+  // PUT /api/specialists/positions - Bulk update positions (Admin only)
+  .put(
+    "/positions",
+    requireRole("admin"),
+    arktypeValidator(
+      "json",
+      type({
+        id: "string",
+        position: "number",
+      }).array()
+    ),
+    async (c) => {
+      try {
+        const positions = c.req.valid("json");
+
+        // Validate all positions are unique
+        const positionSet = new Set(positions.map((p) => p.position));
+        if (positionSet.size !== positions.length) {
+          return c.json(
+            {
+              success: false,
+              error: "Duplicate positions provided",
+            },
+            400
+          );
+        }
+
+        // Update positions in a transaction
+        const result = await specialistRepository.updatePositions(
+          positions as UpdatePositionsInputType
+        );
+
+        // Audit log the update
+        const authContext = c.get("auth");
+        const adminUser = authContext?.user;
+        if (adminUser) {
+          logger.audit("update_specialist_positions", adminUser.id, "specialist", "bulk", {
+            updatedCount: result.updated,
+            positions: positions.map((p) => ({ id: p.id, position: p.position })),
+          });
+        }
+
+        logger.info("Specialist positions updated", {
+          updatedCount: result.updated,
+        });
+
+        return c.json({
+          success: true,
+          data: result,
+          message: "Positions updated successfully",
+        });
+      } catch (error) {
+        logger.error("Failed to update specialist positions", error as Error);
+        return c.json(
+          {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update positions",
           },
           500
         );
@@ -412,6 +482,58 @@ const specialistsRoutes = new Hono()
   })
 
   // GET /api/specialists/:id/availability - Get specialist availability
+  .get("/:id/appointment-types", async (c) => {
+    try {
+      const authContext = c.get("auth");
+      const specialistId = c.req.param("id");
+
+      if (!authContext?.user) {
+        return c.json(
+          {
+            success: false,
+            error: "Authentication required",
+          },
+          401
+        );
+      }
+
+      // Get specialist details
+      const specialistData = await specialistRepository.findById(specialistId);
+      if (!specialistData) {
+        return c.json(
+          {
+            success: false,
+            error: "Specialist not found",
+          },
+          404
+        );
+      }
+
+      // Fetch appointment types from Acuity
+      const appointmentTypes = await acuityService.getAppointmentTypes();
+
+      // Return appointment types with relevant information
+      return c.json({
+        success: true,
+        data: appointmentTypes.map((type) => ({
+          id: type.id,
+          name: type.name,
+          duration: type.duration,
+          description: type.description,
+          category: type.category,
+        })),
+      });
+    } catch (error) {
+      logger.error("Failed to fetch appointment types", error as Error);
+      return c.json(
+        {
+          success: false,
+          error: "Failed to fetch appointment types",
+        },
+        500
+      );
+    }
+  })
   .get("/:id/availability", async (c) => {
     try {
       const authContext = c.get("auth");

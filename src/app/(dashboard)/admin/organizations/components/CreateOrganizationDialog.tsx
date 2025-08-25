@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "@tanstack/react-form";
-import { useMutation } from "@tanstack/react-query";
-import { type } from "arktype";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -17,20 +16,12 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { adminClient } from "@/lib/hono-client";
 import { toast } from "sonner";
+import { debounce } from "@/lib/debounce";
 
-const organizationSchema = type({
-  name: "2<=string<=100",
-  slug: "string",
-  "contactEmail?": "string.email",
-  "phone?": "string",
-  "address?": {
-    street: "string",
-    city: "string",
-    state: "string",
-    zipCode: "string",
-    country: "string",
-  },
-});
+type OrganizationData = {
+  name: string;
+  slug: string;
+};
 
 interface CreateOrganizationDialogProps {
   open: boolean;
@@ -45,26 +36,17 @@ export function CreateOrganizationDialog({
 }: CreateOrganizationDialogProps) {
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [checkingSlug, setCheckingSlug] = useState(false);
+  const queryClient = useQueryClient();
 
   const form = useForm({
     defaultValues: {
       name: "",
       slug: "",
-      contactEmail: "",
-      phone: "",
-      address: {
-        street: "",
-        city: "",
-        state: "",
-        zipCode: "",
-        country: "USA",
-      },
     },
     onSubmit: async ({ value }) => {
-      const validationResult = organizationSchema(value);
-      if (validationResult instanceof type.errors) {
-        const firstError = validationResult[0].message;
-        toast.error(firstError);
+      // Check required fields
+      if (!value.name || !value.slug) {
+        toast.error("Name and slug are required");
         return;
       }
 
@@ -73,13 +55,13 @@ export function CreateOrganizationDialog({
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: typeof form.state.values) => {
+    mutationFn: async (data: OrganizationData) => {
       const response = await adminClient.organizations.$post({
         json: data,
       });
 
       if (!response.ok) {
-        const error = await response.json() as { message?: string };
+        const error = (await response.json()) as { message?: string };
         throw new Error(error.message || "Failed to create organization");
       }
 
@@ -87,6 +69,7 @@ export function CreateOrganizationDialog({
     },
     onSuccess: () => {
       toast.success("Organization created successfully");
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
       form.reset();
       onSuccess();
     },
@@ -95,30 +78,36 @@ export function CreateOrganizationDialog({
     },
   });
 
-  const checkSlugAvailability = async (slug: string) => {
-    if (!slug) {
-      setSlugAvailable(null);
-      return;
-    }
+  // Create a stable debounced function
+  const debouncedCheckSlugAvailability = useMemo(
+    () =>
+      debounce(async (slug: string) => {
+        if (!slug) {
+          setSlugAvailable(null);
+          return;
+        }
 
-    setCheckingSlug(true);
-    try {
-      const response = await adminClient.organizations["check-slug"].$post({
-        json: { slug },
-      });
+        setCheckingSlug(true);
+        try {
+          const response = await adminClient.organizations["check-slug"].$post({
+            json: { slug },
+          });
 
-      if (response.ok) {
-        const data = await response.json();
-        setSlugAvailable(data.available);
-      } else {
-        setSlugAvailable(null);
-      }
-    } catch {
-      setSlugAvailable(null);
-    } finally {
-      setCheckingSlug(false);
-    }
-  };
+          if (response.ok) {
+            const data = await response.json();
+            setSlugAvailable(data.available);
+          } else {
+            setSlugAvailable(null);
+          }
+        } catch {
+          setSlugAvailable(null);
+        } finally {
+          setCheckingSlug(false);
+        }
+      }, 500),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   const generateSlug = (name: string) => {
     return name
@@ -143,201 +132,77 @@ export function CreateOrganizationDialog({
           }}
           className="space-y-4"
         >
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <form.Field name="name">
-                  {(field) => (
-                    <>
-                      <Label htmlFor="name">Organization Name *</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <form.Field name="name">
+                {(field) => (
+                  <>
+                    <Label htmlFor="name">Organization Name *</Label>
+                    <Input
+                      id="name"
+                      value={field.state.value}
+                      onChange={(e) => {
+                        field.handleChange(e.target.value);
+                        const slug = generateSlug(e.target.value);
+                        form.setFieldValue("slug", slug);
+                        debouncedCheckSlugAvailability(slug);
+                      }}
+                      placeholder="Medical Clinic Inc."
+                      required
+                    />
+                  </>
+                )}
+              </form.Field>
+            </div>
+
+            <div className="space-y-2">
+              <form.Field name="slug">
+                {(field) => (
+                  <>
+                    <Label htmlFor="slug">Slug *</Label>
+                    <div className="relative">
                       <Input
-                        id="name"
+                        id="slug"
                         value={field.state.value}
                         onChange={(e) => {
                           field.handleChange(e.target.value);
-                          const slug = generateSlug(e.target.value);
-                          form.setFieldValue("slug", slug);
-                          checkSlugAvailability(slug);
+                          debouncedCheckSlugAvailability(e.target.value);
                         }}
-                        placeholder="Medical Clinic Inc."
+                        placeholder="medical-clinic"
                         required
+                        className={
+                          slugAvailable === false
+                            ? "border-red-500"
+                            : slugAvailable === true
+                              ? "border-green-500"
+                              : ""
+                        }
                       />
-                    </>
-                  )}
-                </form.Field>
-              </div>
-
-              <div className="space-y-2">
-                <form.Field name="slug">
-                  {(field) => (
-                    <>
-                      <Label htmlFor="slug">Slug *</Label>
-                      <div className="relative">
-                        <Input
-                          id="slug"
-                          value={field.state.value}
-                          onChange={(e) => {
-                            field.handleChange(e.target.value);
-                            checkSlugAvailability(e.target.value);
-                          }}
-                          placeholder="medical-clinic"
-                          required
-                          className={
-                            slugAvailable === false
-                              ? "border-red-500"
-                              : slugAvailable === true
-                                ? "border-green-500"
-                                : ""
-                          }
-                        />
-                        {checkingSlug && (
-                          <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin" />
-                        )}
-                      </div>
-                      {slugAvailable === false && (
-                        <p className="text-sm text-red-500 mt-1">This slug is already taken</p>
+                      {checkingSlug && (
+                        <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin" />
                       )}
-                      {slugAvailable === true && (
-                        <p className="text-sm text-green-500 mt-1">This slug is available</p>
-                      )}
-                    </>
-                  )}
-                </form.Field>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <form.Field name="contactEmail">
-                  {(field) => (
-                    <>
-                      <Label htmlFor="contactEmail">Contact Email</Label>
-                      <Input
-                        id="contactEmail"
-                        type="email"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        placeholder="contact@organization.com"
-                      />
-                    </>
-                  )}
-                </form.Field>
-              </div>
-
-              <div className="space-y-2">
-                <form.Field name="phone">
-                  {(field) => (
-                    <>
-                      <Label htmlFor="phone">Phone</Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        placeholder="+1 (555) 123-4567"
-                      />
-                    </>
-                  )}
-                </form.Field>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Address (Optional)</h3>
-
-              <div className="space-y-2">
-                <form.Field name="address.street">
-                  {(field) => (
-                    <>
-                      <Label htmlFor="street">Street Address</Label>
-                      <Input
-                        id="street"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        placeholder="123 Main St"
-                      />
-                    </>
-                  )}
-                </form.Field>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <form.Field name="address.city">
-                    {(field) => (
-                      <>
-                        <Label htmlFor="city">City</Label>
-                        <Input
-                          id="city"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="New York"
-                        />
-                      </>
+                    </div>
+                    {slugAvailable === false && (
+                      <p className="mt-1 text-sm text-red-500">This slug is already taken</p>
                     )}
-                  </form.Field>
-                </div>
-
-                <div className="space-y-2">
-                  <form.Field name="address.state">
-                    {(field) => (
-                      <>
-                        <Label htmlFor="state">State</Label>
-                        <Input
-                          id="state"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="NY"
-                        />
-                      </>
+                    {slugAvailable === true && (
+                      <p className="mt-1 text-sm text-green-500">This slug is available</p>
                     )}
-                  </form.Field>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <form.Field name="address.zipCode">
-                    {(field) => (
-                      <>
-                        <Label htmlFor="zipCode">ZIP Code</Label>
-                        <Input
-                          id="zipCode"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="10001"
-                        />
-                      </>
-                    )}
-                  </form.Field>
-                </div>
-
-                <div className="space-y-2">
-                  <form.Field name="address.country">
-                    {(field) => (
-                      <>
-                        <Label htmlFor="country">Country</Label>
-                        <Input
-                          id="country"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="USA"
-                        />
-                      </>
-                    )}
-                  </form.Field>
-                </div>
-              </div>
+                  </>
+                )}
+              </form.Field>
             </div>
+          </div>
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending || slugAvailable === false}>
-                {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Organization
-              </Button>
-            </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={createMutation.isPending || slugAvailable === false}>
+              {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Create Organization
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

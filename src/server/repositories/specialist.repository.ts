@@ -1,6 +1,6 @@
 import { db } from "@/server/db";
 import { specialists, users } from "@/server/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, asc } from "drizzle-orm";
 import { type } from "arktype";
 
 // Input validation schemas
@@ -8,22 +8,35 @@ export const CreateSpecialistInput = type({
   userId: "string",
   acuityCalendarId: "string",
   name: "string",
-  specialty: "string",
   location: "string | null | undefined",
   isActive: "boolean | undefined",
 });
 
 export const UpdateSpecialistInput = type({
   name: "string | undefined",
-  specialty: "string | undefined",
   location: "string | null | undefined",
   isActive: "boolean | undefined",
 });
 
+export const UpdatePositionsInput = type({
+  id: "string",
+  position: "number",
+}).array();
+
 export type CreateSpecialistInputType = typeof CreateSpecialistInput.infer;
 export type UpdateSpecialistInputType = typeof UpdateSpecialistInput.infer;
+export type UpdatePositionsInputType = typeof UpdatePositionsInput.infer;
 
 export class SpecialistRepository {
+  // Get the highest position value
+  async getMaxPosition(): Promise<number> {
+    const result = await db
+      .select({ maxPosition: sql<number>`COALESCE(MAX(position), 0)` })
+      .from(specialists);
+
+    return result[0]?.maxPosition ?? 0;
+  }
+
   // Create a new specialist
   async create(data: CreateSpecialistInputType) {
     const validated = CreateSpecialistInput(data);
@@ -31,14 +44,18 @@ export class SpecialistRepository {
       throw new Error(`Invalid specialist data: ${validated[0]?.message}`);
     }
 
+    // Get the next position
+    const maxPosition = await this.getMaxPosition();
+    const position = maxPosition + 1;
+
     const [specialist] = await db
       .insert(specialists)
       .values({
         userId: validated.userId,
         acuityCalendarId: validated.acuityCalendarId,
         name: validated.name,
-        specialty: validated.specialty,
         location: validated.location ?? null,
+        position,
         isActive: validated.isActive ?? true,
       })
       .returning();
@@ -56,13 +73,11 @@ export class SpecialistRepository {
     // Build update object dynamically
     const updateData: Partial<{
       name: string;
-      specialty: string;
       location: string | null;
       isActive: boolean;
       updatedAt: Date;
     }> = {};
     if (validated.name !== undefined) updateData.name = validated.name;
-    if (validated.specialty !== undefined) updateData.specialty = validated.specialty;
     if (validated.location !== undefined) updateData.location = validated.location;
     if (validated.isActive !== undefined) updateData.isActive = validated.isActive;
 
@@ -83,7 +98,13 @@ export class SpecialistRepository {
     const result = await db
       .select({
         specialist: specialists,
-        user: users,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          jobTitle: users.jobTitle,
+        },
       })
       .from(specialists)
       .innerJoin(users, eq(specialists.userId, users.id))
@@ -98,7 +119,13 @@ export class SpecialistRepository {
     const result = await db
       .select({
         specialist: specialists,
-        user: users,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          jobTitle: users.jobTitle,
+        },
       })
       .from(specialists)
       .innerJoin(users, eq(specialists.userId, users.id))
@@ -113,7 +140,13 @@ export class SpecialistRepository {
     const result = await db
       .select({
         specialist: specialists,
-        user: users,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          jobTitle: users.jobTitle,
+        },
       })
       .from(specialists)
       .innerJoin(users, eq(specialists.userId, users.id))
@@ -128,12 +161,18 @@ export class SpecialistRepository {
     const results = await db
       .select({
         specialist: specialists,
-        user: users,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          jobTitle: users.jobTitle,
+        },
       })
       .from(specialists)
       .innerJoin(users, eq(specialists.userId, users.id))
       .where(eq(specialists.isActive, true))
-      .orderBy(specialists.name);
+      .orderBy(asc(specialists.position));
 
     return results;
   }
@@ -143,11 +182,17 @@ export class SpecialistRepository {
     const results = await db
       .select({
         specialist: specialists,
-        user: users,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          jobTitle: users.jobTitle,
+        },
       })
       .from(specialists)
       .innerJoin(users, eq(specialists.userId, users.id))
-      .orderBy(specialists.name);
+      .orderBy(asc(specialists.position));
 
     return results;
   }
@@ -198,6 +243,108 @@ export class SpecialistRepository {
       .returning();
 
     return specialist;
+  }
+
+  // Bulk update positions (for drag-and-drop reordering)
+  async updatePositions(updates: UpdatePositionsInputType) {
+    const validated = UpdatePositionsInput(updates);
+    if (validated instanceof type.errors) {
+      throw new Error(`Invalid position update data: ${validated[0]?.message}`);
+    }
+
+    // Use a transaction to ensure atomicity
+    return await db.transaction(async (tx) => {
+      try {
+        // First, verify all specialists exist
+        const specialistIds = validated.map((u) => u.id);
+        const existingSpecialists = await tx
+          .select({ id: specialists.id })
+          .from(specialists)
+          .where(sql`${specialists.id} IN ${specialistIds}`);
+
+        if (existingSpecialists.length !== specialistIds.length) {
+          throw new Error("One or more specialists not found");
+        }
+
+        // Temporarily set positions to negative values to avoid unique constraint violations
+        const tempUpdatePromises = validated.map((update, index) =>
+          tx
+            .update(specialists)
+            .set({
+              position: -(index + 1000), // Use negative values as temporary
+              updatedAt: new Date(),
+            })
+            .where(eq(specialists.id, update.id))
+        );
+
+        await Promise.all(tempUpdatePromises);
+
+        // Now set the actual positions
+        const finalUpdatePromises = validated.map((update) =>
+          tx
+            .update(specialists)
+            .set({
+              position: update.position,
+              updatedAt: new Date(),
+            })
+            .where(eq(specialists.id, update.id))
+        );
+
+        await Promise.all(finalUpdatePromises);
+
+        return { updated: validated.length };
+      } catch (error) {
+        // Transaction will automatically rollback
+        if (error instanceof Error && error.message.includes("unique_specialist_position")) {
+          throw new Error("Position conflict detected. Please refresh and try again.");
+        }
+        throw error;
+      }
+    });
+  }
+
+  // Reorder positions after drag-and-drop
+  async reorderPositions(fromPosition: number, toPosition: number, specialistId: string) {
+    return await db.transaction(async (tx) => {
+      // Get all specialists ordered by position
+      const allSpecialists = await tx
+        .select({ id: specialists.id, position: specialists.position })
+        .from(specialists)
+        .orderBy(asc(specialists.position));
+
+      // Create new positions array
+      const updates: Array<{ id: string; position: number }> = [];
+
+      if (fromPosition < toPosition) {
+        // Moving down
+        allSpecialists.forEach((spec) => {
+          if (spec.id === specialistId) {
+            updates.push({ id: spec.id, position: toPosition });
+          } else if (spec.position > fromPosition && spec.position <= toPosition) {
+            updates.push({ id: spec.id, position: spec.position - 1 });
+          }
+        });
+      } else {
+        // Moving up
+        allSpecialists.forEach((spec) => {
+          if (spec.id === specialistId) {
+            updates.push({ id: spec.id, position: toPosition });
+          } else if (spec.position >= toPosition && spec.position < fromPosition) {
+            updates.push({ id: spec.id, position: spec.position + 1 });
+          }
+        });
+      }
+
+      // Apply updates
+      for (const update of updates) {
+        await tx
+          .update(specialists)
+          .set({ position: update.position, updatedAt: new Date() })
+          .where(eq(specialists.id, update.id));
+      }
+
+      return { updated: updates.length };
+    });
   }
 }
 

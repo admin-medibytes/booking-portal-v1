@@ -8,7 +8,7 @@ import { format } from "date-fns";
 
 interface AuditLogEntry {
   id: string;
-  userId: string;
+  user: { id: string; name: string };
   action: string;
   entityType: string;
   entityId: string;
@@ -80,7 +80,7 @@ export function OrganizationAuditLog({ auditHistory }: OrganizationAuditLogProps
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <User className="h-3 w-3" />
-                      <span>User: {entry.userId}</span>
+                      <span>User: {entry.user.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
@@ -93,7 +93,7 @@ export function OrganizationAuditLog({ auditHistory }: OrganizationAuditLogProps
                         <summary className="text-muted-foreground hover:text-foreground">
                           View details
                         </summary>
-                        <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto">
+                        <pre className="mt-2 p-3 bg-muted rounded-xl text-xs overflow-auto font-mono">
                           {JSON.stringify(entry.changes, null, 2)}
                         </pre>
                       </details>

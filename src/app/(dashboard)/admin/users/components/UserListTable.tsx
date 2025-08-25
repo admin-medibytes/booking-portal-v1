@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { adminClient } from "@/lib/hono-client";
@@ -126,8 +127,8 @@ export function UserListTable({ filters }: UserListTableProps) {
           </TableHeader>
           <TableBody>
             {users.map((user) => (
-              <>
-                <TableRow key={user.id}>
+              <React.Fragment key={user.id}>
+                <TableRow>
                   <TableCell>
                     <Button
                       variant="ghost"
@@ -156,7 +157,7 @@ export function UserListTable({ filters }: UserListTableProps) {
                   </TableCell>
                   <TableCell>
                     {user.banned ? (
-                      <Badge variant="destructive">Inactive</Badge>
+                      <Badge variant="stone">Inactive</Badge>
                     ) : (
                       <Badge variant="success">Active</Badge>
                     )}
@@ -225,8 +226,8 @@ export function UserListTable({ filters }: UserListTableProps) {
                                 {user.specialist.acuityCalendarId}
                               </p>
                               <p>
-                                <span className="text-muted-foreground">Specialty:</span>{" "}
-                                {user.specialist.specialty}
+                                <span className="text-muted-foreground">Position:</span>{" "}
+                                #{user.specialist.position}
                               </p>
                               {user.specialist.location && (
                                 <p>
@@ -241,7 +242,7 @@ export function UserListTable({ filters }: UserListTableProps) {
                     </TableCell>
                   </TableRow>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </TableBody>
         </Table>

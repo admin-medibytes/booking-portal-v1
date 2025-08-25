@@ -200,7 +200,7 @@ export function OrganizationListTable({
                 </TableCell>
                 <TableCell>{org.memberCount}</TableCell>
                 <TableCell>
-                  <Badge variant={org.metadata?.isActive === false ? "secondary" : "default"}>
+                  <Badge variant={org.metadata?.isActive === false ? "stone" : "success"}>
                     {org.metadata?.isActive === false ? "Inactive" : "Active"}
                   </Badge>
                 </TableCell>

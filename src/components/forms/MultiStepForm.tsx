@@ -26,22 +26,11 @@ export function MultiStepForm({ steps, currentStep, onStepClick }: MultiStepForm
           return (
             <li
               key={step.id}
-              className={cn(
-                "relative",
-                index !== steps.length - 1 && "pr-8 sm:pr-20 flex-1"
-              )}
+              className={cn("relative", index !== steps.length - 1 && "pr-8 sm:pr-20 flex-1")}
             >
               {index !== steps.length - 1 && (
-                <div
-                  className="absolute inset-0 flex items-center"
-                  aria-hidden="true"
-                >
-                  <div
-                    className={cn(
-                      "h-0.5 w-full",
-                      isCompleted ? "bg-primary" : "bg-muted"
-                    )}
-                  />
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className={cn("h-0.5 w-full", isCompleted ? "bg-primary" : "bg-muted")} />
                 </div>
               )}
               <button
@@ -62,13 +51,9 @@ export function MultiStepForm({ steps, currentStep, onStepClick }: MultiStepForm
                     !isActive && !isCompleted && "bg-muted text-muted-foreground"
                   )}
                 >
-                  {isCompleted ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    stepNumber
-                  )}
+                  {isCompleted ? <Check className="h-4 w-4" /> : stepNumber}
                 </span>
-                <span className="ml-3 text-sm font-medium hidden sm:block">
+                <span className="ml-3 text-sm font-medium hidden sm:block bg-red-50">
                   <span
                     className={cn(
                       isActive && "text-foreground",
@@ -78,7 +63,7 @@ export function MultiStepForm({ steps, currentStep, onStepClick }: MultiStepForm
                     {step.title}
                   </span>
                   {step.description && (
-                    <span className="block text-xs text-muted-foreground mt-0.5">
+                    <span className="block text-xs text-muted-foreground mt-2">
                       {step.description}
                     </span>
                   )}

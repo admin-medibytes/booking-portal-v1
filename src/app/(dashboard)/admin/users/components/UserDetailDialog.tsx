@@ -102,6 +102,7 @@ export function UserDetailDialog({ userId, open, onOpenChange }: UserDetailDialo
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[700px]">
+          <DialogTitle />
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin" />
           </div>
@@ -266,8 +267,8 @@ export function UserDetailDialog({ userId, open, onOpenChange }: UserDetailDialo
                       <p className="font-mono text-sm">{user.specialist.acuityCalendarId}</p>
                     </div>
                     <div className="space-y-2">
-                      <Label>Specialty</Label>
-                      <p className="text-sm">{user.specialist.specialty}</p>
+                      <Label>Position</Label>
+                      <p className="text-sm">#{user.specialist.position}</p>
                     </div>
                   </div>
                   {user.specialist.location && (

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
+// TODO: Replace with actual API calls when global search endpoint is implemented
 // Mock data for search
 const searchData = {
   users: [

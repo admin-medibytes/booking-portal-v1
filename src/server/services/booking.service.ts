@@ -215,10 +215,10 @@ export class BookingService {
           ? {
               id: specialist.id,
               name: specialistUser.name,
-              specialty: specialist.specialty,
-              location: null,
+              jobTitle: specialistUser.jobTitle,
+              location: specialist.location,
             }
-          : null,
+          : { id: "", name: "", jobTitle: "", location: null },
     };
   }
 

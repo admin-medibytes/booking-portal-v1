@@ -639,7 +639,7 @@ function BookingItem({ booking, view, onClick }: BookingItemProps) {
             </div>
             <div className="text-sm opacity-75">
               with {booking.specialist?.name || "Unassigned"} (
-              {booking.specialist?.specialty || "N/A"})
+              {booking.specialist?.jobTitle || "N/A"})
             </div>
           </div>
         </div>

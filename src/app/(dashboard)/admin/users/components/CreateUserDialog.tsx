@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminClient } from "@/lib/hono-client";
 import {
   Dialog,
@@ -35,18 +35,16 @@ interface CreateUserDialogProps {
 
 export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) {
   const [selectedOrgId, setSelectedOrgId] = useState<string>("");
+  const queryClient = useQueryClient();
 
   // Fetch organizations
   const { data: orgsData } = useQuery({
     queryKey: ["organizations"],
     queryFn: async () => {
-      // For now, return mock data - should be replaced with actual endpoint
-      return {
-        organizations: [
-          { id: "org-1", name: "MediLaw Firm" },
-          { id: "org-2", name: "WorkComp Associates" },
-        ],
-      };
+      const response = await adminClient.organizations.$get({ query: {} });
+      if (!response.ok) throw new Error("Failed to fetch organizations");
+      const data = await response.json();
+      return data;
     },
   });
 
@@ -93,6 +91,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     },
     onSuccess: () => {
       toast.success("User created successfully");
+      queryClient.invalidateQueries({ queryKey: ["users"] });
       onOpenChange(false);
       form.reset();
     },

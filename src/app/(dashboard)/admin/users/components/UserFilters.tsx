@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Search, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-// Organizations will be fetched from parent or passed as props
+import { adminClient } from "@/lib/hono-client";
 
 interface UserFiltersProps {
   filters: {
@@ -32,13 +32,10 @@ export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
   const { data: orgsData } = useQuery({
     queryKey: ["organizations"],
     queryFn: async () => {
-      // For now, return mock data - should be replaced with actual endpoint
-      return {
-        organizations: [
-          { id: "org-1", name: "MediLaw Firm" },
-          { id: "org-2", name: "WorkComp Associates" },
-        ],
-      };
+      const response = await adminClient.organizations.$get({ query: {} });
+      if (!response.ok) throw new Error("Failed to fetch organizations");
+      const data = await response.json();
+      return data;
     },
   });
 

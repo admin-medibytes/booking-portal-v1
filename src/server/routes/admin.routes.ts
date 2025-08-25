@@ -6,19 +6,6 @@ import { userService } from "@/server/services/user.service";
 import { organizationService } from "@/server/services/organization.service";
 import { logger } from "@/server/utils/logger";
 
-const createUserSchema = type({
-  email: "string.email",
-  firstName: "string>=2",
-  lastName: "string>=2",
-  "phone?": "string",
-  "jobTitle?": "string",
-  organizationId: "string",
-  teamId: "string",
-  role: "'referrer'|'specialist'|'admin'",
-  sendEmailInvitation: "boolean",
-  "acuityCalendarId?": "string",
-});
-
 const updateUserSchema = type({
   "firstName?": "string>=2",
   "lastName?": "string>=2",
@@ -46,21 +33,6 @@ const listInvitationsSchema = type({
   "status?": "'pending'|'accepted'|'rejected'|'expired'",
   "page?": "number>=1",
   "limit?": "1<number<=100",
-});
-
-const createOrganizationSchema = type({
-  name: "2<=string<=100",
-  slug: "string",
-  "logo?": "string",
-  "contactEmail?": "string.email",
-  "phone?": "string",
-  "address?": {
-    street: "string",
-    city: "string",
-    state: "string",
-    zipCode: "string",
-    country: "string",
-  },
 });
 
 const updateOrganizationSchema = type({
@@ -93,24 +65,49 @@ const updateTeamSchema = type({
 const app = new Hono()
   .use("*", authMiddleware)
   .use("*", requireAdmin)
-  .post("/users", arktypeValidator("json", createUserSchema), async (c) => {
-    const input = c.req.valid("json");
-    const auth = c.get("auth");
+  .post(
+    "/users",
+    arktypeValidator(
+      "json",
+      type({
+        email: "string.email",
+        firstName: type("string")
+          .pipe((s) => s.trim())
+          .to("string > 1"),
+        lastName: type("string")
+          .pipe((s) => s.trim())
+          .to("string > 1"),
+        "phone?": "string",
+        "jobTitle?": "string",
+        organizationId: "string",
+        teamId: "string",
+        role: "'referrer'|'specialist'|'admin'",
+        sendEmailInvitation: "boolean",
+        "acuityCalendarId?": "string",
+      })
+    ),
+    async (c) => {
+      const input = c.req.valid("json");
+      const auth = c.get("auth");
 
-    const user = await userService.createUserWithMembership({
-      ...input,
-      createdBy: auth.user!.id,
-    });
+      const user = await userService.createUserWithMembership(
+        {
+          ...input,
+          createdBy: auth.user!.id,
+        },
+        c.req.raw.headers
+      );
 
-    logger.info("Admin created new user", {
-      userId: user.id,
-      createdBy: auth.user?.id,
-      email: input.email,
-      role: input.role,
-    });
+      logger.info("Admin created new user", {
+        userId: user.id,
+        createdBy: auth.user?.id,
+        email: input.email,
+        role: input.role,
+      });
 
-    return c.json({ user }, 201);
-  })
+      return c.json({ user }, 201);
+    }
+  )
   .get(
     "/users",
     arktypeValidator(
@@ -251,26 +248,46 @@ const app = new Hono()
     return c.json(invitations);
   })
 
-  .post("/organizations", arktypeValidator("json", createOrganizationSchema), async (c) => {
-    const input = c.req.valid("json");
-    const auth = c.get("auth");
+  .post(
+    "/organizations",
+    arktypeValidator(
+      "json",
+      type({
+        name: "string>=2",
+        slug: "string",
+        "logo?": "string",
+        "contactEmail?": "string.email",
+        "phone?": "string",
+        "address?": {
+          street: "string",
+          city: "string",
+          state: "string",
+          zipCode: "string",
+          country: "string",
+        },
+      })
+    ),
+    async (c) => {
+      const input = c.req.valid("json");
+      const auth = c.get("auth");
 
-    const organization = await organizationService.createOrganization(
-      {
-        ...input,
-        createdBy: auth.user!.id,
-      },
-      c.req.raw.headers
-    );
+      const organization = await organizationService.createOrganization(
+        {
+          ...input,
+          createdBy: auth.user!.id,
+        },
+        c.req.raw.headers
+      );
 
-    logger.info("Admin created organization", {
-      organizationId: organization.id,
-      createdBy: auth.user?.id,
-      name: input.name,
-    });
+      logger.info("Admin created organization", {
+        organizationId: organization.id,
+        createdBy: auth.user?.id,
+        name: input.name,
+      });
 
-    return c.json({ organization }, 201);
-  })
+      return c.json({ organization }, 201);
+    }
+  )
 
   .get(
     "/organizations",

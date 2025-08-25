@@ -9,6 +9,7 @@ import { db } from "@/server/db";
 import { env } from "@/lib/env";
 import { emailService } from "@/server/services/email.service";
 import { hashPassword, verifyPassword } from "@/lib/crypto";
+import { teams } from "@/server/db/schema";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -22,8 +23,8 @@ export const auth = betterAuth({
   trustedOrigins: env.AUTH_TRUSTED_ORIGINS?.split(",").map((origin) => origin.trim()) || [],
 
   session: {
-    expiresIn: Number(env.SESSION_TIMEOUT) || 604800, // 7 days
-    updateAge: 86400, // 1 day
+    expiresIn: Number(env.SESSION_TIMEOUT),
+    updateAge: 3600, // 1 hour
     cookieCache: {
       enabled: true,
       maxAge: 180, // 3 minutes
@@ -84,14 +85,26 @@ export const auth = betterAuth({
       },
       teams: {
         enabled: true,
+
         defaultTeam: {
           enabled: true,
+
           customCreateDefaultTeam: async (organization) => {
+            const [team] = await db
+              .insert(teams)
+              .values({
+                id: crypto.randomUUID(),
+                name: `${organization.name} Main`,
+                organizationId: organization.id,
+                createdAt: new Date(),
+              })
+              .returning();
+
             return {
-              id: crypto.randomUUID(),
-              name: "Default Team",
-              organizationId: organization.id,
-              createdAt: new Date(),
+              id: team.id,
+              name: team.name,
+              organizationId: team.organizationId,
+              createdAt: team.createdAt,
             };
           },
         },
@@ -128,6 +141,11 @@ export const auth = betterAuth({
               required: false,
               input: true,
             },
+            updatedAt: {
+              type: "date",
+              required: false,
+              input: true,
+            },
           },
         },
       },
@@ -136,10 +154,10 @@ export const auth = betterAuth({
           return {
             data: {
               ...organization,
-              metadata: {
+              metadata: JSON.stringify({
                 ...organization.metadata,
                 createdBy: user.id,
-              },
+              }),
             },
           };
         },

@@ -18,7 +18,10 @@ import type {
 } from "@/types/user";
 
 export class UserService {
-  async createUserWithMembership(input: CreateUserInput): Promise<UserWithMemberships> {
+  async createUserWithMembership(
+    input: CreateUserInput,
+    headers: HeadersInit
+  ): Promise<UserWithMemberships> {
     try {
       // Check if user already exists
       const existingUser = await db
@@ -43,6 +46,10 @@ export class UserService {
 
       if (team.length === 0) {
         throw new NotFoundError("Team", input.teamId);
+      }
+
+      if (team[0].organizationId !== org[0].id) {
+        throw new AppError(ErrorCode.VALIDATION_FAILED, "Team is not in the organization", 400);
       }
 
       // Validate specialist acuityCalendarId if role is specialist
@@ -71,9 +78,8 @@ export class UserService {
         // Create user with Better Auth
         const tempPassword = this.generateTempPassword();
         const name = `${input.firstName} ${input.lastName}`;
-
         const authResult = await auth.api.createUser({
-          headers: new Headers(),
+          headers,
           body: {
             email: input.email,
             password: tempPassword,
@@ -82,7 +88,6 @@ export class UserService {
               firstName: input.firstName,
               lastName: input.lastName,
               jobTitle: input.jobTitle || "N/A",
-              phoneNumber: input.phone,
             },
             role: input.role === "admin" ? "admin" : "user",
           },
@@ -105,16 +110,19 @@ export class UserService {
 
         // If specialist, create specialist record
         if (input.role === "specialist" && input.acuityCalendarId) {
+          // Get the highest position for auto-assignment
+          const maxPositionResult = await tx
+            .select({ maxPosition: sql<number>`COALESCE(MAX(${specialists.position}), 0)` })
+            .from(specialists);
+          const position = (maxPositionResult[0]?.maxPosition ?? 0) + 1;
+
           await tx.insert(specialists).values({
-            id: crypto.randomUUID(),
             userId,
             acuityCalendarId: input.acuityCalendarId,
             name,
-            specialty: "General", // Default specialty, can be updated later
             location: null,
+            position,
             isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
           });
         }
 
@@ -280,7 +288,7 @@ export class UserService {
             ? {
                 id: specialist.id,
                 acuityCalendarId: specialist.acuityCalendarId,
-                specialty: specialist.specialty,
+                position: specialist.position,
                 location: specialist.location,
               }
             : undefined,
@@ -346,7 +354,7 @@ export class UserService {
           ? {
               id: specialistData[0].id,
               acuityCalendarId: specialistData[0].acuityCalendarId,
-              specialty: specialistData[0].specialty,
+              position: specialistData[0].position,
               location: specialistData[0].location,
             }
           : undefined,
@@ -536,14 +544,17 @@ export class UserService {
   }
 
   // Keep existing methods for backward compatibility
-  async createUser(input: CreateUserInput): Promise<User> {
+  async createUser(input: CreateUserInput, headers: HeadersInit): Promise<User> {
     // This method is kept for backward compatibility
     // It delegates to the new createUserWithMembership method
-    return this.createUserWithMembership({
-      ...input,
-      sendEmailInvitation: false,
-      createdBy: "system",
-    } as CreateUserInput);
+    return this.createUserWithMembership(
+      {
+        ...input,
+        sendEmailInvitation: false,
+        createdBy: "system",
+      } as CreateUserInput,
+      headers
+    );
   }
 
   async listUsers(params: UserListParams): Promise<{

@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 interface TimeSlot {
   datetime: string;
   duration: number;
+  appointmentTypeId: number;
 }
 
 interface AvailabilityResponse {
@@ -24,11 +25,12 @@ interface AvailabilityResponse {
 
 interface TimeSlotPickerProps {
   specialistId: string;
+  appointmentTypeId: number;
   onSelect: (dateTime: Date) => void;
   selectedDateTime: Date | null;
 }
 
-export function TimeSlotPicker({ specialistId, onSelect, selectedDateTime }: TimeSlotPickerProps) {
+export function TimeSlotPicker({ specialistId, appointmentTypeId, onSelect, selectedDateTime }: TimeSlotPickerProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date()));
 
@@ -39,13 +41,32 @@ export function TimeSlotPicker({ specialistId, onSelect, selectedDateTime }: Tim
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["specialist-availability", specialistId, format(weekStart, "yyyy-MM-dd")],
+    queryKey: ["specialist-availability", specialistId, appointmentTypeId, format(weekStart, "yyyy-MM-dd")],
     queryFn: async () => {
+      const startDate = format(weekStart, "yyyy-MM-dd");
+      const endDate = format(addDays(weekStart, 6), "yyyy-MM-dd");
+      
       const response = await specialistsClient[":id"].availability.$get({
         param: { id: specialistId },
+        query: {
+          startDate,
+          endDate,
+          appointmentTypeId: appointmentTypeId.toString(),
+          timezone: userTimezone,
+        },
       });
-      return (await response.json()) as unknown as AvailabilityResponse;
+      
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch availability");
+      }
+      
+      return {
+        slots: data.data.timeSlots.filter((slot: any) => slot.available),
+        timezone: userTimezone,
+      } as AvailabilityResponse;
     },
+    enabled: !!specialistId && !!appointmentTypeId,
   });
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));

@@ -125,8 +125,8 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
             <div>
               <p className="text-sm font-medium text-gray-500">Specialist</p>
               <p className="text-lg">{booking.specialist?.name || "Not assigned"}</p>
-              {booking.specialist?.specialty && (
-                <p className="text-sm text-gray-500">{booking.specialist.specialty}</p>
+              {booking.specialist.jobTitle && (
+                <p className="text-sm text-gray-500">{booking.specialist.jobTitle}</p>
               )}
             </div>
           </div>

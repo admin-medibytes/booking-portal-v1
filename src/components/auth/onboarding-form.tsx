@@ -225,7 +225,7 @@ function TwoFactorSetup({ onComplete }: { onComplete: () => void }) {
           setTotpURI(result.data.totpURI);
           setBackupCodes(result.data.backupCodes);
         }
-      } catch (err) {
+      } catch (_err) {
         setError("Failed to enable 2FA");
         // Clear the temporary password on error as well
         sessionStorage.removeItem("temp_2fa_pwd");

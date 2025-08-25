@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { MapPin, Video, User } from "lucide-react";
 import { specialistsClient } from "@/lib/hono-client";
 import { handleApiResponse } from "@/lib/hono-utils";
-import type { Specialist } from "@/types/booking";
+import type { Specialist } from "@/types/specialist";
 
 interface SpecialistSelectProps {
   onSelect: (specialist: Specialist) => void;
@@ -27,7 +27,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {[1, 2, 3].map((i) => (
           <Card key={i}>
             <CardHeader>
@@ -65,55 +65,53 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {specialists.map((specialist) => {
-          const isSelected = selectedSpecialist?.id === specialist.id;
-          
-          return (
-            <Card
-              key={specialist.id}
-              className={isSelected ? "border-primary" : ""}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-muted-foreground" />
-                    <CardTitle className="text-lg">{specialist.name}</CardTitle>
+    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      {specialists.map((specialist) => {
+        const isSelected = selectedSpecialist?.id === specialist.id;
+        
+        return (
+          <Card
+            key={specialist.id}
+            className={isSelected ? "border-primary" : ""}
+          >
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle className="text-lg">{specialist.name}</CardTitle>
+                </div>
+                {isSelected && (
+                  <Badge variant="default">Selected</Badge>
+                )}
+              </div>
+              <CardDescription>{specialist.user?.jobTitle || "Specialist"}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 mb-4">
+                {specialist.location && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <MapPin className="h-4 w-4" />
+                    <span>{specialist.location}</span>
                   </div>
-                  {isSelected && (
-                    <Badge variant="default">Selected</Badge>
-                  )}
-                </div>
-                <CardDescription>{specialist.specialty}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 mb-4">
-                  {specialist.location && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      <span>{specialist.location}</span>
-                    </div>
-                  )}
-                  {!specialist.location && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Video className="h-4 w-4" />
-                      <span>Telehealth only</span>
-                    </div>
-                  )}
-                </div>
-                <Button
-                  className="w-full"
-                  variant={isSelected ? "secondary" : "default"}
-                  onClick={() => onSelect(specialist)}
-                >
-                  {isSelected ? "Selected" : "Select Specialist"}
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                )}
+                {!specialist.location && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Video className="h-4 w-4" />
+                    <span>Telehealth only</span>
+                  </div>
+                )}
+              </div>
+              <Button
+                className="w-full"
+                variant={isSelected ? "secondary" : "default"}
+                onClick={() => onSelect(specialist)}
+              >
+                {isSelected ? "Selected" : "Select Specialist"}
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

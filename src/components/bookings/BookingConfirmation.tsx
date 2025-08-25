@@ -13,10 +13,17 @@ import { bookingsClient } from "@/lib/hono-client";
 import { ApiError } from "@/lib/hono-utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import type { Specialist } from "@/types/booking";
+import type { Specialist } from "@/types/specialist";
 
 interface BookingConfirmationProps {
   specialist: Specialist;
+  appointmentType: {
+    id: number;
+    name: string;
+    duration: number;
+    description?: string;
+    category: string;
+  };
   dateTime: Date;
   examineeData: {
     examineeName: string;
@@ -31,6 +38,7 @@ interface BookingConfirmationProps {
 
 export function BookingConfirmation({
   specialist,
+  appointmentType,
   dateTime,
   examineeData,
   onConfirm,
@@ -44,6 +52,7 @@ export function BookingConfirmation({
       const response = await bookingsClient.$post({
         json: {
           specialistId: specialist.id,
+          appointmentTypeId: appointmentType.id,
           appointmentDateTime: dateTime.toISOString(),
           examineeName: examineeData.examineeName,
           examineePhone: examineeData.examineePhone,
@@ -142,7 +151,7 @@ export function BookingConfirmation({
               </div>
               <div>
                 <span className="text-muted-foreground">Specialty:</span>{" "}
-                <span className="font-medium">{specialist.specialty}</span>
+                <span className="font-medium">{specialist.user?.jobTitle || "Specialist"}</span>
               </div>
               {specialist.location && (
                 <div className="flex items-center gap-1">
@@ -163,6 +172,19 @@ export function BookingConfirmation({
               Appointment Details
             </h3>
             <div className="space-y-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Type:</span>{" "}
+                <span className="font-medium">{appointmentType.name}</span>
+                {appointmentType.category && (
+                  <Badge variant="outline" className="ml-2">
+                    {appointmentType.category}
+                  </Badge>
+                )}
+              </div>
+              <div>
+                <span className="text-muted-foreground">Duration:</span>{" "}
+                <span className="font-medium">{appointmentType.duration} minutes</span>
+              </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-3 w-3 text-muted-foreground" />
                 <span className="text-muted-foreground">Date & Time:</span>{" "}

@@ -106,7 +106,7 @@ export const organizations = pgTable("organizations", {
   slug: text("slug").unique(),
   logo: text("logo"),
   createdAt: timestamp("created_at").notNull(),
-  updatedAt: timestamp("updated_at").notNull(),
+  updatedAt: timestamp("updated_at"),
   metadata: text("metadata"),
 });
 

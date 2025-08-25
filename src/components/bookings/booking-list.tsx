@@ -90,7 +90,7 @@ export function BookingList({ bookings }: BookingListProps) {
           return (
             <div>
               <p className="font-medium">{specialist.name}</p>
-              <p className="text-sm text-muted-foreground">{specialist.specialty}</p>
+              <p className="text-sm text-muted-foreground">{specialist.jobTitle || "N/a"}</p>
             </div>
           );
         },
@@ -107,9 +107,7 @@ export function BookingList({ bookings }: BookingListProps) {
           const variant = variantMap[status] || "secondary";
 
           return (
-            <Badge variant={variant}>
-              {status.charAt(0).toUpperCase() + status.slice(1)}
-            </Badge>
+            <Badge variant={variant}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>
           );
         },
       }),
@@ -151,9 +149,7 @@ export function BookingList({ bookings }: BookingListProps) {
         <Input
           placeholder="Search patients..."
           value={(table.getColumn("patientName")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("patientName")?.setFilterValue(event.target.value)
-          }
+          onChange={(event) => table.getColumn("patientName")?.setFilterValue(event.target.value)}
           className="max-w-sm"
         />
       </div>
@@ -168,10 +164,7 @@ export function BookingList({ bookings }: BookingListProps) {
                   <TableHead key={header.id}>
                     {header.isPlaceholder
                       ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
+                      : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
@@ -180,26 +173,17 @@ export function BookingList({ bookings }: BookingListProps) {
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
+                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
+                <TableCell colSpan={columns.length} className="h-24 text-center">
                   No bookings found.
                 </TableCell>
               </TableRow>

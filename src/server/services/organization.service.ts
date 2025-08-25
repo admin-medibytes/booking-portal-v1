@@ -66,9 +66,6 @@ export class OrganizationService {
           name: data.name,
           slug: data.slug,
           logo: data.logo,
-          contactEmail: data.contactEmail,
-          phone: data.phone,
-          address: data.address ? JSON.stringify(data.address) : undefined,
         },
       });
 
@@ -76,28 +73,13 @@ export class OrganizationService {
         throw new HTTPException(400, { message: "Failed to create organization" });
       }
 
-      await auditService.log({
-        userId: data.createdBy,
-        action: "organization.created",
-        resourceType: "organization",
-        resourceId: organization.id,
-        metadata: {
-          name: data.name,
-          slug: data.slug,
-        },
-      });
-
-      const defaultTeamResponse = await auth.api.createTeam({
+      const defaultTeam = await auth.api.listOrganizationTeams({
         headers,
-        body: {
-          name: "Default Team",
-          organizationId: organization.id,
-        },
       });
 
       logger.info("Organization created with default team", {
         organizationId: organization.id,
-        teamId: defaultTeamResponse?.id,
+        teamId: defaultTeam[0].id,
       });
 
       return organization;
@@ -137,9 +119,13 @@ export class OrganizationService {
       }
 
       if (status === "inactive") {
-        organizations = organizations.filter((org: OrganizationData) => org.metadata?.isActive === false);
+        organizations = organizations.filter(
+          (org: OrganizationData) => org.metadata?.isActive === false
+        );
       } else if (status === "active") {
-        organizations = organizations.filter((org: OrganizationData) => org.metadata?.isActive !== false);
+        organizations = organizations.filter(
+          (org: OrganizationData) => org.metadata?.isActive !== false
+        );
       }
 
       const enrichedOrgs = await Promise.all(
@@ -162,7 +148,11 @@ export class OrganizationService {
             ...org,
             memberCount: membersResponse.members?.length || 0,
             teamCount: teamsResponse?.length || 0,
-            address: org.address ? (typeof org.address === 'string' ? JSON.parse(org.address) : org.address) : null,
+            address: org.address
+              ? typeof org.address === "string"
+                ? JSON.parse(org.address)
+                : org.address
+              : null,
           };
         })
       );
@@ -230,13 +220,11 @@ export class OrganizationService {
     headers: HeadersInit
   ) {
     try {
-      const updateData: Record<string, unknown> = {
-        ...data,
-      };
+      // Only update basic fields supported by Better Auth
+      const updateData: Record<string, unknown> = {};
 
-      if (data.address) {
-        updateData.address = JSON.stringify(data.address);
-      }
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.logo !== undefined) updateData.logo = data.logo;
 
       const response = await auth.api.updateOrganization({
         headers,

@@ -233,7 +233,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
                       />
                       <div className="flex-1">
                         <div className="font-medium">{specialist.name}</div>
-                        <div className="text-sm text-muted-foreground">{specialist.specialty}</div>
+                        <div className="text-sm text-muted-foreground">{specialist.user?.jobTitle || "Specialist"}</div>
                       </div>
                     </CommandItem>
                   ))}

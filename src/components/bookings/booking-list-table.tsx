@@ -35,17 +35,19 @@ import {
 import type { BookingWithSpecialist } from "@/types/booking";
 
 // Memoized cell components for performance
-const SpecialistCell = memo(({ specialist }: { specialist: BookingWithSpecialist["specialist"] }) => {
-  if (!specialist) {
-    return <span className="text-muted-foreground">Not assigned</span>;
+const SpecialistCell = memo(
+  ({ specialist }: { specialist: BookingWithSpecialist["specialist"] }) => {
+    if (!specialist) {
+      return <span className="text-muted-foreground">Not assigned</span>;
+    }
+    return (
+      <div>
+        <div className="font-medium">{specialist.name}</div>
+        <div className="text-sm text-muted-foreground">{specialist.jobTitle || "N/a"}</div>
+      </div>
+    );
   }
-  return (
-    <div>
-      <div className="font-medium">{specialist.name}</div>
-      <div className="text-sm text-muted-foreground">{specialist.specialty}</div>
-    </div>
-  );
-});
+);
 SpecialistCell.displayName = "SpecialistCell";
 
 const StatusBadge = memo(({ status }: { status: string }) => {
@@ -210,10 +212,7 @@ export const BookingListTable = memo(function BookingListTable({
                     <TableHead key={header.id}>
                       {header.isPlaceholder
                         ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                        : flexRender(header.column.columnDef.header, header.getContext())}
                     </TableHead>
                   );
                 })}
@@ -223,10 +222,7 @@ export const BookingListTable = memo(function BookingListTable({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
+                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -279,7 +275,7 @@ export const BookingListTable = memo(function BookingListTable({
             >
               Previous
             </Button>
-            
+
             <div className="flex items-center gap-1">
               {Array.from({ length: Math.min(5, Math.ceil(totalCount / pageSize)) }, (_, i) => {
                 const pageNumber = i + 1;
@@ -299,7 +295,9 @@ export const BookingListTable = memo(function BookingListTable({
                 <>
                   <span className="mx-1">...</span>
                   <Button
-                    variant={currentPage === Math.ceil(totalCount / pageSize) ? "default" : "outline"}
+                    variant={
+                      currentPage === Math.ceil(totalCount / pageSize) ? "default" : "outline"
+                    }
                     size="sm"
                     onClick={() => onPageChange(Math.ceil(totalCount / pageSize))}
                     className="w-8"

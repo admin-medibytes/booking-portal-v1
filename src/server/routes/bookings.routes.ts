@@ -15,16 +15,6 @@ const bookingFiltersSchema = type({
   "limit?": "string.integer<=100",
 });
 
-const createBookingSchema = type({
-  specialistId: "string.uuid",
-  appointmentDateTime: "string.date",
-  examineeName: "string>0",
-  examineePhone: "string>0",
-  "examineeEmail?": "string.email|null",
-  appointmentType: "'in_person'|'telehealth'",
-  "notes?": "string|null",
-});
-
 const updateProgressSchema = type({
   progress:
     "'scheduled'|'rescheduled'|'cancelled'|'no-show'|'generating-report'|'report-generated'|'payment-received'",
@@ -103,32 +93,48 @@ const bookingsRoutes = new Hono()
   })
 
   // POST /api/bookings - Create a new booking
-  .post("/", arktypeValidator("json", createBookingSchema), bookingCreateRateLimit, async (c) => {
-    const authContext = c.get("auth");
-    const user = authContext?.user;
-    if (!user) {
-      return c.json({ error: "Unauthorized" }, 401);
+  .post(
+    "/",
+    arktypeValidator(
+      "json",
+      type({
+        specialistId: "string.uuid",
+        appointmentDateTime: "string.date",
+        examineeName: "string>0",
+        examineePhone: "string>0",
+        "examineeEmail?": "string.email|null",
+        appointmentType: "'in_person'|'telehealth'",
+        "notes?": "string|null",
+      })
+    ),
+    bookingCreateRateLimit,
+    async (c) => {
+      const authContext = c.get("auth");
+      const user = authContext?.user;
+      if (!user) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+
+      // Validate request body
+      const input = c.req.valid("json");
+
+      // Create booking
+      const booking = await bookingService.createBooking({
+        ...input,
+        appointmentDateTime: new Date(input.appointmentDateTime),
+        referrerId: user.id,
+      });
+
+      return c.json(
+        {
+          success: true,
+          id: booking.id,
+          message: "Booking created successfully",
+        },
+        201
+      );
     }
-
-    // Validate request body
-    const input = c.req.valid("json");
-
-    // Create booking
-    const booking = await bookingService.createBooking({
-      ...input,
-      appointmentDateTime: new Date(input.appointmentDateTime),
-      referrerId: user.id,
-    });
-
-    return c.json(
-      {
-        success: true,
-        id: booking.id,
-        message: "Booking created successfully",
-      },
-      201
-    );
-  })
+  )
 
   // POST /api/bookings/:id/progress - Update booking progress
   .post("/:id/progress", arktypeValidator("json", updateProgressSchema), async (c) => {

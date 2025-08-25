@@ -35,7 +35,7 @@ export interface UserWithMemberships extends User {
   specialist?: {
     id: string;
     acuityCalendarId: string;
-    specialty: string;
+    position: number;
     location?: string | null;
   };
 }

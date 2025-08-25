@@ -36,12 +36,19 @@ export class AuditService {
   }
 
   async getLogsForResource(resourceType: string, resourceId: string, limit = 50) {
-    return db
-      .select()
-      .from(auditLogs)
-      .where(and(eq(auditLogs.entityType, resourceType), eq(auditLogs.entityId, resourceId)))
-      .orderBy(desc(auditLogs.createdAt))
-      .limit(limit);
+    return db.query.auditLogs.findMany({
+      with: {
+        user: {
+          columns: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      where: and(eq(auditLogs.entityType, resourceType), eq(auditLogs.entityId, resourceId)),
+      orderBy: desc(auditLogs.createdAt),
+      limit,
+    });
   }
 
   async getLogsForUser(userId: string, limit = 100) {

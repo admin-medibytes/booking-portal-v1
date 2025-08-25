@@ -14,13 +14,11 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { TwoFactorModal } from "./two-factor-modal";
 
-const loginSchema = type({
-  email: "string.email",
-  password: "string>=8",
-  "rememberMe?": "boolean",
-});
-
-type LoginFormData = typeof loginSchema.infer;
+type LoginFormData = {
+  email: string;
+  password: string;
+  rememberMe?: boolean | undefined;
+};
 
 export function LoginForm() {
   const router = useRouter();
@@ -119,7 +117,7 @@ export function LoginForm() {
           e.stopPropagation();
           form.handleSubmit();
         }}
-        className="mt-8 space-y-6 bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10"
+        className="px-4 py-8 mt-8 space-y-6 bg-white shadow sm:rounded-lg sm:px-10"
       >
         <div className="space-y-4">
           <form.Field
@@ -207,7 +205,7 @@ export function LoginForm() {
                   />
                   <Label
                     htmlFor="remember-me"
-                    className="ml-2 block text-sm text-gray-900 cursor-pointer"
+                    className="block ml-2 text-sm text-gray-900 cursor-pointer"
                   >
                     Remember me
                   </Label>

@@ -6,16 +6,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SpecialistSelect } from "@/components/bookings/SpecialistSelect";
+import { AppointmentTypeSelect } from "@/components/bookings/AppointmentTypeSelect";
 import { TimeSlotPicker } from "@/components/bookings/TimeSlotPicker";
 import { ExamineeForm } from "@/components/bookings/ExamineeForm";
 import { BookingConfirmation } from "@/components/bookings/BookingConfirmation";
 import { MultiStepForm } from "@/components/forms/MultiStepForm";
-import type { Specialist } from "@/types/booking";
+import type { Specialist } from "@/types/specialist";
 
 const steps = [
-  { id: "specialist", title: "Select Specialist", description: "Choose a specialist for the examination" },
+  {
+    id: "specialist",
+    title: "Select Specialist",
+    description: "Choose a specialist for the examination",
+  },
+  {
+    id: "appointment-type",
+    title: "Appointment Type",
+    description: "Select the type of appointment",
+  },
   { id: "timeslot", title: "Choose Time", description: "Select an available appointment time" },
-  { id: "details", title: "Examinee Details", description: "Provide information about the examinee" },
+  {
+    id: "details",
+    title: "Examinee Details",
+    description: "Provide information about the examinee",
+  },
   { id: "confirmation", title: "Confirmation", description: "Review and confirm your booking" },
 ];
 
@@ -23,8 +37,15 @@ export default function NewBookingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentStep = parseInt(searchParams.get("step") || "1", 10);
-  
+
   const [selectedSpecialist, setSelectedSpecialist] = useState<Specialist | null>(null);
+  const [selectedAppointmentType, setSelectedAppointmentType] = useState<{
+    id: number;
+    name: string;
+    duration: number;
+    description?: string;
+    category: string;
+  } | null>(null);
   const [selectedDateTime, setSelectedDateTime] = useState<Date | null>(null);
   const [examineeData, setExamineeData] = useState<{
     examineeName: string;
@@ -58,6 +79,17 @@ export default function NewBookingPage() {
     handleNext();
   };
 
+  const handleAppointmentTypeSelect = (appointmentType: {
+    id: number;
+    name: string;
+    duration: number;
+    description?: string;
+    category: string;
+  }) => {
+    setSelectedAppointmentType(appointmentType);
+    handleNext();
+  };
+
   const handleTimeSlotSelect = (dateTime: Date) => {
     setSelectedDateTime(dateTime);
     handleNext();
@@ -77,10 +109,12 @@ export default function NewBookingPage() {
       case 1:
         return selectedSpecialist !== null;
       case 2:
-        return selectedDateTime !== null;
+        return selectedAppointmentType !== null;
       case 3:
-        return examineeData !== null;
+        return selectedDateTime !== null;
       case 4:
+        return examineeData !== null;
+      case 5:
         return bookingId !== null;
       default:
         return false;
@@ -98,21 +132,21 @@ export default function NewBookingPage() {
         );
       case 2:
         return selectedSpecialist ? (
-          <TimeSlotPicker
+          <AppointmentTypeSelect
             specialistId={selectedSpecialist.id}
-            onSelect={handleTimeSlotSelect}
-            selectedDateTime={selectedDateTime}
+            onSelect={handleAppointmentTypeSelect}
+            selectedAppointmentType={selectedAppointmentType}
           />
         ) : (
-          <div className="text-center text-muted-foreground">
-            Please select a specialist first
-          </div>
+          <div className="text-center text-muted-foreground">Please select a specialist first</div>
         );
       case 3:
-        return selectedSpecialist && selectedDateTime ? (
-          <ExamineeForm
-            onSubmit={handleExamineeSubmit}
-            defaultValues={examineeData || undefined}
+        return selectedSpecialist && selectedAppointmentType ? (
+          <TimeSlotPicker
+            specialistId={selectedSpecialist.id}
+            appointmentTypeId={selectedAppointmentType.id}
+            onSelect={handleTimeSlotSelect}
+            selectedDateTime={selectedDateTime}
           />
         ) : (
           <div className="text-center text-muted-foreground">
@@ -120,9 +154,18 @@ export default function NewBookingPage() {
           </div>
         );
       case 4:
-        return selectedSpecialist && selectedDateTime && examineeData ? (
+        return selectedSpecialist && selectedAppointmentType && selectedDateTime ? (
+          <ExamineeForm onSubmit={handleExamineeSubmit} defaultValues={examineeData || undefined} />
+        ) : (
+          <div className="text-center text-muted-foreground">
+            Please complete previous steps first
+          </div>
+        );
+      case 5:
+        return selectedSpecialist && selectedAppointmentType && selectedDateTime && examineeData ? (
           <BookingConfirmation
             specialist={selectedSpecialist}
+            appointmentType={selectedAppointmentType}
             dateTime={selectedDateTime}
             examineeData={examineeData}
             onConfirm={handleBookingConfirm}
@@ -139,51 +182,42 @@ export default function NewBookingPage() {
   };
 
   return (
-    <div className="container max-w-4xl py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create New Booking</CardTitle>
-          <CardDescription>
-            Schedule an independent medical examination
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MultiStepForm
-            steps={steps}
-            currentStep={currentStep}
-            onStepClick={(step) => {
-              if (step < currentStep) {
-                updateStep(step);
-              }
-            }}
-          />
-          
-          <div className="mt-8">
-            {renderStepContent()}
-          </div>
+    <div className="flex flex-col items-center justify-center h-full">
+      <div className="container max-w-7xl py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Create New Booking</CardTitle>
+            <CardDescription>Schedule an independent medical examination</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MultiStepForm
+              steps={steps}
+              currentStep={currentStep}
+              onStepClick={(step) => {
+                if (step < currentStep) {
+                  updateStep(step);
+                }
+              }}
+            />
 
-          <div className="mt-8 flex justify-between">
-            <Button
-              variant="outline"
-              onClick={handleBack}
-              disabled={currentStep === 1}
-            >
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-            
-            {currentStep < 4 && (
-              <Button
-                onClick={handleNext}
-                disabled={!canProceed()}
-              >
-                Next
-                <ChevronRight className="ml-2 h-4 w-4" />
+            <div className="mt-8">{renderStepContent()}</div>
+
+            <div className="mt-8 flex justify-between">
+              <Button variant="outline" onClick={handleBack} disabled={currentStep === 1}>
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back
               </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+
+              {currentStep < 5 && (
+                <Button onClick={handleNext} disabled={!canProceed()}>
+                  Next
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
