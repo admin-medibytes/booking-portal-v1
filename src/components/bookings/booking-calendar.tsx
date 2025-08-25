@@ -385,7 +385,7 @@ function WeekView({ currentDate, bookingsByDate, onBookingClick }: WeekViewProps
       </div>
 
       {/* Time slots grid */}
-      <div className="grid grid-cols-8 max-h-[600px] overflow-y-auto">
+      <div className="grid grid-cols-8 overflow-y-auto ">
         {businessHours.map((hour) => (
           <React.Fragment key={hour}>
             {/* Hour label */}

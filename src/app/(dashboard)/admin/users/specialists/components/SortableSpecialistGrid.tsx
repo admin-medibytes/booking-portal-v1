@@ -39,9 +39,10 @@ interface Specialist {
 interface SortableSpecialistGridProps {
   specialists: Specialist[];
   onReorder: (positions: Array<{ id: string; position: number }>) => void;
+  onSpecialistClick?: (specialist: Specialist) => void;
 }
 
-export function SortableSpecialistGrid({ specialists, onReorder }: SortableSpecialistGridProps) {
+export function SortableSpecialistGrid({ specialists, onReorder, onSpecialistClick }: SortableSpecialistGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -94,6 +95,7 @@ export function SortableSpecialistGrid({ specialists, onReorder }: SortableSpeci
             <DraggableSpecialistCard
               key={specialist.id}
               specialist={specialist}
+              onClick={() => onSpecialistClick?.(specialist)}
             />
           ))}
         </div>

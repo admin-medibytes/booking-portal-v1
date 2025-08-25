@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Users, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { adminClient, specialistsClient } from "@/lib/hono-client";
 import { SortableSpecialistGrid } from "./components/SortableSpecialistGrid";
+import { SpecialistDetailDialog } from "./components/SpecialistDetailDialog";
 
 interface Specialist {
   id: string;
@@ -29,10 +32,12 @@ interface Specialist {
 }
 
 export default function AdminSpecialistsPage() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [pendingPositions, setPendingPositions] = useState<Array<{ id: string; position: number }> | null>(null);
   const [localSpecialists, setLocalSpecialists] = useState<Specialist[] | null>(null);
+  const [selectedSpecialist, setSelectedSpecialist] = useState<Specialist | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch specialists
@@ -123,13 +128,26 @@ export default function AdminSpecialistsPage() {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Specialist Management</h1>
-        <p className="text-muted-foreground">
+    <div className="container mx-auto py-10">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Specialist Management</h1>
+        <p className="text-muted-foreground mt-2">
           Manage specialist positions and display order for the booking interface
         </p>
       </div>
+
+      <Tabs value="specialists" className="mb-6">
+        <TabsList>
+          <TabsTrigger value="all-users" onClick={() => router.push("/admin/users")}>
+            <Users className="mr-2 h-4 w-4" />
+            All Users
+          </TabsTrigger>
+          <TabsTrigger value="specialists" onClick={() => router.push("/admin/users/specialists")}>
+            <UserCheck className="mr-2 h-4 w-4" />
+            Specialists
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Controls */}
       <div className="flex gap-4 mb-6">
@@ -184,7 +202,20 @@ export default function AdminSpecialistsPage() {
           <p className="text-muted-foreground">No specialists found</p>
         </div>
       ) : (
-        <SortableSpecialistGrid specialists={filteredSpecialists} onReorder={handleReorder} />
+        <SortableSpecialistGrid 
+          specialists={filteredSpecialists} 
+          onReorder={handleReorder}
+          onSpecialistClick={setSelectedSpecialist}
+        />
+      )}
+
+      {/* Specialist Detail Dialog */}
+      {selectedSpecialist && (
+        <SpecialistDetailDialog
+          specialist={selectedSpecialist}
+          open={!!selectedSpecialist}
+          onOpenChange={(open) => !open && setSelectedSpecialist(null)}
+        />
       )}
     </div>
   );

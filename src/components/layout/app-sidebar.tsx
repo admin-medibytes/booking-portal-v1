@@ -52,8 +52,8 @@ export function AppSidebar({ user }: AppUserProps) {
       icon: Home,
     },
     {
-      href: "/admin/impersonate",
-      label: "Switch User",
+      href: "/admin/users",
+      label: "User Management",
       icon: Users,
     },
     {

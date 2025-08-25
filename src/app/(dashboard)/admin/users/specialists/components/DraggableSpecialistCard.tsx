@@ -25,9 +25,10 @@ interface Specialist {
 
 interface DraggableSpecialistCardProps {
   specialist: Specialist;
+  onClick?: () => void;
 }
 
-export function DraggableSpecialistCard({ specialist }: DraggableSpecialistCardProps) {
+export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecialistCardProps) {
   const {
     attributes,
     listeners,
@@ -45,10 +46,19 @@ export function DraggableSpecialistCard({ specialist }: DraggableSpecialistCardP
 
   return (
     <div ref={setNodeRef} style={style}>
-      <Card className={`p-4 relative ${isDragging ? "shadow-lg" : ""}`}>
+      <Card 
+        className={`p-4 relative ${isDragging ? "shadow-lg" : ""} cursor-pointer hover:shadow-md transition-shadow`}
+        onClick={(e) => {
+          // Don't trigger click when dragging
+          const target = e.target as HTMLElement;
+          if (!target.closest('[data-drag-handle]')) {
+            onClick?.();
+          }
+        }}>
         {/* Drag Handle */}
         <div 
           className="absolute top-4 right-4 cursor-move text-muted-foreground hover:text-foreground touch-none"
+          data-drag-handle
           {...attributes}
           {...listeners}
         >
