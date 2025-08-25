@@ -153,32 +153,28 @@ export default function BookingsPage() {
       </div>
 
       {/* Content Area */}
-      <div className="bg-white rounded-lg shadow">
-        {isLoading ? (
+      {isLoading ? (
+        <div className="bg-white border rounded-lg shadow-sm">
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            <Loader2 className="w-8 h-8 animate-spin text-stone-400" />
           </div>
-        ) : (
-          <>
-            {view === "list" ? (
-              <div className="p-6">
-                <BookingListTable
-                  bookings={data?.bookings || []}
-                  totalCount={data?.pagination.total || 0}
-                  currentPage={filters.page || 1}
-                  pageSize={filters.limit || 20}
-                  onPageChange={handlePageChange}
-                  onPageSizeChange={handlePageSizeChange}
-                />
-              </div>
-            ) : (
-              <div className="p-6">
-                <BookingCalendar bookings={data?.bookings || []} />
-              </div>
-            )}
-          </>
-        )}
-      </div>
+        </div>
+      ) : (
+        <>
+          {view === "list" ? (
+            <BookingListTable
+              bookings={data?.bookings || []}
+              totalCount={data?.pagination.total || 0}
+              currentPage={filters.page || 1}
+              pageSize={filters.limit || 20}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          ) : (
+            <BookingCalendar bookings={data?.bookings || []} />
+          )}
+        </>
+      )}
     </div>
   );
 }

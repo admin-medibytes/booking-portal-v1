@@ -254,7 +254,7 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick }: MonthViewPro
   }, [currentDate]);
 
   return (
-    <div className="overflow-hidden border rounded-lg">
+    <div className="overflow-hidden border rounded-lg shadow">
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 bg-muted">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
@@ -359,7 +359,7 @@ function WeekView({ currentDate, bookingsByDate, onBookingClick }: WeekViewProps
   const businessHours = Array.from({ length: 11 }, (_, i) => i + 8); // 8am to 6pm
 
   return (
-    <div className="overflow-hidden border rounded-lg">
+    <div className="overflow-hidden border rounded-lg shadow">
       {/* Time column and day headers */}
       <div className="grid grid-cols-8 bg-muted">
         <div className="p-2 text-sm font-medium border-r text-muted-foreground">Time</div>
@@ -439,7 +439,7 @@ function DayView({ currentDate, bookingsByDate, onBookingClick }: DayViewProps) 
   const businessHours = Array.from({ length: 11 }, (_, i) => i + 8); // 8am to 6pm
 
   return (
-    <div className="overflow-hidden border rounded-lg">
+    <div className="overflow-hidden border rounded-lg shadow">
       {/* Day header */}
       <div className="p-4 border-b bg-muted">
         <h3 className="text-lg font-semibold">{format(currentDate, "EEEE, MMMM d, yyyy")}</h3>
@@ -525,7 +525,7 @@ function AgendaView({ currentDate, bookings, onBookingClick }: AgendaViewProps) 
 
   if (agendaBookings.length === 0) {
     return (
-      <div className="p-8 border rounded-lg">
+      <div className="p-8 border rounded-lg shadow">
         <div className="flex flex-col items-center justify-center text-center">
           <Calendar className="w-12 h-12 mb-4 text-muted-foreground" />
           <h3 className="text-lg font-medium">No bookings found</h3>

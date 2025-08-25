@@ -56,6 +56,7 @@ export function UserListTable({ filters }: UserListTableProps) {
           ...(filters.status && { status: filters.status as "active" | "inactive" }),
         },
       });
+
       if (!response.ok) throw new Error("Failed to fetch users");
       return response.json();
     },
@@ -111,8 +112,8 @@ export function UserListTable({ filters }: UserListTableProps) {
   const pagination = data?.pagination || { page: 1, totalPages: 1 };
 
   return (
-    <div className="space-y-4 bg-background">
-      <div className="border rounded-md">
+    <div className="space-y-4">
+      <div className="border rounded-md bg-background shadow">
         <Table>
           <TableHeader>
             <TableRow>
@@ -157,7 +158,7 @@ export function UserListTable({ filters }: UserListTableProps) {
                   </TableCell>
                   <TableCell>
                     {user.banned ? (
-                      <Badge variant="stone">Inactive</Badge>
+                      <Badge variant="secondary">Inactive</Badge>
                     ) : (
                       <Badge variant="success">Active</Badge>
                     )}
@@ -226,8 +227,8 @@ export function UserListTable({ filters }: UserListTableProps) {
                                 {user.specialist.acuityCalendarId}
                               </p>
                               <p>
-                                <span className="text-muted-foreground">Position:</span>{" "}
-                                #{user.specialist.position}
+                                <span className="text-muted-foreground">Position:</span> #
+                                {user.specialist.position}
                               </p>
                               {user.specialist.location && (
                                 <p>

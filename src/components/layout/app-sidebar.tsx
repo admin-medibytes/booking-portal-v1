@@ -15,8 +15,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import Brand from "@/components/brand";
 import { Badge } from "@/components/ui/badge";
 import { AppUserProps } from "./type";
+import Image from "next/image";
 
 interface NavItem {
   href: string;
@@ -67,11 +69,9 @@ export function AppSidebar({ user }: AppUserProps) {
     <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <Home className="size-4" />
-          </div>
+          <Image src="/logo.png" alt="Medibytes" quality={100} width={32} height={32} />
           <div className="flex flex-col gap-0.5 leading-none">
-            <span className="font-semibold">Medibytes</span>
+            <Brand className="uppercase">Medibytes Legal</Brand>
             <span className="text-xs text-muted-foreground">Booking Portal</span>
           </div>
         </div>

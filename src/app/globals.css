@@ -34,7 +34,7 @@
   --chart-3: oklch(0.7235 0.0332 48.2398);
   --chart-4: oklch(0.7711 0.0247 44.2782);
   --chart-5: oklch(0.8171 0.0187 30.2847);
-  --sidebar: oklch(1 0 0);
+  --sidebar: oklch(0.9834 0.0025 48.7198);
   --sidebar-foreground: oklch(0.3729 0.0306 259.7328);
   --sidebar-primary: oklch(0.6311 0.0507 56.1313);
   --sidebar-primary-foreground: oklch(1 0 0);
@@ -45,7 +45,7 @@
   --font-sans: Inter, sans-serif;
   --font-serif: serif;
   --font-mono: IBM Plex Mono, monospace;
-  --radius: 0.5rem;
+  --radius: 1rem;
   --shadow-2xs: 0px 2px 4px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0px 2px 4px 0px hsl(0 0% 0% / 0.05);
   --shadow-sm: 0px 2px 4px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);

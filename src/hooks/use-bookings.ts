@@ -53,8 +53,8 @@ export function useBookings(filters?: BookingFilters) {
       }
 
       const data = await res.json();
-      console.log("Done fetching with use bookings");
-      return data as unknown as BookingListResponse;
+
+      return data;
     },
     staleTime: 30 * 1000, // 30 seconds as per requirements
     gcTime: 5 * 60 * 1000, // 5 minutes cache time

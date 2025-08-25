@@ -233,7 +233,9 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
                       />
                       <div className="flex-1">
                         <div className="font-medium">{specialist.name}</div>
-                        <div className="text-sm text-muted-foreground">{specialist.user?.jobTitle || "Specialist"}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {specialist.user?.jobTitle || "Specialist"}
+                        </div>
                       </div>
                     </CommandItem>
                   ))}
@@ -255,11 +257,11 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
       {(selectedSpecialists.length > 0 || filters.status || filters.search) && (
         <div className="flex flex-wrap gap-2">
           {filters.status && (
-            <Badge variant="stone" className="capitalize">
+            <Badge variant="secondary" className="capitalize">
               Status: {filters.status}
             </Badge>
           )}
-          {filters.search && <Badge variant="stone">Search: {filters.search}</Badge>}
+          {filters.search && <Badge variant="secondary">Search: {filters.search}</Badge>}
           {selectedSpecialists.map((specialist) => (
             <Badge key={specialist.id} variant="secondary">
               {specialist.name}

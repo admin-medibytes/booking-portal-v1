@@ -202,7 +202,7 @@ export const BookingListTable = memo(function BookingListTable({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-md border shadow">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

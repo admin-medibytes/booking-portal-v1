@@ -26,7 +26,7 @@ export function DashboardClientWrapper({ children, user }: DashboardClientWrappe
       <AppSidebar user={user} />
       <SidebarInset>
         <AppTopbar user={user} />
-        <main className="flex flex-1 flex-col gap-4 p-4 pt-0 bg-slate-50">{children}</main>
+        <main className="flex flex-1 flex-col gap-4 p-4 pt-0 bg-white">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );
