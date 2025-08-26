@@ -9,7 +9,7 @@ interface DashboardClientWrapperProps {
   user: {
     name: string;
     email: string;
-    role: "user" | "admin";
+    role: "admin" | "specialist" | "referrer";
     image: string | null;
   };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Calendar, FileText, Settings, Users, Shield, Home } from "lucide-react";
+import { Calendar, FileText, Settings, Users, Shield, Home, CalendarCheck } from "lucide-react";
 
 import {
   Sidebar,
@@ -14,9 +14,12 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import Brand from "@/components/brand";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { AppUserProps } from "./type";
 import Image from "next/image";
 
@@ -113,7 +116,37 @@ export function AppSidebar({ user }: AppUserProps) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {user.role !== "specialist" && (
+          <>
+            <SidebarSeparator />
+
+            <SidebarGroup>
+              <div className="px-3 pb-3">
+                <Card className="rounded-[.5rem] border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-2">
+                        <CalendarCheck className="size-5 text-primary" />
+                        <h3 className="font-semibold text-sm">Need Medical Legal Services?</h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Book an appointment with our specialists for expert medical legal
+                        consultations.
+                      </p>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button asChild size="sm" className="w-full mt-auto">
+                      <a href="/bookings/new">Book Now</a>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </div>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
+
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
