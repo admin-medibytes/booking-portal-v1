@@ -34,7 +34,7 @@ export function TwoFactorModal({ open, onOpenChange, onSuccess }: TwoFactorModal
 
     try {
       let result;
-      
+
       if (verificationMethod === "totp") {
         result = await authClient.twoFactor.verifyTotp({
           code,
@@ -47,8 +47,6 @@ export function TwoFactorModal({ open, onOpenChange, onSuccess }: TwoFactorModal
         });
       }
 
-      console.log("2FA verification result:", result);
-
       if (result.error) {
         setError(result.error.message || "Invalid verification code");
         return;
@@ -56,11 +54,11 @@ export function TwoFactorModal({ open, onOpenChange, onSuccess }: TwoFactorModal
 
       if (result.data) {
         toast.success("Two-factor authentication verified successfully");
-        
+
         // Clear the form
         setCode("");
         setError(null);
-        
+
         // Call success callback
         onSuccess();
       }
@@ -81,7 +79,7 @@ export function TwoFactorModal({ open, onOpenChange, onSuccess }: TwoFactorModal
             Enter the verification code from your authenticator app
           </AlertDialogDescription>
         </AlertDialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="2fa-code">

@@ -18,6 +18,7 @@ export const CreateSpecialistInput = type({
   userId: "string",
   acuityCalendarId: "string",
   name: "string",
+  slug: "string",
   location: LocationInput.or("null | undefined"),
   acceptsInPerson: "boolean | undefined",
   acceptsTelehealth: "boolean | undefined",
@@ -26,6 +27,7 @@ export const CreateSpecialistInput = type({
 
 export const UpdateSpecialistInput = type({
   name: "string | undefined",
+  slug: "string | undefined",
   location: LocationInput.or("null | undefined"),
   acceptsInPerson: "boolean | undefined",
   acceptsTelehealth: "boolean | undefined",
@@ -72,6 +74,7 @@ export class SpecialistRepository {
         userId: validated.userId,
         acuityCalendarId: validated.acuityCalendarId,
         name: validated.name,
+        slug: validated.slug,
         location: (validated.location as SpecialistLocation | null) ?? null,
         acceptsInPerson,
         acceptsTelehealth,
@@ -111,6 +114,7 @@ export class SpecialistRepository {
     // Build update object dynamically
     const updateData: Partial<{
       name: string;
+      slug: string;
       location: SpecialistLocation | null;
       acceptsInPerson: boolean;
       acceptsTelehealth: boolean;
@@ -118,6 +122,7 @@ export class SpecialistRepository {
       updatedAt: Date;
     }> = {};
     if (validated.name !== undefined) updateData.name = validated.name;
+    if (validated.slug !== undefined) updateData.slug = validated.slug;
     if (validated.location !== undefined)
       updateData.location = validated.location as SpecialistLocation | null;
     if (validated.acceptsInPerson !== undefined)
@@ -260,6 +265,26 @@ export class SpecialistRepository {
       .where(eq(specialists.acuityCalendarId, acuityCalendarId));
 
     return result.count > 0;
+  }
+
+  // Find specialist by slug
+  async findBySlug(slug: string) {
+    const result = await db
+      .select({
+        specialist: specialists,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          jobTitle: users.jobTitle,
+        },
+      })
+      .from(specialists)
+      .innerJoin(users, eq(specialists.userId, users.id))
+      .where(eq(specialists.slug, slug));
+
+    return result[0] || null;
   }
 
   // Deactivate a specialist

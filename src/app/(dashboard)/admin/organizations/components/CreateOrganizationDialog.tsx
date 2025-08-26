@@ -17,6 +17,7 @@ import { Loader2 } from "lucide-react";
 import { adminClient } from "@/lib/hono-client";
 import { toast } from "sonner";
 import { debounce } from "@/lib/debounce";
+import { generateSlug } from "@/lib/utils/slug";
 
 type OrganizationData = {
   name: string;
@@ -108,13 +109,6 @@ export function CreateOrganizationDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
-
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

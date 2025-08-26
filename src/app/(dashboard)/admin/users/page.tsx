@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Plus, Users, UserCheck } from "lucide-react";
+import { Plus, Users, Stethoscope } from "lucide-react";
 import { CreateUserDialog } from "./components/CreateUserDialog";
 import { UserListTable } from "./components/UserListTable";
 import { UserFilters } from "./components/UserFilters";
@@ -40,7 +40,7 @@ export default function UsersPage() {
             All Users
           </Button>
           <Button variant="ghost" size="sm" onClick={() => router.push("/admin/users/specialists")}>
-            <UserCheck className="mr-2 h-4 w-4" />
+            <Stethoscope className="mr-2 h-4 w-4" />
             Specialists
           </Button>
         </div>

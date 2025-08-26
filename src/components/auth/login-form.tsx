@@ -53,7 +53,6 @@ export function LoginForm() {
 
         if (result.data?.user) {
           const user = result.data.user;
-          console.log("User data:", user);
 
           if (!user.emailVerified) {
             router.push("/verify?type=email");

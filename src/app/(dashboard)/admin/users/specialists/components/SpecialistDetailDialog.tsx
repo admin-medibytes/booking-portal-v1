@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminClient, specialistsClient } from "@/lib/hono-client";
+import { generateSlug } from "@/lib/utils/slug";
+import { debounce } from "@/lib/debounce";
 import {
   Dialog,
   DialogContent,
@@ -43,13 +45,16 @@ import {
 import { format } from "date-fns";
 import { Country, State, City } from "country-state-city";
 import type { SpecialistLocation } from "@/server/db/schema/specialists";
-import { formatLocationFull } from "@/lib/utils/location";
+import { formatLocationFull, formatLocationShort } from "@/lib/utils/location";
+import SpecialistImageUpload from "@/components/specialists/SpecialistImageUpload";
+import Link from "next/link";
 
 interface Specialist {
   id: string;
   userId: string;
   acuityCalendarId: string;
   name: string;
+  slug: string;
   location: SpecialistLocation | null;
   acceptsInPerson: boolean;
   acceptsTelehealth: boolean;
@@ -75,6 +80,7 @@ interface ExtendedUser {
   phoneNumber?: string | null;
   emailVerified?: boolean;
   banned?: boolean | null;
+  image?: string | null;
   createdAt: string;
   memberships?: Array<{
     organizationId: string;
@@ -98,6 +104,9 @@ export function SpecialistDetailDialog({
   const queryClient = useQueryClient();
   const [isEditingSpecialist, setIsEditingSpecialist] = useState(false);
   const [isEditingUser, setIsEditingUser] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [checkingSlug, setCheckingSlug] = useState(false);
 
   // Memoize initial values to prevent recalculation
   const initialValues = useMemo(() => {
@@ -122,6 +131,7 @@ export function SpecialistDetailDialog({
     return {
       specialistForm: {
         name: specialist.name,
+        slug: specialist.slug,
         acceptsInPerson: !!specialist.acceptsInPerson,
         acceptsTelehealth: !!specialist.acceptsTelehealth,
         location: specialist.location || null,
@@ -142,6 +152,42 @@ export function SpecialistDetailDialog({
   const [availableCities, setAvailableCities] = useState(initialValues.cities);
 
   const allCountries = Country.getAllCountries();
+
+  // Debounced slug check function
+  const debouncedCheckSlugAvailability = useMemo(
+    () =>
+      debounce(async (slug: string, currentSlug: string) => {
+        // If it's the same as current slug, it's available
+        if (slug === currentSlug) {
+          setSlugAvailable(true);
+          return;
+        }
+
+        if (!slug) {
+          setSlugAvailable(null);
+          return;
+        }
+
+        setCheckingSlug(true);
+        try {
+          const response = await specialistsClient["check-slug"].$post({
+            json: { slug },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setSlugAvailable(data.available);
+          } else {
+            setSlugAvailable(null);
+          }
+        } catch {
+          setSlugAvailable(null);
+        } finally {
+          setCheckingSlug(false);
+        }
+      }, 500),
+    []
+  );
 
   // Reset form when specialist changes (dialog opened with different specialist)
   useEffect(() => {
@@ -235,6 +281,7 @@ export function SpecialistDetailDialog({
   const updateSpecialistMutation = useMutation({
     mutationFn: async (values: {
       name?: string;
+      slug?: string;
       location?: SpecialistLocation | null;
       acceptsInPerson?: boolean;
       acceptsTelehealth?: boolean;
@@ -256,6 +303,7 @@ export function SpecialistDetailDialog({
         // Update the form state
         const updatedForm = {
           name: data.name,
+          slug: data.slug || "",
           acceptsInPerson: data.acceptsInPerson,
           acceptsTelehealth: data.acceptsTelehealth,
           location: data.location || null,
@@ -276,6 +324,7 @@ export function SpecialistDetailDialog({
         // This ensures badges and status indicators update immediately
         Object.assign(specialist, {
           name: data.name,
+          slug: data.slug,
           acceptsInPerson: data.acceptsInPerson,
           acceptsTelehealth: data.acceptsTelehealth,
           location: data.location,
@@ -302,6 +351,7 @@ export function SpecialistDetailDialog({
       lastName?: string;
       phone?: string;
       jobTitle?: string;
+      image?: string | null;
     }) => {
       const response = await adminClient.users[":id"].$put({
         param: { id: specialist.userId },
@@ -326,6 +376,17 @@ export function SpecialistDetailDialog({
   });
 
   const handleSaveSpecialist = () => {
+    // Validate slug
+    if (!specialistForm.slug) {
+      toast.error("Slug is required");
+      return;
+    }
+
+    if (slugAvailable === false) {
+      toast.error("The selected slug is not available");
+      return;
+    }
+
     // Validate location fields if location is provided
     if (showLocationFields && specialistForm.location) {
       if (
@@ -362,6 +423,31 @@ export function SpecialistDetailDialog({
     updateUserMutation.mutate(userForm);
   };
 
+  // Handle image upload
+  const handleImageUpload = async (imageBlob: Blob | null) => {
+    setIsUploadingImage(true);
+    try {
+      let imageUrl: string | null = null;
+
+      if (imageBlob) {
+        // Convert blob to base64 for storage
+        const reader = new FileReader();
+        imageUrl = await new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(imageBlob);
+        });
+      }
+
+      await updateUserMutation.mutateAsync({ image: imageUrl });
+      toast.success(imageUrl ? "Image uploaded successfully" : "Image removed successfully");
+    } catch (error) {
+      toast.error("Failed to update image");
+      console.error(error);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const handleCancelUserEdit = () => {
     setIsEditingUser(false);
     const userToRevert = userData?.user || specialist.user;
@@ -378,6 +464,7 @@ export function SpecialistDetailDialog({
     phoneNumber: "",
     emailVerified: false,
     banned: false,
+    image: null,
     createdAt: specialist.createdAt,
     memberships: [],
   };
@@ -395,31 +482,11 @@ export function SpecialistDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Top status badges - simplified */}
         <div className="flex items-center gap-2 mt-4">
           <Badge variant={specialist.isActive ? "success" : "secondary"} className="text-sm">
             {specialist.isActive ? "Active" : "Inactive"}
           </Badge>
-          <Badge variant="outline" className="text-sm font-mono">
-            Position #{specialist.position}
-          </Badge>
-          {specialist.acceptsInPerson && (
-            <Badge variant="outline" className="text-sm">
-              <MapPinned className="w-3 h-3 mr-1" />
-              In-person
-            </Badge>
-          )}
-          {specialist.acceptsTelehealth && (
-            <Badge variant="outline" className="text-sm">
-              <Video className="w-3 h-3 mr-1" />
-              Telehealth
-            </Badge>
-          )}
-          {!specialist.acceptsInPerson && !specialist.acceptsTelehealth && (
-            <Badge variant="secondary" className="text-sm">
-              <AlertCircle className="w-3 h-3 mr-1" />
-              On Request
-            </Badge>
-          )}
           {user.emailVerified && (
             <Badge variant="outline" className="text-sm">
               Email Verified
@@ -469,27 +536,117 @@ export function SpecialistDetailDialog({
                   </div>
                 )}
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Display Name</Label>
+              <CardContent className="space-y-6">
+                {/* Profile Section */}
+                <div className="flex flex-col items-center space-y-4 pb-6 border-b">
+                  <SpecialistImageUpload
+                    currentImageUrl={user.image}
+                    userName={specialist.name}
+                    onImageChange={handleImageUpload}
+                    isUploading={isUploadingImage}
+                  />
+                  <div className="text-center w-full max-w-sm">
+                    {isEditingSpecialist ? (
+                      <div className="space-y-2">
+                        <Label>Display Name</Label>
+                        <Input
+                          value={specialistForm.name}
+                          onChange={(e) =>
+                            setSpecialistForm({ ...specialistForm, name: e.target.value })
+                          }
+                          placeholder="Enter display name"
+                          className="text-center"
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="text-lg font-semibold">{specialist.name}</h3>
+                        <p className="text-sm text-muted-foreground">{specialist.user.jobTitle}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Specialist URL Section */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Specialist URL</Label>
                   {isEditingSpecialist ? (
-                    <Input
-                      value={specialistForm.name}
-                      onChange={(e) =>
-                        setSpecialistForm({ ...specialistForm, name: e.target.value })
-                      }
-                      placeholder="Enter display name"
-                    />
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Input
+                          value={specialistForm.slug}
+                          onChange={(e) => {
+                            const newSlug = e.target.value;
+                            setSpecialistForm({ ...specialistForm, slug: newSlug });
+                            debouncedCheckSlugAvailability(newSlug, specialist.slug);
+                          }}
+                          placeholder="john-smith"
+                          className={
+                            slugAvailable === false
+                              ? "border-red-500"
+                              : slugAvailable === true
+                                ? "border-green-500"
+                                : ""
+                          }
+                        />
+                        {checkingSlug && (
+                          <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin" />
+                        )}
+                      </div>
+                      {slugAvailable === false && (
+                        <p className="text-sm text-red-500">This slug is already taken</p>
+                      )}
+                      {slugAvailable === true && (
+                        <p className="text-sm text-green-500">This slug is available</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Specialist's profile will be available at: medibytes.com.au/our-panel/
+                        {specialistForm.slug || "{slug}"}
+                      </p>
+                    </div>
                   ) : (
-                    <p className="text-sm font-medium">{specialist.name}</p>
+                    <div>
+                      <Link
+                        href={`https://medibytes.com.au/our-panel/${specialist.slug}`}
+                        className="text-sm font-mono bg-muted px-2 py-1 rounded hover:underline"
+                        target="_blank"
+                      >
+                        medibytes.com.au/our-panel/{specialist.slug || "{slug}"}
+                      </Link>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Public URL for the specialist's profile page
+                      </p>
+                    </div>
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label>
-                    Appointment Types{" "}
-                    <span className="text-muted-foreground text-xs">(leave both unchecked for 'availability on request')</span>
-                  </Label>
+                {/* Appointment Settings Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-medium">Appointment Settings</Label>
+                    <div className="flex gap-2">
+                      {!isEditingSpecialist && specialist.acceptsInPerson && (
+                        <Badge variant="outline" className="text-xs">
+                          <MapPinned className="w-3 h-3 mr-1" />
+                          In-person
+                        </Badge>
+                      )}
+                      {!isEditingSpecialist && specialist.acceptsTelehealth && (
+                        <Badge variant="outline" className="text-xs">
+                          <Video className="w-3 h-3 mr-1" />
+                          Telehealth
+                        </Badge>
+                      )}
+                      {!isEditingSpecialist &&
+                        !specialist.acceptsInPerson &&
+                        !specialist.acceptsTelehealth && (
+                          <Badge variant="secondary" className="text-xs">
+                            <AlertCircle className="w-3 h-3 mr-1" />
+                            On Request
+                          </Badge>
+                        )}
+                    </div>
+                  </div>
                   {isEditingSpecialist ? (
                     <div className="space-y-3">
                       <div className="flex items-center space-x-2">
@@ -535,44 +692,26 @@ export function SpecialistDetailDialog({
                         <Alert>
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            This specialist will be marked as "Availability on Request" - bookings will need to be coordinated directly
+                            This specialist will be marked as "Availability on Request" - bookings
+                            will need to be coordinated directly
                           </AlertDescription>
                         </Alert>
                       )}
                     </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      {specialistForm.acceptsTelehealth && (
-                        <Badge variant="outline">
-                          <Video className="w-3 h-3 mr-1" />
-                          Telehealth
-                        </Badge>
-                      )}
-                      {specialistForm.acceptsInPerson && (
-                        <Badge variant="outline">
-                          <MapPinned className="w-3 h-3 mr-1" />
-                          In-person
-                        </Badge>
-                      )}
-                      {!specialistForm.acceptsTelehealth && !specialistForm.acceptsInPerson && (
-                        <Badge variant="secondary">
-                          <AlertCircle className="w-3 h-3 mr-1" />
-                          Availability on Request
-                        </Badge>
-                      )}
-                    </div>
-                  )}
+                  ) : null}
                 </div>
 
-                <div className="space-y-2">
-                  <Label>
-                    Practice Location
-                    {isEditingSpecialist && specialistForm.acceptsInPerson && (
-                      <span className="text-muted-foreground text-xs ml-2">
-                        (Optional - can be added later)
-                      </span>
+                {/* Location Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-medium">Practice Location</Label>
+                    {!isEditingSpecialist && specialist.location && (
+                      <Badge variant="outline" className="text-xs">
+                        <MapPin className="w-3 h-3 mr-1" />
+                        {formatLocationShort(specialist.location)}
+                      </Badge>
                     )}
-                  </Label>
+                  </div>
                   {isEditingSpecialist && specialistForm.acceptsInPerson ? (
                     <div className="space-y-3">
                       {!showLocationFields || !specialistForm.location ? (
@@ -599,7 +738,81 @@ export function SpecialistDetailDialog({
                           Add Location
                         </Button>
                       ) : (
-                        <div className="space-y-3 border p-4 rounded-lg">
+                        <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                          <div className="grid grid-cols-2 gap-3">
+                            <Select value={selectedCountryCode} onValueChange={handleCountryChange}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Country *" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allCountries.map((country) => (
+                                  <SelectItem key={country.isoCode} value={country.isoCode}>
+                                    {country.flag} {country.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={specialistForm.location?.state || ""}
+                              onValueChange={handleStateChange}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="State/Province *" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableStates.map((state) => (
+                                  <SelectItem key={state.isoCode} value={state.isoCode}>
+                                    {state.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <Select
+                              value={specialistForm.location?.city || ""}
+                              onValueChange={(value) =>
+                                setSpecialistForm({
+                                  ...specialistForm,
+                                  location: {
+                                    ...specialistForm.location!,
+                                    city: value,
+                                  },
+                                })
+                              }
+                              disabled={!specialistForm.location?.state}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue
+                                  placeholder={
+                                    !specialistForm.location?.state
+                                      ? "Select state first"
+                                      : "City *"
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableCities.map((city) => (
+                                  <SelectItem key={city.name} value={city.name}>
+                                    {city.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              placeholder="Postal Code"
+                              value={specialistForm.location?.postalCode || ""}
+                              onChange={(e) =>
+                                setSpecialistForm({
+                                  ...specialistForm,
+                                  location: {
+                                    ...specialistForm.location!,
+                                    postalCode: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
                           <Input
                             placeholder="Street Address (optional)"
                             value={specialistForm.location?.streetAddress || ""}
@@ -626,85 +839,11 @@ export function SpecialistDetailDialog({
                               })
                             }
                           />
-                          <div className="grid grid-cols-2 gap-3">
-                            <Select
-                              value={specialistForm.location?.state || ""}
-                              onValueChange={handleStateChange}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Select State *" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableStates.map((state) => (
-                                  <SelectItem key={state.isoCode} value={state.isoCode}>
-                                    {state.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-
-                            <Select
-                              value={specialistForm.location?.city || ""}
-                              onValueChange={(value) =>
-                                setSpecialistForm({
-                                  ...specialistForm,
-                                  location: {
-                                    ...specialistForm.location!,
-                                    city: value,
-                                  },
-                                })
-                              }
-                              disabled={!specialistForm.location?.state}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue
-                                  placeholder={
-                                    !specialistForm.location?.state
-                                      ? "Select state first"
-                                      : "Select City *"
-                                  }
-                                />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableCities.map((city) => (
-                                  <SelectItem key={city.name} value={city.name}>
-                                    {city.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <Input
-                              placeholder="Postal Code"
-                              value={specialistForm.location?.postalCode || ""}
-                              onChange={(e) =>
-                                setSpecialistForm({
-                                  ...specialistForm,
-                                  location: {
-                                    ...specialistForm.location!,
-                                    postalCode: e.target.value,
-                                  },
-                                })
-                              }
-                            />
-                            <Select value={selectedCountryCode} onValueChange={handleCountryChange}>
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Country *" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {allCountries.map((country) => (
-                                  <SelectItem key={country.isoCode} value={country.isoCode}>
-                                    {country.flag} {country.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
+                            className="w-full"
                             onClick={() => {
                               setShowLocationFields(false);
                               setSpecialistForm({
@@ -714,7 +853,7 @@ export function SpecialistDetailDialog({
                             }}
                           >
                             <X className="w-4 h-4 mr-2" />
-                            Clear Location
+                            Remove Location
                           </Button>
                         </div>
                       )}
@@ -730,21 +869,38 @@ export function SpecialistDetailDialog({
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Acuity Calendar ID</Label>
-                    <p className="font-mono text-sm bg-muted px-3 py-1 rounded-md">
-                      {specialist.acuityCalendarId}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Display Position</Label>
-                    <p className="text-sm font-medium">#{specialist.position}</p>
+                {/* System Information Section */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">System Information</Label>
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Calendar ID</p>
+                      <p className="font-mono text-sm">{specialist.acuityCalendarId}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Display Position</p>
+                      <p className="text-sm font-medium">#{specialist.position}</p>
+                    </div>
+                    {!isEditingSpecialist && (
+                      <div className="space-y-1 col-span-2">
+                        <p className="text-xs text-muted-foreground">Status</p>
+                        <Badge
+                          variant={specialist.isActive ? "success" : "secondary"}
+                          className="w-fit"
+                        >
+                          {specialist.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
 
+                {/* Active Status Toggle - only in edit mode */}
                 {isEditingSpecialist && (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                    <Label htmlFor="active-status" className="text-sm font-medium">
+                      Specialist Active
+                    </Label>
                     <Switch
                       id="active-status"
                       checked={!!specialistForm.isActive}
@@ -752,15 +908,14 @@ export function SpecialistDetailDialog({
                         setSpecialistForm({ ...specialistForm, isActive: checked })
                       }
                     />
-                    <Label htmlFor="active-status">Active</Label>
                   </div>
                 )}
 
-                <div className="pt-4 border-t space-y-2">
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>Created: {format(new Date(specialist.createdAt), "PP")}</span>
-                    <span>•</span>
-                    <span>Updated: {format(new Date(specialist.updatedAt), "PP")}</span>
+                {/* Timestamps - subtle at bottom */}
+                <div className="pt-4 border-t">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Created {format(new Date(specialist.createdAt), "PP")}</span>
+                    <span>Updated {format(new Date(specialist.updatedAt), "PP")}</span>
                   </div>
                 </div>
               </CardContent>

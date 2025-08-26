@@ -4,7 +4,16 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  Calendar,
+  Clock,
+  FileText,
+  CheckCircle,
+} from "lucide-react";
 import { SpecialistSelect } from "@/components/bookings/SpecialistSelect";
 import { AppointmentTypeSelect } from "@/components/bookings/AppointmentTypeSelect";
 import { TimeSlotPicker } from "@/components/bookings/TimeSlotPicker";
@@ -18,19 +27,32 @@ const steps = [
     id: "specialist",
     title: "Select Specialist",
     description: "Choose a specialist for the examination",
+    icon: User,
   },
   {
     id: "appointment-type",
     title: "Appointment Type",
     description: "Select the type of appointment",
+    icon: Calendar,
   },
-  { id: "timeslot", title: "Choose Time", description: "Select an available appointment time" },
+  {
+    id: "timeslot",
+    title: "Choose Time",
+    description: "Select an available appointment time",
+    icon: Clock,
+  },
   {
     id: "details",
     title: "Examinee Details",
     description: "Provide information about the examinee",
+    icon: FileText,
   },
-  { id: "confirmation", title: "Confirmation", description: "Review and confirm your booking" },
+  {
+    id: "confirmation",
+    title: "Confirmation",
+    description: "Review and confirm your booking",
+    icon: CheckCircle,
+  },
 ];
 
 export default function NewBookingPage() {
@@ -76,7 +98,7 @@ export default function NewBookingPage() {
 
   const handleSpecialistSelect = (specialist: Specialist) => {
     setSelectedSpecialist(specialist);
-    handleNext();
+    // handleNext();
   };
 
   const handleAppointmentTypeSelect = (appointmentType: {
@@ -182,24 +204,30 @@ export default function NewBookingPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full">
+    <div className="flex flex-col items-center justify-center">
       <div className="container max-w-7xl py-8">
+        <div className="mb-8">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Create New Booking</h1>
+            <p className="text-slate-600">Schedule an independent medical examination</p>
+          </div>
+        </div>
+
+        <MultiStepForm
+          steps={steps}
+          currentStep={currentStep}
+          onStepClick={(step) => {
+            if (step < currentStep) {
+              updateStep(step);
+            }
+          }}
+        />
         <Card>
           <CardHeader>
-            <CardTitle>Create New Booking</CardTitle>
-            <CardDescription>Schedule an independent medical examination</CardDescription>
+            <CardTitle>{steps[currentStep - 1].title}</CardTitle>
+            <CardDescription>{steps[currentStep - 1].description}</CardDescription>
           </CardHeader>
           <CardContent>
-            <MultiStepForm
-              steps={steps}
-              currentStep={currentStep}
-              onStepClick={(step) => {
-                if (step < currentStep) {
-                  updateStep(step);
-                }
-              }}
-            />
-
             <div className="mt-8">{renderStepContent()}</div>
 
             <div className="mt-8 flex justify-between">

@@ -32,6 +32,7 @@ export const specialists = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     acuityCalendarId: text("acuity_calendar_id").notNull().unique(),
     name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
     location: jsonb("location").$type<SpecialistLocation>(),
     acceptsInPerson: boolean("accepts_in_person").default(false).notNull(),
     acceptsTelehealth: boolean("accepts_telehealth").default(true).notNull(),
@@ -43,6 +44,7 @@ export const specialists = pgTable(
   (table) => ({
     userIdIdx: index("specialists_user_id_idx").on(table.userId),
     acuityCalendarIdIdx: index("specialists_acuity_calendar_id_idx").on(table.acuityCalendarId),
+    slugIdx: index("specialists_slug_idx").on(table.slug),
     isActiveIdx: index("specialists_is_active_idx").on(table.isActive),
     positionIdx: index("specialists_position_idx").on(table.position),
     positionUnique: unique("unique_specialist_position").on(table.position),

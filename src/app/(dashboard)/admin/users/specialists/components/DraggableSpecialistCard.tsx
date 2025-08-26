@@ -4,13 +4,16 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Mail, User, GripVertical, Video, MapPinned, AlertCircle } from "lucide-react";
 import type { SpecialistLocation } from "@/server/db/schema/specialists";
-import { formatLocationShort, getLocationDisplay } from "@/lib/utils/location";
+import { getLocationDisplay } from "@/lib/utils/location";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 
 interface Specialist {
   id: string;
   userId: string;
   acuityCalendarId: string;
   name: string;
+  slug: string;
   location: SpecialistLocation | null;
   acceptsInPerson: boolean;
   acceptsTelehealth: boolean;
@@ -22,6 +25,7 @@ interface Specialist {
     firstName: string;
     lastName: string;
     jobTitle: string;
+    image?: string | null;
   };
   createdAt: string;
   updatedAt: string;
@@ -41,6 +45,15 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+  };
+
+  // Get initials from specialist name
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(" ");
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return parts[0]?.[0]?.toUpperCase() || "S";
   };
 
   return (
@@ -75,9 +88,20 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
         <div className="mt-8 space-y-3">
           {/* Name and Status */}
           <div className="flex items-start justify-between">
-            <div>
-              <h3 className="font-semibold text-lg">{specialist.name}</h3>
-              <p className="text-sm text-muted-foreground">{specialist.user.jobTitle}</p>
+            <div className="flex gap-3">
+              <Avatar className="h-12 w-12">
+                <AvatarImage src={specialist.user.image || ""} alt={specialist.name} />
+                <AvatarFallback>{getInitials(specialist.name)}</AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="font-semibold text-lg">{specialist.name}</h3>
+                <p className="text-sm text-muted-foreground">{specialist.user.jobTitle}</p>
+              </div>
+            </div>
+            <div className="flex flex-col items-end">
+              <Badge variant={specialist.isActive ? "success" : "secondary"}>
+                {specialist.isActive ? "Active" : "Inactive"}
+              </Badge>
               {/* Appointment Type Badges */}
               <div className="flex gap-1 mt-2">
                 {specialist.acceptsInPerson && (
@@ -100,10 +124,9 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
                 )}
               </div>
             </div>
-            <Badge variant={specialist.isActive ? "success" : "secondary"}>
-              {specialist.isActive ? "Active" : "Inactive"}
-            </Badge>
           </div>
+
+          <Separator />
 
           {/* Contact Info */}
           <div className="space-y-2 text-sm">

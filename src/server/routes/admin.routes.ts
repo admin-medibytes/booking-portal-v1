@@ -85,6 +85,7 @@ const app = new Hono()
         role: "'referrer'|'specialist'|'admin'",
         sendEmailInvitation: "boolean",
         "acuityCalendarId?": "string",
+        "slug?": "string",
       })
     ),
     async (c) => {

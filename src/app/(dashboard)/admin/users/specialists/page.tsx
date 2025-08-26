@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Users, UserCheck, MapPinned, Video, Filter, AlertCircle } from "lucide-react";
+import { Search, Users, Stethoscope, MapPinned, Video, Filter, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { adminClient, specialistsClient } from "@/lib/hono-client";
 import { SortableSpecialistGrid } from "./components/SortableSpecialistGrid";
@@ -25,6 +25,7 @@ interface Specialist {
   userId: string;
   acuityCalendarId: string;
   name: string;
+  slug: string;
   location: SpecialistLocation | null;
   acceptsInPerson: boolean;
   acceptsTelehealth: boolean;
@@ -36,6 +37,7 @@ interface Specialist {
     firstName: string;
     lastName: string;
     jobTitle: string;
+    image?: string | null;
   };
   createdAt: string;
   updatedAt: string;
@@ -72,8 +74,14 @@ export default function AdminSpecialistsPage() {
       }
 
       const response = await adminClient.specialists.$get({ query });
-      const data = (await response.json()) as { success: boolean; data: Specialist[] };
-      return data.data || [];
+      const json = await response.json();
+
+      if ("error" in json) {
+        toast.error("Failed to fetch specialists");
+        return [];
+      }
+
+      return json.data;
     },
   });
 
@@ -197,7 +205,7 @@ export default function AdminSpecialistsPage() {
             size="sm"
             onClick={() => router.push("/admin/users/specialists")}
           >
-            <UserCheck className="mr-2 h-4 w-4" />
+            <Stethoscope className="mr-2 h-4 w-4" />
             Specialists
           </Button>
         </div>

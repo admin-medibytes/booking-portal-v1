@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminClient } from "@/lib/hono-client";
+import { adminClient, specialistsClient } from "@/lib/hono-client";
+import { generateSlug } from "@/lib/utils/slug";
+import { debounce } from "@/lib/debounce";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +37,8 @@ interface CreateUserDialogProps {
 
 export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) {
   const [selectedOrgId, setSelectedOrgId] = useState<string>("");
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [checkingSlug, setCheckingSlug] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch organizations
@@ -62,6 +66,36 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     enabled: !!selectedOrgId,
   });
 
+  // Debounced slug check function
+  const debouncedCheckSlugAvailability = useMemo(
+    () =>
+      debounce(async (slug: string) => {
+        if (!slug) {
+          setSlugAvailable(null);
+          return;
+        }
+
+        setCheckingSlug(true);
+        try {
+          const response = await specialistsClient["check-slug"].$post({
+            json: { slug },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setSlugAvailable(data.available);
+          } else {
+            setSlugAvailable(null);
+          }
+        } catch {
+          setSlugAvailable(null);
+        } finally {
+          setCheckingSlug(false);
+        }
+      }, 500),
+    []
+  );
+
   const createUserMutation = useMutation({
     mutationFn: async (values: {
       firstName: string;
@@ -74,6 +108,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       role: "referrer" | "specialist" | "admin";
       sendEmailInvitation: boolean;
       acuityCalendarId: string;
+      slug?: string;
     }) => {
       const response = await adminClient.users.$post({
         json: values,
@@ -94,6 +129,8 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       queryClient.invalidateQueries({ queryKey: ["users"] });
       onOpenChange(false);
       form.reset();
+      setSlugAvailable(null);
+      setCheckingSlug(false);
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -112,6 +149,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       role: "referrer" as "referrer" | "specialist" | "admin",
       sendEmailInvitation: true,
       acuityCalendarId: "",
+      slug: "",
     },
     onSubmit: async ({ value }) => {
       // Validate required fields
@@ -125,17 +163,38 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
         return;
       }
 
-      if (value.role === "specialist" && !value.acuityCalendarId) {
-        toast.error("Acuity Calendar ID is required for specialists");
-        return;
+      if (value.role === "specialist") {
+        if (!value.acuityCalendarId) {
+          toast.error("Acuity Calendar ID is required for specialists");
+          return;
+        }
+        if (!value.slug || value.slug === "") {
+          toast.error("Slug is required for specialists");
+          return;
+        }
+        if (slugAvailable === false) {
+          toast.error("The selected slug is not available");
+          return;
+        }
       }
 
       await createUserMutation.mutateAsync({
         ...value,
         jobTitle: value.jobTitle || "N/A",
+        slug: value.role === "specialist" ? value.slug : undefined,
       });
     },
   });
+
+  // Reset form state when dialog opens/closes
+  useEffect(() => {
+    if (!open) {
+      form.reset();
+      setSlugAvailable(null);
+      setCheckingSlug(false);
+      setSelectedOrgId("");
+    }
+  }, [open, form]);
 
   // Auto-select first team when organization changes
   useEffect(() => {
@@ -185,7 +244,17 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                           id="firstName"
                           value={field.state.value}
                           onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
+                          onChange={(e) => {
+                            field.handleChange(e.target.value);
+                            // Auto-generate slug if specialist role is selected
+                            if (form.state.values.role === "specialist") {
+                              const slug = generateSlug(
+                                `${e.target.value}-${form.state.values.lastName || ""}`
+                              );
+                              form.setFieldValue("slug", slug);
+                              debouncedCheckSlugAvailability(slug);
+                            }
+                          }}
                           placeholder="John"
                           className="pr-8"
                         />
@@ -204,7 +273,17 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                         id="lastName"
                         value={field.state.value}
                         onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
+                        onChange={(e) => {
+                          field.handleChange(e.target.value);
+                          // Auto-generate slug if specialist role is selected
+                          if (form.state.values.role === "specialist") {
+                            const slug = generateSlug(
+                              `${form.state.values.firstName || ""}-${e.target.value}`
+                            );
+                            form.setFieldValue("slug", slug);
+                            debouncedCheckSlugAvailability(slug);
+                          }
+                        }}
                         placeholder="Doe"
                       />
                     </div>
@@ -382,26 +461,85 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                 <form.Subscribe selector={(state) => state.values.role}>
                   {(role) =>
                     role === "specialist" ? (
-                      <form.Field name="acuityCalendarId">
-                        {(field) => (
-                          <div className="space-y-2">
-                            <Label htmlFor="acuityCalendarId" className="text-sm font-medium">
-                              Acuity Calendar ID <span className="text-destructive">*</span>
-                            </Label>
-                            <Input
-                              id="acuityCalendarId"
-                              value={field.state.value}
-                              onBlur={field.handleBlur}
-                              onChange={(e) => field.handleChange(e.target.value)}
-                              placeholder="12345678"
-                              className="h-10"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              For specialists to sync with Acuity Scheduling
-                            </p>
-                          </div>
-                        )}
-                      </form.Field>
+                      <div className="space-y-4">
+                        <form.Field name="acuityCalendarId">
+                          {(field) => (
+                            <div className="space-y-2">
+                              <Label htmlFor="acuityCalendarId" className="text-sm font-medium">
+                                Acuity Calendar ID <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                id="acuityCalendarId"
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) => field.handleChange(e.target.value)}
+                                placeholder="12345678"
+                                className="h-10"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                For specialists to sync with Acuity Scheduling
+                              </p>
+                            </div>
+                          )}
+                        </form.Field>
+                        <form.Field name="slug">
+                          {(field) => {
+                            // Generate initial slug if field is empty and names exist
+                            const currentValue = field.state.value;
+                            const firstName = form.state.values.firstName;
+                            const lastName = form.state.values.lastName;
+
+                            // If slug is empty and we have names, generate it
+                            if (!currentValue && (firstName || lastName)) {
+                              const generatedSlug = generateSlug(`${firstName}-${lastName}`);
+                              // Set the value immediately
+                              setTimeout(() => {
+                                form.setFieldValue("slug", generatedSlug);
+                                debouncedCheckSlugAvailability(generatedSlug);
+                              }, 0);
+                            }
+
+                            return (
+                              <div className="space-y-2">
+                                <Label htmlFor="slug" className="text-sm font-medium">
+                                  URL Slug <span className="text-destructive">*</span>
+                                </Label>
+                                <div className="relative">
+                                  <Input
+                                    id="slug"
+                                    value={field.state.value || ""}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => {
+                                      field.handleChange(e.target.value);
+                                      debouncedCheckSlugAvailability(e.target.value);
+                                    }}
+                                    placeholder="john-smith"
+                                    className={`h-10 ${
+                                      slugAvailable === false
+                                        ? "border-red-500"
+                                        : slugAvailable === true
+                                          ? "border-green-500"
+                                          : ""
+                                    }`}
+                                  />
+                                  {checkingSlug && (
+                                    <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin" />
+                                  )}
+                                </div>
+                                {slugAvailable === false && (
+                                  <p className="text-sm text-red-500">This slug is already taken</p>
+                                )}
+                                {slugAvailable === true && (
+                                  <p className="text-sm text-green-500">This slug is available</p>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                  Unique URL identifier for the specialist's panel page
+                                </p>
+                              </div>
+                            );
+                          }}
+                        </form.Field>
+                      </div>
                     ) : (
                       <div className="space-y-2">
                         <Label className="invisible text-sm font-medium">Placeholder</Label>

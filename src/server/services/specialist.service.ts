@@ -16,8 +16,9 @@ export interface AdminSpecialistListOptions {
 export interface AdminSpecialistListItem {
   id: string;
   userId: string;
-  acuityCalendarId: string | null;
+  acuityCalendarId: string;
   name: string;
+  slug: string;
   location: SpecialistLocation | null;
   acceptsInPerson: boolean;
   acceptsTelehealth: boolean;
@@ -26,9 +27,9 @@ export interface AdminSpecialistListItem {
   user: {
     id: string;
     email: string;
-    firstName: string | null;
-    lastName: string | null;
-    jobTitle: string | null;
+    firstName: string;
+    lastName: string;
+    jobTitle: string;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -61,6 +62,7 @@ export class SpecialistService {
         userId: specialist.userId,
         acuityCalendarId: specialist.acuityCalendarId,
         name: specialist.name,
+        slug: specialist.slug,
         location: specialist.location,
         acceptsInPerson: specialist.acceptsInPerson,
         acceptsTelehealth: specialist.acceptsTelehealth,
@@ -78,12 +80,9 @@ export class SpecialistService {
       }));
     } catch (error) {
       logger.error("Failed to list specialists for admin", error as Error);
-      throw new AppError(
-        ErrorCode.INTERNAL_SERVER_ERROR,
-        "Failed to retrieve specialists",
-        500,
-        { error: (error as Error).message }
-      );
+      throw new AppError(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to retrieve specialists", 500, {
+        error: (error as Error).message,
+      });
     }
   }
 }

@@ -10,6 +10,7 @@ import {
 } from "@/server/repositories/specialist.repository";
 import { acuityService } from "@/server/services/acuity.service";
 import { logger } from "@/server/utils/logger";
+import { generateSlug } from "@/lib/utils/slug";
 import type { SpecialistAvailabilityResponse } from "@/types/acuity";
 import type { SpecialistLocation } from "@/server/db/schema";
 
@@ -21,6 +22,7 @@ function getSpecialistFields(
     userId: string;
     acuityCalendarId: string;
     name: string;
+    slug: string;
     location: SpecialistLocation | null;
     acceptsInPerson: boolean;
     acceptsTelehealth: boolean;
@@ -40,6 +42,7 @@ function getSpecialistFields(
   const baseFields = {
     id: specialist.id,
     name: specialist.name,
+    slug: specialist.slug,
     location: specialist.location,
     acceptsInPerson: specialist.acceptsInPerson,
     acceptsTelehealth: specialist.acceptsTelehealth,
@@ -79,10 +82,15 @@ const syncSpecialistSchema = type({
 
 const updateSpecialistSchema = type({
   "name?": "string",
+  "slug?": "string",
   "location?": LocationInput.or("null"),
   "acceptsInPerson?": "boolean",
   "acceptsTelehealth?": "boolean",
   "isActive?": "boolean",
+});
+
+const checkSlugSchema = type({
+  slug: "string",
 });
 
 const specialistsRoutes = new Hono()
@@ -90,6 +98,24 @@ const specialistsRoutes = new Hono()
   // Apply auth middleware to all routes
   .use("*", authMiddleware)
   .use("*", requireAuth)
+
+  // POST /api/specialists/check-slug - Check if a slug is available
+  .post(
+    "/check-slug",
+    requireRole("admin"),
+    arktypeValidator("json", checkSlugSchema),
+    async (c) => {
+      const { slug } = c.req.valid("json");
+
+      try {
+        const existing = await specialistRepository.findBySlug(slug);
+        return c.json({ available: !existing });
+      } catch (error) {
+        logger.error("Failed to check specialist slug availability", error as Error);
+        return c.json({ available: false }, 500);
+      }
+    }
+  )
 
   // GET /api/specialists - List all active specialists
   .get("/", async (c) => {
@@ -101,7 +127,11 @@ const specialistsRoutes = new Hono()
       }
 
       const includeInactive = c.req.query("includeInactive") === "true";
-      const appointmentType = c.req.query("appointmentType") as 'in_person' | 'telehealth' | 'both' | undefined;
+      const appointmentType = c.req.query("appointmentType") as
+        | "in_person"
+        | "telehealth"
+        | "both"
+        | undefined;
       const city = c.req.query("city");
       const state = c.req.query("state");
 
@@ -115,7 +145,7 @@ const specialistsRoutes = new Hono()
       });
 
       let specialists;
-      
+
       // Apply filters based on query parameters
       if (appointmentType) {
         specialists = await specialistRepository.findByAppointmentType(appointmentType);
@@ -127,11 +157,13 @@ const specialistsRoutes = new Hono()
           : await specialistRepository.findAllActive();
       }
 
+      const data = specialists.map(({ specialist, user: specialistUser }) =>
+        getSpecialistFields(user, specialist, specialistUser)
+      );
+
       return c.json({
         success: true,
-        data: specialists.map(({ specialist, user: specialistUser }) =>
-          getSpecialistFields(user, specialist, specialistUser)
-        ),
+        data,
       });
     } catch (error) {
       logger.error("Failed to list specialists", error as Error);
@@ -249,11 +281,23 @@ const specialistsRoutes = new Hono()
           );
         }
 
+        // Generate a unique slug based on calendar name
+        let baseSlug = generateSlug(acuityCalendar.name);
+        let slug = baseSlug;
+        let counter = 1;
+
+        // Check for slug uniqueness and append counter if needed
+        while (await specialistRepository.findBySlug(slug)) {
+          counter++;
+          slug = `${baseSlug}-${counter}`;
+        }
+
         // Create specialist profile
         const specialist = await specialistRepository.create({
           userId: data.userId,
           acuityCalendarId: data.acuityCalendarId,
           name: acuityCalendar.name,
+          slug,
           location: null,
           acceptsInPerson: false,
           acceptsTelehealth: true,

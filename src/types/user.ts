@@ -18,6 +18,7 @@ export interface CreateUserInput {
   role: "referrer" | "specialist" | "admin";
   sendEmailInvitation: boolean;
   acuityCalendarId?: string;
+  slug?: string;
   createdBy: string;
 }
 

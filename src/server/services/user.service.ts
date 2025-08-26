@@ -52,13 +52,18 @@ export class UserService {
         throw new AppError(ErrorCode.VALIDATION_FAILED, "Team is not in the organization", 400);
       }
 
-      // Validate specialist acuityCalendarId if role is specialist
-      if (input.role === "specialist" && !input.acuityCalendarId) {
-        throw new AppError(
-          ErrorCode.VALIDATION_FAILED,
-          "Acuity Calendar ID is required for specialists",
-          400
-        );
+      // Validate specialist requirements if role is specialist
+      if (input.role === "specialist") {
+        if (!input.acuityCalendarId) {
+          throw new AppError(
+            ErrorCode.VALIDATION_FAILED,
+            "Acuity Calendar ID is required for specialists",
+            400
+          );
+        }
+        if (!input.slug) {
+          throw new AppError(ErrorCode.VALIDATION_FAILED, "Slug is required for specialists", 400);
+        }
       }
 
       if (input.acuityCalendarId) {
@@ -70,6 +75,19 @@ export class UserService {
 
         if (existingSpecialist.length > 0) {
           throw new ConflictError("A specialist with this Acuity Calendar ID already exists");
+        }
+      }
+
+      // Check slug uniqueness for specialists
+      if (input.role === "specialist" && input.slug) {
+        const existingSlug = await db
+          .select()
+          .from(specialists)
+          .where(eq(specialists.slug, input.slug))
+          .limit(1);
+
+        if (existingSlug.length > 0) {
+          throw new ConflictError("A specialist with this slug already exists");
         }
       }
 
@@ -120,6 +138,7 @@ export class UserService {
             userId,
             acuityCalendarId: input.acuityCalendarId,
             name,
+            slug: input.slug!,
             location: null,
             position,
             isActive: true,
