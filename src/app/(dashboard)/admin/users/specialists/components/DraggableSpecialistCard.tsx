@@ -2,14 +2,18 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Mail, User, GripVertical } from "lucide-react";
+import { MapPin, Mail, User, GripVertical, Video, MapPinned, AlertCircle } from "lucide-react";
+import type { SpecialistLocation } from "@/server/db/schema/specialists";
+import { formatLocationShort, getLocationDisplay } from "@/lib/utils/location";
 
 interface Specialist {
   id: string;
   userId: string;
   acuityCalendarId: string;
   name: string;
-  location: string | null;
+  location: SpecialistLocation | null;
+  acceptsInPerson: boolean;
+  acceptsTelehealth: boolean;
   position: number;
   isActive: boolean;
   user: {
@@ -29,14 +33,9 @@ interface DraggableSpecialistCardProps {
 }
 
 export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecialistCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: specialist.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: specialist.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -46,17 +45,18 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
 
   return (
     <div ref={setNodeRef} style={style}>
-      <Card 
+      <Card
         className={`p-4 relative ${isDragging ? "shadow-lg" : ""} cursor-pointer hover:shadow-md transition-shadow`}
         onClick={(e) => {
           // Don't trigger click when dragging
           const target = e.target as HTMLElement;
-          if (!target.closest('[data-drag-handle]')) {
+          if (!target.closest("[data-drag-handle]")) {
             onClick?.();
           }
-        }}>
+        }}
+      >
         {/* Drag Handle */}
-        <div 
+        <div
           className="absolute top-4 right-4 cursor-move text-muted-foreground hover:text-foreground touch-none"
           data-drag-handle
           {...attributes}
@@ -78,6 +78,27 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
             <div>
               <h3 className="font-semibold text-lg">{specialist.name}</h3>
               <p className="text-sm text-muted-foreground">{specialist.user.jobTitle}</p>
+              {/* Appointment Type Badges */}
+              <div className="flex gap-1 mt-2">
+                {specialist.acceptsInPerson && (
+                  <Badge variant="outline" className="text-xs">
+                    <MapPinned className="w-3 h-3 mr-1" />
+                    In-person
+                  </Badge>
+                )}
+                {specialist.acceptsTelehealth && (
+                  <Badge variant="outline" className="text-xs">
+                    <Video className="w-3 h-3 mr-1" />
+                    Telehealth
+                  </Badge>
+                )}
+                {!specialist.acceptsInPerson && !specialist.acceptsTelehealth && (
+                  <Badge variant="secondary" className="text-xs">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    On Request
+                  </Badge>
+                )}
+              </div>
             </div>
             <Badge variant={specialist.isActive ? "success" : "secondary"}>
               {specialist.isActive ? "Active" : "Inactive"}
@@ -90,14 +111,18 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
               <Mail className="h-4 w-4 text-muted-foreground" />
               <span className="truncate">{specialist.user.email}</span>
             </div>
-            
-            {specialist.location && (
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span>{specialist.location}</span>
-              </div>
-            )}
-            
+
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span>
+                {getLocationDisplay(
+                  specialist.acceptsInPerson,
+                  specialist.acceptsTelehealth,
+                  specialist.location
+                )}
+              </span>
+            </div>
+
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <span>

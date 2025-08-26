@@ -6,8 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Video, User } from "lucide-react";
+import { MapPin, Video, User, MapPinned } from "lucide-react";
 import { specialistsClient } from "@/lib/hono-client";
+import { 
+  formatLocationShort, 
+  getLocationDisplay,
+  getAppointmentTypeDisplay 
+} from "@/lib/utils/location";
 import { handleApiResponse } from "@/lib/hono-utils";
 import type { Specialist } from "@/types/specialist";
 
@@ -87,19 +92,34 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
               <CardDescription>{specialist.user?.jobTitle || "Specialist"}</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2 mb-4">
-                {specialist.location && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    <span>{specialist.location}</span>
-                  </div>
-                )}
-                {!specialist.location && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Video className="h-4 w-4" />
-                    <span>Telehealth only</span>
-                  </div>
-                )}
+              <div className="space-y-3 mb-4">
+                {/* Appointment Type Badges */}
+                <div className="flex gap-2 flex-wrap">
+                  {specialist.acceptsInPerson && (
+                    <Badge variant="outline" className="text-xs">
+                      <MapPinned className="w-3 h-3 mr-1" />
+                      In-person
+                    </Badge>
+                  )}
+                  {specialist.acceptsTelehealth && (
+                    <Badge variant="outline" className="text-xs">
+                      <Video className="w-3 h-3 mr-1" />
+                      Telehealth
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Location Display */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  <span>
+                    {getLocationDisplay(
+                      specialist.acceptsInPerson || false, 
+                      specialist.acceptsTelehealth || true,
+                      specialist.location
+                    )}
+                  </span>
+                </div>
               </div>
               <Button
                 className="w-full"

@@ -1,20 +1,34 @@
 import { db } from "@/server/db";
-import { specialists, users } from "@/server/db/schema";
-import { eq, sql, asc } from "drizzle-orm";
+import { specialists, users, type SpecialistLocation } from "@/server/db/schema";
+import { eq, sql, asc, and, or } from "drizzle-orm";
 import { type } from "arktype";
+
+// Location validation schema
+export const LocationInput = type({
+  streetAddress: "string | undefined",
+  suburb: "string | undefined",
+  city: "string",
+  state: "string",
+  postalCode: "string | undefined",
+  country: "string",
+});
 
 // Input validation schemas
 export const CreateSpecialistInput = type({
   userId: "string",
   acuityCalendarId: "string",
   name: "string",
-  location: "string | null | undefined",
+  location: LocationInput.or("null | undefined"),
+  acceptsInPerson: "boolean | undefined",
+  acceptsTelehealth: "boolean | undefined",
   isActive: "boolean | undefined",
 });
 
 export const UpdateSpecialistInput = type({
   name: "string | undefined",
-  location: "string | null | undefined",
+  location: LocationInput.or("null | undefined"),
+  acceptsInPerson: "boolean | undefined",
+  acceptsTelehealth: "boolean | undefined",
   isActive: "boolean | undefined",
 });
 
@@ -44,6 +58,10 @@ export class SpecialistRepository {
       throw new Error(`Invalid specialist data: ${validated[0]?.message}`);
     }
 
+    // Validate at least one appointment type is selected
+    const acceptsInPerson = validated.acceptsInPerson ?? false;
+    const acceptsTelehealth = validated.acceptsTelehealth ?? true;
+
     // Get the next position
     const maxPosition = await this.getMaxPosition();
     const position = maxPosition + 1;
@@ -54,7 +72,9 @@ export class SpecialistRepository {
         userId: validated.userId,
         acuityCalendarId: validated.acuityCalendarId,
         name: validated.name,
-        location: validated.location ?? null,
+        location: (validated.location as SpecialistLocation | null) ?? null,
+        acceptsInPerson,
+        acceptsTelehealth,
         position,
         isActive: validated.isActive ?? true,
       })
@@ -70,15 +90,40 @@ export class SpecialistRepository {
       throw new Error(`Invalid update data: ${validated[0]?.message}`);
     }
 
+    // If appointment types are being updated, validate at least one is selected
+    if (validated.acceptsInPerson !== undefined || validated.acceptsTelehealth !== undefined) {
+      const [existing] = await db
+        .select({
+          acceptsInPerson: specialists.acceptsInPerson,
+          acceptsTelehealth: specialists.acceptsTelehealth,
+        })
+        .from(specialists)
+        .where(eq(specialists.id, id));
+
+      if (!existing) {
+        throw new Error("Specialist not found");
+      }
+
+      const newAcceptsInPerson = validated.acceptsInPerson ?? existing.acceptsInPerson;
+      const newAcceptsTelehealth = validated.acceptsTelehealth ?? existing.acceptsTelehealth;
+    }
+
     // Build update object dynamically
     const updateData: Partial<{
       name: string;
-      location: string | null;
+      location: SpecialistLocation | null;
+      acceptsInPerson: boolean;
+      acceptsTelehealth: boolean;
       isActive: boolean;
       updatedAt: Date;
     }> = {};
     if (validated.name !== undefined) updateData.name = validated.name;
-    if (validated.location !== undefined) updateData.location = validated.location;
+    if (validated.location !== undefined)
+      updateData.location = validated.location as SpecialistLocation | null;
+    if (validated.acceptsInPerson !== undefined)
+      updateData.acceptsInPerson = validated.acceptsInPerson;
+    if (validated.acceptsTelehealth !== undefined)
+      updateData.acceptsTelehealth = validated.acceptsTelehealth;
     if (validated.isActive !== undefined) updateData.isActive = validated.isActive;
 
     // Always update the updatedAt timestamp
@@ -301,6 +346,71 @@ export class SpecialistRepository {
         throw error;
       }
     });
+  }
+
+  // Filter specialists by appointment type
+  async findByAppointmentType(type: "in_person" | "telehealth" | "both") {
+    let whereClause;
+    if (type === "in_person") {
+      whereClause = and(eq(specialists.acceptsInPerson, true), eq(specialists.isActive, true));
+    } else if (type === "telehealth") {
+      whereClause = and(eq(specialists.acceptsTelehealth, true), eq(specialists.isActive, true));
+    } else {
+      whereClause = and(
+        eq(specialists.acceptsInPerson, true),
+        eq(specialists.acceptsTelehealth, true),
+        eq(specialists.isActive, true)
+      );
+    }
+
+    const results = await db
+      .select({
+        specialist: specialists,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          jobTitle: users.jobTitle,
+        },
+      })
+      .from(specialists)
+      .innerJoin(users, eq(specialists.userId, users.id))
+      .where(whereClause)
+      .orderBy(asc(specialists.position));
+
+    return results;
+  }
+
+  // Search specialists by location
+  async searchByLocation(city?: string, state?: string) {
+    const conditions = [eq(specialists.isActive, true)];
+
+    if (city) {
+      conditions.push(sql`lower(${specialists.location}->>'city') = lower(${city})`);
+    }
+
+    if (state) {
+      conditions.push(sql`lower(${specialists.location}->>'state') = lower(${state})`);
+    }
+
+    const results = await db
+      .select({
+        specialist: specialists,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          jobTitle: users.jobTitle,
+        },
+      })
+      .from(specialists)
+      .innerJoin(users, eq(specialists.userId, users.id))
+      .where(and(...conditions))
+      .orderBy(asc(specialists.position));
+
+    return results;
   }
 
   // Reorder positions after drag-and-drop

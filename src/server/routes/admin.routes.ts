@@ -4,6 +4,7 @@ import { authMiddleware, requireAdmin } from "@/server/middleware/auth.middlewar
 import { arktypeValidator } from "@/server/middleware/validate.middleware";
 import { userService } from "@/server/services/user.service";
 import { organizationService } from "@/server/services/organization.service";
+import { specialistService } from "@/server/services/specialist.service";
 import { logger } from "@/server/utils/logger";
 
 const updateUserSchema = type({
@@ -448,6 +449,27 @@ const app = new Hono()
     });
 
     return c.json({ success: true });
+  })
+
+  // Specialists routes
+  .get("/specialists", async (c) => {
+    const auth = c.get("auth");
+    const adminUser = auth.user;
+
+    if (!adminUser) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const includeInactive = c.req.query("includeInactive") === "true";
+
+    const specialists = await specialistService.getAdminSpecialistList(adminUser.id, {
+      includeInactive,
+    });
+
+    return c.json({
+      success: true,
+      data: specialists,
+    });
   });
 
 export default app;

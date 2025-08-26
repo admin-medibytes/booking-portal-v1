@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { adminClient } from "@/lib/hono-client";
+import { formatLocationShort } from "@/lib/utils/location";
 import {
   Dialog,
   DialogContent,
@@ -274,7 +275,7 @@ export function UserDetailDialog({ userId, open, onOpenChange }: UserDetailDialo
                   {user.specialist.location && (
                     <div className="space-y-2">
                       <Label>Location</Label>
-                      <p className="text-sm">{user.specialist.location}</p>
+                      <p className="text-sm">{formatLocationShort(user.specialist.location) || "Not specified"}</p>
                     </div>
                   )}
                 </CardContent>

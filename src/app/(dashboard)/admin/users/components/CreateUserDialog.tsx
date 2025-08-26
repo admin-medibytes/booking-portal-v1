@@ -146,7 +146,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center mb-4 space-x-2 text-center">
             <div className="flex items-center justify-center w-12 h-12 border rounded-full border-stone-200 bg-muted">
@@ -301,7 +301,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                             form.setFieldValue("teamId", "");
                           }}
                         >
-                          <SelectTrigger className="h-10 pl-10">
+                          <SelectTrigger className="h-10 pl-10 w-full">
                             <SelectValue placeholder="Select an organization" />
                           </SelectTrigger>
                           <SelectContent>
@@ -329,7 +329,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                           onValueChange={(value) => field.handleChange(value)}
                           disabled={!selectedOrgId}
                         >
-                          <SelectTrigger className="h-10">
+                          <SelectTrigger className="h-10 w-full">
                             <SelectValue
                               placeholder={
                                 selectedOrgId ? "Select a team" : "Select organization first"
@@ -365,7 +365,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                             field.handleChange(value)
                           }
                         >
-                          <SelectTrigger className="h-10 pl-10">
+                          <SelectTrigger className="h-10 pl-10 w-full">
                             <SelectValue placeholder="Select a role" />
                           </SelectTrigger>
                           <SelectContent>

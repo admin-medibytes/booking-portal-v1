@@ -128,22 +128,20 @@ export default function BookingsPage() {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <BookingFilters specialists={specialists || []} onFiltersChange={handleFiltersChange} />
 
-          {/* View Toggle */}
-          <div className="flex flex-shrink-0">
+          {/* View Toggle - Button Group Style */}
+          <div className="flex gap-1 p-1 rounded-md bg-muted flex-shrink-0">
             <Button
-              variant={view === "list" ? "default" : "outline"}
+              variant={view === "list" ? "default" : "ghost"}
               size="sm"
               onClick={() => handleViewChange("list")}
-              className="rounded-e-none"
             >
               <List className="w-4 h-4 mr-2" />
               List
             </Button>
             <Button
-              variant={view === "calendar" ? "default" : "outline"}
+              variant={view === "calendar" ? "default" : "ghost"}
               size="sm"
               onClick={() => handleViewChange("calendar")}
-              className="rounded-s-none"
             >
               <Calendar className="w-4 h-4 mr-2" />
               Calendar

@@ -16,13 +16,16 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { DraggableSpecialistCard } from "./DraggableSpecialistCard";
+import type { SpecialistLocation } from "@/types/specialist";
 
 interface Specialist {
   id: string;
   userId: string;
   acuityCalendarId: string;
   name: string;
-  location: string | null;
+  location: SpecialistLocation | null;
+  acceptsInPerson: boolean;
+  acceptsTelehealth: boolean;
   position: number;
   isActive: boolean;
   user: {

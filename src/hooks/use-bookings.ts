@@ -54,7 +54,21 @@ export function useBookings(filters?: BookingFilters) {
 
       const data = await res.json();
 
-      return data;
+      // Transform date strings to Date objects for TypeScript compatibility
+      const transformedData: BookingListResponse = {
+        ...data,
+        bookings: data.bookings?.map((booking: any) => ({
+          ...booking,
+          createdAt: new Date(booking.createdAt),
+          updatedAt: new Date(booking.updatedAt),
+          appointmentDate: booking.appointmentDate ? new Date(booking.appointmentDate) : null,
+          confirmedAt: booking.confirmedAt ? new Date(booking.confirmedAt) : null,
+          completedAt: booking.completedAt ? new Date(booking.completedAt) : null,
+          cancelledAt: booking.cancelledAt ? new Date(booking.cancelledAt) : null,
+        })) || [],
+      };
+
+      return transformedData;
     },
     staleTime: 30 * 1000, // 30 seconds as per requirements
     gcTime: 5 * 60 * 1000, // 5 minutes cache time

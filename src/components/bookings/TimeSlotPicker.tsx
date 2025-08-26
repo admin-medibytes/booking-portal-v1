@@ -46,7 +46,7 @@ export function TimeSlotPicker({ specialistId, appointmentTypeId, onSelect, sele
       const startDate = format(weekStart, "yyyy-MM-dd");
       const endDate = format(addDays(weekStart, 6), "yyyy-MM-dd");
       
-      const response = await specialistsClient[":id"].availability.$get({
+      const response = await (specialistsClient[":id"].availability as any).$get({
         param: { id: specialistId },
         query: {
           startDate,
@@ -56,13 +56,13 @@ export function TimeSlotPicker({ specialistId, appointmentTypeId, onSelect, sele
         },
       });
       
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.error || "Failed to fetch availability");
+      const data = await response.json() as any;
+      if ('success' in data && !data.success) {
+        throw new Error('error' in data ? data.error : "Failed to fetch availability");
       }
       
       return {
-        slots: data.data.timeSlots.filter((slot: any) => slot.available),
+        slots: ('data' in data ? data.data.timeSlots : []).filter((slot: any) => slot.available),
         timezone: userTimezone,
       } as AvailabilityResponse;
     },

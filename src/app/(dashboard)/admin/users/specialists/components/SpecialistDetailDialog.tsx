@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminClient, specialistsClient } from "@/lib/hono-client";
 import {
@@ -17,16 +17,42 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Loader2, Edit2, X, Check, User, Mail, Phone, MapPin, Calendar, Hash, Building } from "lucide-react";
+import {
+  Loader2,
+  Edit2,
+  X,
+  Check,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Building,
+  Video,
+  MapPinned,
+  AlertCircle,
+} from "lucide-react";
 import { format } from "date-fns";
+import { Country, State, City } from "country-state-city";
+import type { SpecialistLocation } from "@/server/db/schema/specialists";
+import { formatLocationFull } from "@/lib/utils/location";
 
 interface Specialist {
   id: string;
   userId: string;
   acuityCalendarId: string;
   name: string;
-  location: string | null;
+  location: SpecialistLocation | null;
+  acceptsInPerson: boolean;
+  acceptsTelehealth: boolean;
   position: number;
   isActive: boolean;
   user: {
@@ -48,7 +74,7 @@ interface ExtendedUser {
   jobTitle: string;
   phoneNumber?: string | null;
   emailVerified?: boolean;
-  banned?: boolean;
+  banned?: boolean | null;
   createdAt: string;
   memberships?: Array<{
     organizationId: string;
@@ -64,23 +90,121 @@ interface SpecialistDetailDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function SpecialistDetailDialog({ specialist, open, onOpenChange }: SpecialistDetailDialogProps) {
+export function SpecialistDetailDialog({
+  specialist,
+  open,
+  onOpenChange,
+}: SpecialistDetailDialogProps) {
   const queryClient = useQueryClient();
   const [isEditingSpecialist, setIsEditingSpecialist] = useState(false);
   const [isEditingUser, setIsEditingUser] = useState(false);
-  
-  const [specialistForm, setSpecialistForm] = useState({
-    name: specialist.name,
-    location: specialist.location || "",
-    isActive: specialist.isActive,
-  });
-  
+
+  // Memoize initial values to prevent recalculation
+  const initialValues = useMemo(() => {
+    // Determine country code from location
+    let countryCode = "AU";
+    if (specialist.location?.country) {
+      const country = Country.getAllCountries().find(
+        (c) => c.name === specialist.location?.country
+      );
+      countryCode = country?.isoCode || "AU";
+    }
+
+    // Get states for the country
+    const states = State.getStatesOfCountry(countryCode);
+
+    // Get cities if state exists
+    let cities: any[] = [];
+    if (specialist.location?.state && specialist.location?.country) {
+      cities = City.getCitiesOfState(countryCode, specialist.location.state);
+    }
+
+    return {
+      specialistForm: {
+        name: specialist.name,
+        acceptsInPerson: !!specialist.acceptsInPerson,
+        acceptsTelehealth: !!specialist.acceptsTelehealth,
+        location: specialist.location || null,
+        isActive: !!specialist.isActive,
+      },
+      countryCode,
+      states,
+      cities,
+      showLocationFields: !!specialist.location,
+    };
+  }, [specialist.id]); // Only recalculate when specialist ID changes
+
+  // Initialize all state with computed initial values
+  const [specialistForm, setSpecialistForm] = useState(initialValues.specialistForm);
+  const [showLocationFields, setShowLocationFields] = useState(initialValues.showLocationFields);
+  const [selectedCountryCode, setSelectedCountryCode] = useState(initialValues.countryCode);
+  const [availableStates, setAvailableStates] = useState(initialValues.states);
+  const [availableCities, setAvailableCities] = useState(initialValues.cities);
+
+  const allCountries = Country.getAllCountries();
+
+  // Reset form when specialist changes (dialog opened with different specialist)
+  useEffect(() => {
+    if (open) {
+      setSpecialistForm(initialValues.specialistForm);
+      setShowLocationFields(initialValues.showLocationFields);
+      setSelectedCountryCode(initialValues.countryCode);
+      setAvailableStates(initialValues.states);
+      setAvailableCities(initialValues.cities);
+      setIsEditingSpecialist(false);
+      setIsEditingUser(false);
+    }
+  }, [open, specialist.id, initialValues]);
+
+  // Initialize user form state
   const [userForm, setUserForm] = useState({
     firstName: specialist.user.firstName,
     lastName: specialist.user.lastName,
     phone: "",
     jobTitle: specialist.user.jobTitle,
   });
+
+  // Handle country changes
+  const handleCountryChange = useCallback(
+    (countryCode: string) => {
+      setSelectedCountryCode(countryCode);
+      const states = State.getStatesOfCountry(countryCode);
+      setAvailableStates(states);
+
+      const country = Country.getCountryByCode(countryCode);
+      if (specialistForm.location) {
+        setSpecialistForm((prev) => ({
+          ...prev,
+          location: {
+            ...prev.location!,
+            country: country?.name || "Australia",
+            state: "",
+            city: "",
+          },
+        }));
+        setAvailableCities([]);
+      }
+    },
+    [specialistForm.location]
+  );
+
+  // Handle state changes
+  const handleStateChange = useCallback(
+    (stateCode: string) => {
+      setSpecialistForm((prev) => ({
+        ...prev,
+        location: {
+          ...prev.location!,
+          state: stateCode,
+          city: "",
+        },
+      }));
+
+      const cities = City.getCitiesOfState(selectedCountryCode, stateCode);
+      setAvailableCities(cities);
+    },
+    [selectedCountryCode]
+  );
 
   // Fetch detailed user data
   const { data: userData, refetch: refetchUser } = useQuery({
@@ -90,39 +214,81 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
         param: { id: specialist.userId },
       });
       if (!response.ok) throw new Error("Failed to fetch user details");
-      const data = await response.json();
-      // Update user form with fetched data
-      if (data.user) {
-        setUserForm({
-          firstName: data.user.firstName || "",
-          lastName: data.user.lastName || "",
-          phone: data.user.phoneNumber || "",
-          jobTitle: data.user.jobTitle || "",
-        });
-      }
-      return data;
+      return response.json();
     },
     enabled: open && !!specialist.userId,
   });
+
+  // Update user form when user data is fetched
+  useEffect(() => {
+    if (userData?.user) {
+      setUserForm({
+        firstName: userData.user.firstName || "",
+        lastName: userData.user.lastName || "",
+        phone: userData.user.phoneNumber || "",
+        jobTitle: userData.user.jobTitle || "",
+      });
+    }
+  }, [userData]);
 
   // Update specialist mutation
   const updateSpecialistMutation = useMutation({
     mutationFn: async (values: {
       name?: string;
-      location?: string;
+      location?: SpecialistLocation | null;
+      acceptsInPerson?: boolean;
+      acceptsTelehealth?: boolean;
       isActive?: boolean;
     }) => {
       const response = await specialistsClient[":id"].$put({
         param: { id: specialist.id },
-        json: values,
+        json: values as any,
       });
       if (!response.ok) throw new Error("Failed to update specialist");
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       toast.success("Specialist updated successfully");
       setIsEditingSpecialist(false);
+
+      // Update local form state with the returned data
+      if (data) {
+        // Update the form state
+        const updatedForm = {
+          name: data.name,
+          acceptsInPerson: data.acceptsInPerson,
+          acceptsTelehealth: data.acceptsTelehealth,
+          location: data.location || null,
+          isActive: data.isActive,
+        };
+        setSpecialistForm(updatedForm);
+        setShowLocationFields(!!data.location);
+
+        // Update country code if location exists
+        if (data.location?.country) {
+          const country = Country.getAllCountries().find((c) => c.name === data.location?.country);
+          if (country) {
+            setSelectedCountryCode(country.isoCode);
+          }
+        }
+
+        // IMPORTANT: Update the parent specialist object to reflect changes in the UI
+        // This ensures badges and status indicators update immediately
+        Object.assign(specialist, {
+          name: data.name,
+          acceptsInPerson: data.acceptsInPerson,
+          acceptsTelehealth: data.acceptsTelehealth,
+          location: data.location,
+          isActive: data.isActive,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      // Invalidate all specialist-related queries to refresh UI
       queryClient.invalidateQueries({ queryKey: ["admin-specialists"] });
+      queryClient.invalidateQueries({ queryKey: ["specialists"] });
+      // Also invalidate appointment types since they depend on specialist data
+      queryClient.invalidateQueries({ queryKey: ["appointment-types", specialist.id] });
     },
     onError: () => {
       toast.error("Failed to update specialist");
@@ -148,7 +314,11 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
       toast.success("User information updated successfully");
       setIsEditingUser(false);
       refetchUser();
+      // Invalidate all specialist-related queries to refresh UI
       queryClient.invalidateQueries({ queryKey: ["admin-specialists"] });
+      queryClient.invalidateQueries({ queryKey: ["specialists"] });
+      // Also invalidate user queries
+      queryClient.invalidateQueries({ queryKey: ["user", specialist.userId] });
     },
     onError: () => {
       toast.error("Failed to update user information");
@@ -156,16 +326,36 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
   });
 
   const handleSaveSpecialist = () => {
-    updateSpecialistMutation.mutate(specialistForm);
+    // Validate location fields if location is provided
+    if (showLocationFields && specialistForm.location) {
+      if (
+        !specialistForm.location.city ||
+        !specialistForm.location.state ||
+        !specialistForm.location.country
+      ) {
+        toast.error("City, state, and country are required when adding a location");
+        return;
+      }
+    }
+
+    updateSpecialistMutation.mutate({
+      ...specialistForm,
+      location: showLocationFields ? specialistForm.location : null,
+    } as Parameters<typeof updateSpecialistMutation.mutate>[0]);
   };
 
   const handleCancelSpecialistEdit = () => {
     setIsEditingSpecialist(false);
-    setSpecialistForm({
-      name: specialist.name,
-      location: specialist.location || "",
-      isActive: specialist.isActive,
-    });
+    setSpecialistForm(initialValues.specialistForm);
+    setShowLocationFields(initialValues.showLocationFields);
+    setSelectedCountryCode(initialValues.countryCode);
+    setAvailableStates(initialValues.states);
+    setAvailableCities(initialValues.cities);
+  };
+
+  const formatLocation = (location: SpecialistLocation | null) => {
+    if (!location) return "Not specified";
+    return formatLocationFull(location);
   };
 
   const handleSaveUser = () => {
@@ -189,7 +379,7 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
     emailVerified: false,
     banned: false,
     createdAt: specialist.createdAt,
-    memberships: []
+    memberships: [],
   };
 
   return (
@@ -212,6 +402,24 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
           <Badge variant="outline" className="text-sm font-mono">
             Position #{specialist.position}
           </Badge>
+          {specialist.acceptsInPerson && (
+            <Badge variant="outline" className="text-sm">
+              <MapPinned className="w-3 h-3 mr-1" />
+              In-person
+            </Badge>
+          )}
+          {specialist.acceptsTelehealth && (
+            <Badge variant="outline" className="text-sm">
+              <Video className="w-3 h-3 mr-1" />
+              Telehealth
+            </Badge>
+          )}
+          {!specialist.acceptsInPerson && !specialist.acceptsTelehealth && (
+            <Badge variant="secondary" className="text-sm">
+              <AlertCircle className="w-3 h-3 mr-1" />
+              On Request
+            </Badge>
+          )}
           {user.emailVerified && (
             <Badge variant="outline" className="text-sm">
               Email Verified
@@ -267,7 +475,9 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
                   {isEditingSpecialist ? (
                     <Input
                       value={specialistForm.name}
-                      onChange={(e) => setSpecialistForm({ ...specialistForm, name: e.target.value })}
+                      onChange={(e) =>
+                        setSpecialistForm({ ...specialistForm, name: e.target.value })
+                      }
                       placeholder="Enter display name"
                     />
                   ) : (
@@ -276,22 +486,254 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Location</Label>
+                  <Label>
+                    Appointment Types{" "}
+                    <span className="text-muted-foreground text-xs">(leave both unchecked for 'availability on request')</span>
+                  </Label>
                   {isEditingSpecialist ? (
-                    <Input
-                      value={specialistForm.location}
-                      onChange={(e) => setSpecialistForm({ ...specialistForm, location: e.target.value })}
-                      placeholder="Enter location"
-                    />
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="telehealth"
+                          checked={!!specialistForm.acceptsTelehealth}
+                          onCheckedChange={(checked) =>
+                            setSpecialistForm({
+                              ...specialistForm,
+                              acceptsTelehealth: checked,
+                            })
+                          }
+                        />
+                        <Label
+                          htmlFor="telehealth"
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <Video className="w-4 h-4" />
+                          Telehealth appointments
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="in-person"
+                          checked={!!specialistForm.acceptsInPerson}
+                          onCheckedChange={(checked) =>
+                            setSpecialistForm({
+                              ...specialistForm,
+                              acceptsInPerson: checked,
+                            })
+                          }
+                        />
+                        <Label
+                          htmlFor="in-person"
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <MapPinned className="w-4 h-4" />
+                          In-person appointments
+                        </Label>
+                      </div>
+
+                      {!specialistForm.acceptsInPerson && !specialistForm.acceptsTelehealth && (
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            This specialist will be marked as "Availability on Request" - bookings will need to be coordinated directly
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
                   ) : (
-                    <p className="text-sm">{specialist.location || "Not specified"}</p>
+                    <div className="flex gap-2">
+                      {specialistForm.acceptsTelehealth && (
+                        <Badge variant="outline">
+                          <Video className="w-3 h-3 mr-1" />
+                          Telehealth
+                        </Badge>
+                      )}
+                      {specialistForm.acceptsInPerson && (
+                        <Badge variant="outline">
+                          <MapPinned className="w-3 h-3 mr-1" />
+                          In-person
+                        </Badge>
+                      )}
+                      {!specialistForm.acceptsTelehealth && !specialistForm.acceptsInPerson && (
+                        <Badge variant="secondary">
+                          <AlertCircle className="w-3 h-3 mr-1" />
+                          Availability on Request
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>
+                    Practice Location
+                    {isEditingSpecialist && specialistForm.acceptsInPerson && (
+                      <span className="text-muted-foreground text-xs ml-2">
+                        (Optional - can be added later)
+                      </span>
+                    )}
+                  </Label>
+                  {isEditingSpecialist && specialistForm.acceptsInPerson ? (
+                    <div className="space-y-3">
+                      {!showLocationFields || !specialistForm.location ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowLocationFields(true);
+                            setSelectedCountryCode("AU");
+                            setSpecialistForm({
+                              ...specialistForm,
+                              location: {
+                                streetAddress: "",
+                                suburb: "",
+                                city: "",
+                                state: "",
+                                postalCode: "",
+                                country: "Australia",
+                              },
+                            });
+                          }}
+                        >
+                          <MapPin className="w-4 h-4 mr-2" />
+                          Add Location
+                        </Button>
+                      ) : (
+                        <div className="space-y-3 border p-4 rounded-lg">
+                          <Input
+                            placeholder="Street Address (optional)"
+                            value={specialistForm.location?.streetAddress || ""}
+                            onChange={(e) =>
+                              setSpecialistForm({
+                                ...specialistForm,
+                                location: {
+                                  ...specialistForm.location!,
+                                  streetAddress: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <Input
+                            placeholder="Suburb (optional)"
+                            value={specialistForm.location?.suburb || ""}
+                            onChange={(e) =>
+                              setSpecialistForm({
+                                ...specialistForm,
+                                location: {
+                                  ...specialistForm.location!,
+                                  suburb: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <Select
+                              value={specialistForm.location?.state || ""}
+                              onValueChange={handleStateChange}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select State *" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableStates.map((state) => (
+                                  <SelectItem key={state.isoCode} value={state.isoCode}>
+                                    {state.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <Select
+                              value={specialistForm.location?.city || ""}
+                              onValueChange={(value) =>
+                                setSpecialistForm({
+                                  ...specialistForm,
+                                  location: {
+                                    ...specialistForm.location!,
+                                    city: value,
+                                  },
+                                })
+                              }
+                              disabled={!specialistForm.location?.state}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue
+                                  placeholder={
+                                    !specialistForm.location?.state
+                                      ? "Select state first"
+                                      : "Select City *"
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableCities.map((city) => (
+                                  <SelectItem key={city.name} value={city.name}>
+                                    {city.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <Input
+                              placeholder="Postal Code"
+                              value={specialistForm.location?.postalCode || ""}
+                              onChange={(e) =>
+                                setSpecialistForm({
+                                  ...specialistForm,
+                                  location: {
+                                    ...specialistForm.location!,
+                                    postalCode: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                            <Select value={selectedCountryCode} onValueChange={handleCountryChange}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Country *" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allCountries.map((country) => (
+                                  <SelectItem key={country.isoCode} value={country.isoCode}>
+                                    {country.flag} {country.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setShowLocationFields(false);
+                              setSpecialistForm({
+                                ...specialistForm,
+                                location: null,
+                              });
+                            }}
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Clear Location
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm">
+                      {specialistForm.acceptsInPerson
+                        ? specialistForm.location
+                          ? formatLocation(specialistForm.location)
+                          : "Location TBD"
+                        : "Online only"}
+                    </p>
                   )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Acuity Calendar ID</Label>
-                    <p className="font-mono text-sm bg-muted px-2 py-1 rounded">
+                    <p className="font-mono text-sm bg-muted px-3 py-1 rounded-md">
                       {specialist.acuityCalendarId}
                     </p>
                   </div>
@@ -305,8 +747,8 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="active-status"
-                      checked={specialistForm.isActive}
-                      onCheckedChange={(checked: boolean) => 
+                      checked={!!specialistForm.isActive}
+                      onCheckedChange={(checked) =>
                         setSpecialistForm({ ...specialistForm, isActive: checked })
                       }
                     />
@@ -392,7 +834,9 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
                     <Mail className="w-4 h-4 text-muted-foreground" />
                     <p className="text-sm">{user.email}</p>
                     {user.emailVerified && (
-                      <Badge variant="outline" className="text-xs">Verified</Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Verified
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -427,25 +871,6 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Account Status</Label>
-                    <div>
-                      {user.banned ? (
-                        <Badge variant="destructive">Banned</Badge>
-                      ) : (
-                        <Badge variant="success">Active</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>User ID</Label>
-                    <p className="font-mono text-xs bg-muted px-2 py-1 rounded truncate">
-                      {user.id}
-                    </p>
-                  </div>
-                </div>
-
                 <div className="pt-4 border-t">
                   <Label>Account Created</Label>
                   <p className="text-sm mt-1">{format(new Date(user.createdAt), "PPpp")}</p>
@@ -458,7 +883,9 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
             <Card>
               <CardHeader>
                 <CardTitle>Organization Memberships</CardTitle>
-                <CardDescription>All organizations and roles assigned to this specialist</CardDescription>
+                <CardDescription>
+                  All organizations and roles assigned to this specialist
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {user.memberships && user.memberships.length > 0 ? (
@@ -473,7 +900,8 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
                           <div>
                             <p className="font-medium">{membership.organizationName}</p>
                             <p className="text-sm text-muted-foreground">
-                              Joined {format(
+                              Joined{" "}
+                              {format(
                                 typeof membership.joinedAt === "string"
                                   ? new Date(membership.joinedAt)
                                   : membership.joinedAt,
@@ -489,7 +917,9 @@ export function SpecialistDetailDialog({ specialist, open, onOpenChange }: Speci
                 ) : (
                   <div className="text-center py-8">
                     <Building className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">No organization memberships found</p>
+                    <p className="text-sm text-muted-foreground">
+                      No organization memberships found
+                    </p>
                   </div>
                 )}
               </CardContent>

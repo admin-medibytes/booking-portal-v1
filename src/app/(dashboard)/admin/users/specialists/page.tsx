@@ -6,18 +6,28 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Users, UserCheck } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Search, Users, UserCheck, MapPinned, Video, Filter, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { adminClient, specialistsClient } from "@/lib/hono-client";
 import { SortableSpecialistGrid } from "./components/SortableSpecialistGrid";
 import { SpecialistDetailDialog } from "./components/SpecialistDetailDialog";
+import type { SpecialistLocation } from "@/types/specialist";
 
 interface Specialist {
   id: string;
   userId: string;
   acuityCalendarId: string;
   name: string;
-  location: string | null;
+  location: SpecialistLocation | null;
+  acceptsInPerson: boolean;
+  acceptsTelehealth: boolean;
   position: number;
   isActive: boolean;
   user: {
@@ -34,19 +44,34 @@ interface Specialist {
 export default function AdminSpecialistsPage() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
-  const [includeInactive, setIncludeInactive] = useState(false);
-  const [pendingPositions, setPendingPositions] = useState<Array<{ id: string; position: number }> | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [appointmentTypeFilter, setAppointmentTypeFilter] = useState<
+    "all" | "in_person" | "telehealth" | "on_request"
+  >("all");
+  const [locationFilter, setLocationFilter] = useState<"all" | "has_location" | "no_location">(
+    "all"
+  );
+  const [pendingPositions, setPendingPositions] = useState<Array<{
+    id: string;
+    position: number;
+  }> | null>(null);
   const [localSpecialists, setLocalSpecialists] = useState<Specialist[] | null>(null);
   const [selectedSpecialist, setSelectedSpecialist] = useState<Specialist | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch specialists
   const { data: specialists = [], isLoading } = useQuery({
-    queryKey: ["admin-specialists", includeInactive],
+    queryKey: ["admin-specialists", statusFilter, appointmentTypeFilter],
     queryFn: async () => {
-      const response = await adminClient.specialists.$get({
-        query: { includeInactive: includeInactive ? "true" : "false" },
-      });
+      const query: Record<string, string> = {
+        includeInactive: statusFilter === "all" || statusFilter === "inactive" ? "true" : "false",
+      };
+
+      if (appointmentTypeFilter !== "all") {
+        query.appointmentType = appointmentTypeFilter;
+      }
+
+      const response = await adminClient.specialists.$get({ query });
       const data = (await response.json()) as { success: boolean; data: Specialist[] };
       return data.data || [];
     },
@@ -89,18 +114,42 @@ export default function AdminSpecialistsPage() {
   // Filter and sort specialists
   const filteredSpecialists = useMemo(() => {
     if (!displaySpecialists) return [];
-    const filtered = displaySpecialists.filter((specialist) => {
+    let filtered = displaySpecialists.filter((specialist) => {
       const searchLower = searchTerm.toLowerCase();
-      return (
+      const matchesSearch =
         specialist.name.toLowerCase().includes(searchLower) ||
         specialist.user.email.toLowerCase().includes(searchLower) ||
         specialist.user.jobTitle.toLowerCase().includes(searchLower) ||
-        (specialist.location && specialist.location.toLowerCase().includes(searchLower))
-      );
+        (specialist.location?.city &&
+          specialist.location.city.toLowerCase().includes(searchLower)) ||
+        (specialist.location?.state &&
+          specialist.location.state.toLowerCase().includes(searchLower));
+
+      if (!matchesSearch) return false;
+
+      // Apply appointment type filter
+      if (appointmentTypeFilter === "in_person" && !specialist.acceptsInPerson) return false;
+      if (appointmentTypeFilter === "telehealth" && !specialist.acceptsTelehealth) return false;
+      if (
+        appointmentTypeFilter === "on_request" &&
+        (specialist.acceptsInPerson || specialist.acceptsTelehealth)
+      )
+        return false;
+
+      // Apply status filter
+      if (statusFilter === "active" && !specialist.isActive) return false;
+      if (statusFilter === "inactive" && specialist.isActive) return false;
+
+      // Apply location filter
+      if (locationFilter === "has_location" && !specialist.location) return false;
+      if (locationFilter === "no_location" && specialist.location) return false;
+
+      return true;
     });
+
     // Ensure sorted by position
     return filtered.sort((a, b) => a.position - b.position);
-  }, [displaySpecialists, searchTerm]);
+  }, [displaySpecialists, searchTerm, appointmentTypeFilter, statusFilter, locationFilter]);
 
   const handleReorder = (positions: Array<{ id: string; position: number }>) => {
     // Update local state immediately for responsive UI
@@ -136,36 +185,132 @@ export default function AdminSpecialistsPage() {
         </p>
       </div>
 
-      <Tabs value="specialists" className="mb-6">
-        <TabsList>
-          <TabsTrigger value="all-users" onClick={() => router.push("/admin/users")}>
+      {/* Navigation Tabs - Button Group Style */}
+      <div className="mb-6">
+        <div className="flex gap-1 p-1 rounded-xl bg-muted w-fit border">
+          <Button variant="ghost" size="sm" onClick={() => router.push("/admin/users")}>
             <Users className="mr-2 h-4 w-4" />
             All Users
-          </TabsTrigger>
-          <TabsTrigger value="specialists" onClick={() => router.push("/admin/users/specialists")}>
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => router.push("/admin/users/specialists")}
+          >
             <UserCheck className="mr-2 h-4 w-4" />
             Specialists
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+          </Button>
+        </div>
+      </div>
 
       {/* Controls */}
-      <div className="flex gap-4 mb-6">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, email, job title, or location..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-background"
-          />
+      <div className="space-y-4 mb-6">
+        <div className="flex gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, email, job title, or location..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-background"
+            />
+          </div>
         </div>
-        <Button
-          variant={includeInactive ? "default" : "outline"}
-          onClick={() => setIncludeInactive(!includeInactive)}
-        >
-          {includeInactive ? "Show Active Only" : "Show All"}
-        </Button>
+
+        {/* Filters Row */}
+        <div className="flex gap-4">
+          {/* Status Toggle - OriginUI Tabs Style */}
+          <Tabs
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value as "all" | "active" | "inactive")}
+          >
+            <TabsList className="bg-background h-auto -space-x-px p-0 shadow-xs rtl:space-x-reverse border">
+              <TabsTrigger
+                value="all"
+                className="data-[state=active]:bg-muted data-[state=active]:after:bg-primary relative overflow-hidden rounded-md [&:nth-child(n):not(:first-child):not(:last-child)]:rounded-none border py-2 px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 first:rounded-e last:rounded-s capitalize"
+              >
+                All
+              </TabsTrigger>
+              <TabsTrigger
+                value="active"
+                className="data-[state=active]:bg-muted data-[state=active]:after:bg-primary relative overflow-hidden rounded-md [&:nth-child(n):not(:first-child):not(:last-child)]:rounded-none border py-2 px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 first:rounded-e last:rounded-s capitalize"
+              >
+                Active
+              </TabsTrigger>
+              <TabsTrigger
+                value="inactive"
+                className="data-[state=active]:bg-muted data-[state=active]:after:bg-primary relative overflow-hidden rounded-md [&:nth-child(n):not(:first-child):not(:last-child)]:rounded-none border py-2 px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 first:rounded-e last:rounded-s capitalize"
+              >
+                Inactive
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Select
+            value={appointmentTypeFilter}
+            onValueChange={(value: "all" | "in_person" | "telehealth" | "on_request") =>
+              setAppointmentTypeFilter(value)
+            }
+          >
+            <SelectTrigger className="max-w-[230px]">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Appointment Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="in_person">
+                <div className="flex items-center">
+                  <MapPinned className="w-4 h-4 mr-2" />
+                  In-person Only
+                </div>
+              </SelectItem>
+              <SelectItem value="telehealth">
+                <div className="flex items-center">
+                  <Video className="w-4 h-4 mr-2" />
+                  Telehealth Only
+                </div>
+              </SelectItem>
+              <SelectItem value="on_request">
+                <div className="flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  On Request Only
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={locationFilter}
+            onValueChange={(value: "all" | "has_location" | "no_location") =>
+              setLocationFilter(value)
+            }
+          >
+            <SelectTrigger className="w-[200px]">
+              <MapPinned className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Location Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              <SelectItem value="has_location">Has Location</SelectItem>
+              <SelectItem value="no_location">No Location / TBD</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {(appointmentTypeFilter !== "all" ||
+            locationFilter !== "all" ||
+            statusFilter !== "all") && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setAppointmentTypeFilter("all");
+                setLocationFilter("all");
+                setStatusFilter("all");
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Save/Cancel buttons - only show when positions have changed */}
@@ -183,10 +328,7 @@ export default function AdminSpecialistsPage() {
           >
             Cancel
           </Button>
-          <Button
-            onClick={handleSavePositions}
-            disabled={updatePositionsMutation.isPending}
-          >
+          <Button onClick={handleSavePositions} disabled={updatePositionsMutation.isPending}>
             {updatePositionsMutation.isPending ? "Saving..." : "Save Changes"}
           </Button>
         </div>
@@ -202,8 +344,8 @@ export default function AdminSpecialistsPage() {
           <p className="text-muted-foreground">No specialists found</p>
         </div>
       ) : (
-        <SortableSpecialistGrid 
-          specialists={filteredSpecialists} 
+        <SortableSpecialistGrid
+          specialists={filteredSpecialists}
           onReorder={handleReorder}
           onSpecialistClick={setSelectedSpecialist}
         />

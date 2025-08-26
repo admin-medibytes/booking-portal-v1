@@ -4,12 +4,14 @@ import { authMiddleware, requireAuth, requireRole } from "@/server/middleware/au
 import { arktypeValidator } from "@/server/middleware/validate.middleware";
 import {
   specialistRepository,
+  LocationInput,
   type UpdateSpecialistInputType,
   type UpdatePositionsInputType,
 } from "@/server/repositories/specialist.repository";
 import { acuityService } from "@/server/services/acuity.service";
 import { logger } from "@/server/utils/logger";
 import type { SpecialistAvailabilityResponse } from "@/types/acuity";
+import type { SpecialistLocation } from "@/server/db/schema";
 
 // Helper function for role-based field filtering
 function getSpecialistFields(
@@ -19,7 +21,9 @@ function getSpecialistFields(
     userId: string;
     acuityCalendarId: string;
     name: string;
-    location: string | null;
+    location: SpecialistLocation | null;
+    acceptsInPerson: boolean;
+    acceptsTelehealth: boolean;
     position: number;
     isActive: boolean;
     createdAt: Date;
@@ -37,6 +41,8 @@ function getSpecialistFields(
     id: specialist.id,
     name: specialist.name,
     location: specialist.location,
+    acceptsInPerson: specialist.acceptsInPerson,
+    acceptsTelehealth: specialist.acceptsTelehealth,
     position: specialist.position,
     isActive: specialist.isActive,
     user: {
@@ -73,7 +79,9 @@ const syncSpecialistSchema = type({
 
 const updateSpecialistSchema = type({
   "name?": "string",
-  "location?": "string | null",
+  "location?": LocationInput.or("null"),
+  "acceptsInPerson?": "boolean",
+  "acceptsTelehealth?": "boolean",
   "isActive?": "boolean",
 });
 
@@ -93,16 +101,31 @@ const specialistsRoutes = new Hono()
       }
 
       const includeInactive = c.req.query("includeInactive") === "true";
+      const appointmentType = c.req.query("appointmentType") as 'in_person' | 'telehealth' | 'both' | undefined;
+      const city = c.req.query("city");
+      const state = c.req.query("state");
 
       // Audit log the access
       logger.audit("view_specialist_list", user.id, "specialist", "list", {
         includeInactive,
+        appointmentType,
+        city,
+        state,
         userRole: user.role,
       });
 
-      const specialists = includeInactive
-        ? await specialistRepository.findAll()
-        : await specialistRepository.findAllActive();
+      let specialists;
+      
+      // Apply filters based on query parameters
+      if (appointmentType) {
+        specialists = await specialistRepository.findByAppointmentType(appointmentType);
+      } else if (city || state) {
+        specialists = await specialistRepository.searchByLocation(city, state);
+      } else {
+        specialists = includeInactive
+          ? await specialistRepository.findAll()
+          : await specialistRepository.findAllActive();
+      }
 
       return c.json({
         success: true,
@@ -231,7 +254,9 @@ const specialistsRoutes = new Hono()
           userId: data.userId,
           acuityCalendarId: data.acuityCalendarId,
           name: acuityCalendar.name,
-          location: null, // Default to telehealth
+          location: null,
+          acceptsInPerson: false,
+          acceptsTelehealth: true,
           isActive: true,
         });
 

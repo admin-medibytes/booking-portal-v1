@@ -11,7 +11,6 @@ import publicRoutes from "./routes/public.routes";
 import userRoutes from "./routes/user.routes";
 import { bookingsRoutes } from "./routes/bookings.routes";
 import { specialistsRoutes } from "./routes/specialists.routes";
-import { adminSpecialistsRoutes } from "./routes/admin-specialists.routes";
 import { documentsRoutes } from "./routes/documents.routes";
 import { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -29,9 +28,6 @@ const app = new Hono()
 
   // Mount admin routes
   .route("/admin", adminRoutes)
-  
-  // Mount admin specialists routes
-  .route("/admin/specialists", adminSpecialistsRoutes)
 
   // Mount user routes (authenticated)
   .route("/user", userRoutes)

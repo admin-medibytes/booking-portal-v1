@@ -4,6 +4,7 @@ import React from "react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { adminClient } from "@/lib/hono-client";
+import { formatLocationShort } from "@/lib/utils/location";
 import {
   Table,
   TableBody,
@@ -233,7 +234,7 @@ export function UserListTable({ filters }: UserListTableProps) {
                               {user.specialist.location && (
                                 <p>
                                   <span className="text-muted-foreground">Location:</span>{" "}
-                                  {user.specialist.location}
+                                  {formatLocationShort(user.specialist.location) || "Not specified"}
                                 </p>
                               )}
                             </div>

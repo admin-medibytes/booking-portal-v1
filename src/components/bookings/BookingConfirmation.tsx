@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, User, Calendar, Clock, Phone, Mail, FileText, MapPin, Video, AlertCircle } from "lucide-react";
+import { CheckCircle, User, Calendar, Clock, Phone, Mail, FileText, MapPin, Video, AlertCircle, MapPinned } from "lucide-react";
 import { bookingsClient } from "@/lib/hono-client";
 import { ApiError } from "@/lib/hono-utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { formatLocationFull, getLocationDisplay } from "@/lib/utils/location";
 import type { Specialist } from "@/types/specialist";
 
 interface BookingConfirmationProps {
@@ -52,12 +53,11 @@ export function BookingConfirmation({
       const response = await bookingsClient.$post({
         json: {
           specialistId: specialist.id,
-          appointmentTypeId: appointmentType.id,
+          appointmentType: examineeData.appointmentType || "telehealth",
           appointmentDateTime: dateTime.toISOString(),
           examineeName: examineeData.examineeName,
           examineePhone: examineeData.examineePhone,
           examineeEmail: examineeData.examineeEmail,
-          appointmentType: examineeData.appointmentType,
           notes: examineeData.notes,
         },
       });
@@ -153,13 +153,17 @@ export function BookingConfirmation({
                 <span className="text-muted-foreground">Specialty:</span>{" "}
                 <span className="font-medium">{specialist.user?.jobTitle || "Specialist"}</span>
               </div>
-              {specialist.location && (
-                <div className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-muted-foreground">Location:</span>{" "}
-                  <span className="font-medium">{specialist.location}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-1">
+                <MapPin className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Location:</span>{" "}
+                <span className="font-medium">
+                  {getLocationDisplay(
+                    specialist.acceptsInPerson || false,
+                    specialist.acceptsTelehealth || true,
+                    specialist.location
+                  )}
+                </span>
+              </div>
             </div>
           </div>
 

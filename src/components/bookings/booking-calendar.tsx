@@ -23,6 +23,7 @@ import {
 } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import type { BookingWithSpecialist } from "@/types/booking";
@@ -179,20 +180,35 @@ export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProp
           </div>
         </div>
 
-        {/* View Toggle */}
-        <div className="flex gap-1 p-1 overflow-x-auto rounded-md bg-muted">
-          {(["month", "week", "day", "agenda"] as const).map((view) => (
-            <Button
-              key={view}
-              variant={viewType === view ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewType(view)}
-              className="flex-shrink-0 capitalize"
+        {/* View Toggle - OriginUI Tabs Style */}
+        <Tabs value={viewType} onValueChange={(value) => setViewType(value as ViewType)}>
+          <TabsList className="bg-background h-auto -space-x-px p-0 shadow-xs rtl:space-x-reverse border">
+            <TabsTrigger
+              value="month"
+              className="data-[state=active]:bg-muted data-[state=active]:after:bg-primary relative overflow-hidden rounded-md [&:nth-child(n):not(:first-child):not(:last-child)]:rounded-none border py-2 px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 first:rounded-e last:rounded-s capitalize"
             >
-              {view}
-            </Button>
-          ))}
-        </div>
+              Month
+            </TabsTrigger>
+            <TabsTrigger
+              value="week"
+              className="data-[state=active]:bg-muted data-[state=active]:after:bg-primary relative overflow-hidden rounded-md [&:nth-child(n):not(:first-child):not(:last-child)]:rounded-none border py-2 px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 first:rounded-e last:rounded-s capitalize"
+            >
+              Week
+            </TabsTrigger>
+            <TabsTrigger
+              value="day"
+              className="data-[state=active]:bg-muted data-[state=active]:after:bg-primary relative overflow-hidden rounded-md [&:nth-child(n):not(:first-child):not(:last-child)]:rounded-none border py-2 px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 first:rounded-e last:rounded-s capitalize"
+            >
+              Day
+            </TabsTrigger>
+            <TabsTrigger
+              value="agenda"
+              className="data-[state=active]:bg-muted data-[state=active]:after:bg-primary relative overflow-hidden rounded-md [&:nth-child(n):not(:first-child):not(:last-child)]:rounded-none border py-2 px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 first:rounded-e last:rounded-s capitalize"
+            >
+              Agenda
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Calendar Views */}
