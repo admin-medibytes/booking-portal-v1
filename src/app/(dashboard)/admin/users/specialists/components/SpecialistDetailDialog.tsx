@@ -54,7 +54,7 @@ interface Specialist {
   userId: string;
   acuityCalendarId: string;
   name: string;
-  slug: string;
+  slug: string | null;
   image?: string | null;
   location: SpecialistLocation | null;
   acceptsInPerson: boolean;
@@ -593,11 +593,11 @@ export function SpecialistDetailDialog({
                     <div className="space-y-2">
                       <div className="relative">
                         <Input
-                          value={specialistForm.slug}
+                          value={specialistForm.slug || ""}
                           onChange={(e) => {
                             const newSlug = e.target.value;
                             setSpecialistForm({ ...specialistForm, slug: newSlug });
-                            debouncedCheckSlugAvailability(newSlug, specialist.slug);
+                            debouncedCheckSlugAvailability(newSlug, specialist.slug || "");
                           }}
                           placeholder="john-smith"
                           className={

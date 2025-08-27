@@ -23,7 +23,8 @@ interface Specialist {
   userId: string;
   acuityCalendarId: string;
   name: string;
-  slug: string;
+  slug: string | null;
+  image?: string | null;
   location: SpecialistLocation | null;
   acceptsInPerson: boolean;
   acceptsTelehealth: boolean;
@@ -35,6 +36,7 @@ interface Specialist {
     firstName: string;
     lastName: string;
     jobTitle: string;
+    image?: string | null;
   };
   createdAt: string;
   updatedAt: string;

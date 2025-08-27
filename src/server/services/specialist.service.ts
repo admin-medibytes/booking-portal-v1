@@ -18,7 +18,7 @@ export interface AdminSpecialistListItem {
   userId: string;
   acuityCalendarId: string;
   name: string;
-  slug: string;
+  slug: string | null;
   location: SpecialistLocation | null;
   acceptsInPerson: boolean;
   acceptsTelehealth: boolean;

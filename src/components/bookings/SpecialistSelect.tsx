@@ -189,9 +189,9 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                     </div>
 
                     {/* Experience Badge */}
-                    {/* <div className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium">
-                      {experience}
-                    </div> */}
+                    <div className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium">
+                      {/* {experience} */}
+                    </div>
                   </div>
 
                   {/* Location and Options Row */}
@@ -229,7 +229,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex flex-col items-center gap-3 flex-shrink-0">
                   <Button
                     variant="outline"
                     size="sm"

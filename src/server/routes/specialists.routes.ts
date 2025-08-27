@@ -21,7 +21,7 @@ function getSpecialistFields(
     userId: string;
     acuityCalendarId: string;
     name: string;
-    slug: string;
+    slug: string | null;
     image?: string | null;
     location: SpecialistLocation | null;
     acceptsInPerson: boolean;

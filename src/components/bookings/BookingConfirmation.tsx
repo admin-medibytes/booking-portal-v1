@@ -8,7 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, User, Calendar, Clock, Phone, Mail, FileText, MapPin, Video, AlertCircle, MapPinned } from "lucide-react";
+import {
+  CheckCircle,
+  User,
+  Calendar,
+  Clock,
+  Phone,
+  Mail,
+  FileText,
+  MapPin,
+  Video,
+  AlertCircle,
+  MapPinned,
+} from "lucide-react";
 import { bookingsClient } from "@/lib/hono-client";
 import { ApiError } from "@/lib/hono-utils";
 import { useRouter } from "next/navigation";
@@ -61,13 +73,13 @@ export function BookingConfirmation({
           notes: examineeData.notes,
         },
       });
-      
+
       if (!response.ok) {
         const error = await response.text();
-        throw new ApiError(error || 'Failed to create booking', response.status);
+        throw new ApiError(error || "Failed to create booking", response.status);
       }
-      
-      return await response.json() as { success: boolean; id: string; message: string };
+
+      return (await response.json()) as { success: boolean; id: string; message: string };
     },
     onSuccess: (data) => {
       onConfirm(data.id);
@@ -110,11 +122,11 @@ export function BookingConfirmation({
         <CardContent className="space-y-4">
           <Alert>
             <AlertDescription>
-              A confirmation has been sent to the referrer and the specialist has been notified.
-              The examinee will receive appointment details closer to the examination date.
+              A confirmation has been sent to the referrer and the specialist has been notified. The
+              examinee will receive appointment details closer to the examination date.
             </AlertDescription>
           </Alert>
-          
+
           <div className="flex gap-2">
             <Button onClick={handleViewBooking} className="flex-1">
               View Booking Details
@@ -160,7 +172,7 @@ export function BookingConfirmation({
                   {getLocationDisplay(
                     specialist.acceptsInPerson || false,
                     specialist.acceptsTelehealth || true,
-                    specialist.location
+                    specialist.location ?? null
                   )}
                 </span>
               </div>
