@@ -282,35 +282,43 @@ export function SpecialistDetailDialog({
   const updateSpecialistMutation = useMutation({
     mutationFn: async (values: {
       name?: string;
-      slug?: string;
+      slug?: string | null;
       image?: string | null;
       location?: SpecialistLocation | null;
       acceptsInPerson?: boolean;
       acceptsTelehealth?: boolean;
       isActive?: boolean;
     }) => {
+      const payload = {
+        name: values.name,
+        slug: values.slug,
+        image: values.image,
+        location: values.location
+          ? {
+              streetAddress: values.location.streetAddress,
+              suburb: values.location.suburb,
+              city: values.location.city,
+              state: values.location.state,
+              postalCode: values.location.postalCode,
+              country: values.location.country,
+            }
+          : null,
+        acceptsInPerson: values.acceptsInPerson,
+        acceptsTelehealth: values.acceptsTelehealth,
+        isActive: values.isActive,
+      };
+
+      console.log("Sending payload to API:", payload);
+
       const response = await specialistsClient[":id"].$put({
         param: { id: specialist.id },
-        json: {
-          name: values.name,
-          slug: values.slug,
-          image: values.image,
-          location: values.location
-            ? {
-                streetAddress: values.location.streetAddress,
-                suburb: values.location.suburb,
-                city: values.location.city,
-                state: values.location.state,
-                postalCode: values.location.postalCode,
-                country: values.location.country,
-              }
-            : null,
-          acceptsInPerson: values.acceptsInPerson,
-          acceptsTelehealth: values.acceptsTelehealth,
-          isActive: values.isActive,
-        },
+        json: payload,
       });
-      if (!response.ok) throw new Error("Failed to update specialist");
+
+      if (!response.ok) {
+        throw new Error(`Failed to update specialist`);
+      }
+
       return response.json();
     },
     onSuccess: ({ data }) => {
@@ -394,13 +402,8 @@ export function SpecialistDetailDialog({
   });
 
   const handleSaveSpecialist = () => {
-    // Validate slug
-    if (!specialistForm.slug) {
-      toast.error("Slug is required");
-      return;
-    }
-
-    if (slugAvailable === false) {
+    // Validate slug only if provided
+    if (specialistForm.slug && slugAvailable === false) {
       toast.error("The selected slug is not available");
       return;
     }
@@ -417,10 +420,18 @@ export function SpecialistDetailDialog({
       }
     }
 
-    updateSpecialistMutation.mutate({
+    const dataToSend = {
       ...specialistForm,
       location: showLocationFields ? specialistForm.location : null,
-    } as Parameters<typeof updateSpecialistMutation.mutate>[0]);
+    };
+
+    console.log("Data being sent to mutation:", dataToSend);
+    console.log("specialistForm.slug value:", specialistForm.slug);
+    console.log("specialistForm.slug type:", typeof specialistForm.slug);
+
+    updateSpecialistMutation.mutate(
+      dataToSend as Parameters<typeof updateSpecialistMutation.mutate>[0]
+    );
   };
 
   const handleCancelSpecialistEdit = () => {
@@ -595,11 +606,15 @@ export function SpecialistDetailDialog({
                         <Input
                           value={specialistForm.slug || ""}
                           onChange={(e) => {
-                            const newSlug = e.target.value;
+                            const newSlug = e.target.value ? e.target.value : null;
                             setSpecialistForm({ ...specialistForm, slug: newSlug });
-                            debouncedCheckSlugAvailability(newSlug, specialist.slug || "");
+                            if (newSlug) {
+                              debouncedCheckSlugAvailability(newSlug, specialist.slug || "");
+                            } else {
+                              setSlugAvailable(null);
+                            }
                           }}
-                          placeholder="john-smith"
+                          placeholder="john-smith (optional)"
                           className={
                             slugAvailable === false
                               ? "border-red-500"
@@ -619,22 +634,29 @@ export function SpecialistDetailDialog({
                         <p className="text-sm text-green-500">This slug is available</p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        Specialist's profile will be available at: medibytes.com.au/our-panel/
-                        {specialistForm.slug || "{slug}"}
+                        {specialistForm.slug
+                          ? `Specialist's profile will be available at: medibytes.com.au/our-panel/${specialistForm.slug}`
+                          : "Optional: Leave empty if no public profile is needed"}
                       </p>
                     </div>
                   ) : (
                     <div>
-                      <Link
-                        href={`https://medibytes.com.au/our-panel/${specialist.slug}`}
-                        className="text-sm font-mono bg-muted px-2 py-1 rounded hover:underline"
-                        target="_blank"
-                      >
-                        medibytes.com.au/our-panel/{specialist.slug || "{slug}"}
-                      </Link>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Public URL for the specialist's profile page
-                      </p>
+                      {specialist.slug ? (
+                        <>
+                          <Link
+                            href={`https://medibytes.com.au/our-panel/${specialist.slug}`}
+                            className="text-sm font-mono bg-muted px-2 py-1 rounded hover:underline"
+                            target="_blank"
+                          >
+                            medibytes.com.au/our-panel/{specialist.slug}
+                          </Link>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Public URL for the specialist's profile page
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No public profile URL</p>
+                      )}
                     </div>
                   )}
                 </div>

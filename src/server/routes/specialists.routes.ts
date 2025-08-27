@@ -402,7 +402,7 @@ const specialistsRoutes = new Hono()
       "json",
       type({
         "name?": "string",
-        "slug?": "string",
+        "slug?": "string | null",
         "image?": "string | null",
         "location?": LocationInput.or("null"),
         "acceptsInPerson?": "boolean",
@@ -430,7 +430,7 @@ const specialistsRoutes = new Hono()
         // Update specialist - updateData now matches UpdateSpecialistInputType
         const updated = await specialistRepository.update(id, {
           name: updateData.name,
-          slug: updateData.slug,
+          slug: updateData.slug ?? null,
           image: updateData.image,
           isActive: updateData.isActive,
           acceptsInPerson: updateData.acceptsInPerson,

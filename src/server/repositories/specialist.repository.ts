@@ -27,7 +27,7 @@ export const CreateSpecialistInput = type({
 
 export const UpdateSpecialistInput = type({
   name: "string | undefined",
-  slug: "string | undefined",
+  slug: "string | undefined | null",
   image: "string | null | undefined",
   location: LocationInput.or("null | undefined"),
   acceptsInPerson: "boolean | undefined",
@@ -115,7 +115,7 @@ export class SpecialistRepository {
     // Build update object dynamically
     const updateData: Partial<{
       name: string;
-      slug: string;
+      slug: string | null;
       location: SpecialistLocation | null;
       acceptsInPerson: boolean;
       acceptsTelehealth: boolean;
