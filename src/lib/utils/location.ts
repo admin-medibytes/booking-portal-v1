@@ -65,7 +65,7 @@ export function getLocationDisplay(
   }
 
   if (!acceptsInPerson && acceptsTelehealth) {
-    return "Online Meeting Room";
+    return "Online";
   }
 
   if (acceptsInPerson && !location) {
