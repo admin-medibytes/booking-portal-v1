@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MapPin, Video, User, MapPinned, Check, Eye, Search, Star } from "lucide-react";
 import { specialistsClient } from "@/lib/hono-client";
 import {
@@ -154,6 +154,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                 {/* Professional Avatar Section */}
                 <div className="relative flex-shrink-0">
                   <Avatar className="w-16 h-16 ring-2 ring-white shadow-lg">
+                    {specialist.image && <AvatarImage src={specialist.image} alt={specialist.name} />}
                     <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/30 text-xl font-semibold text-primary/80">
                       {getInitials(specialist.name)}
                     </AvatarFallback>

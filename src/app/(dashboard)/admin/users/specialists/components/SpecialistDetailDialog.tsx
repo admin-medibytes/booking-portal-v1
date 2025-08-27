@@ -55,6 +55,7 @@ interface Specialist {
   acuityCalendarId: string;
   name: string;
   slug: string;
+  image?: string | null;
   location: SpecialistLocation | null;
   acceptsInPerson: boolean;
   acceptsTelehealth: boolean;
@@ -351,7 +352,6 @@ export function SpecialistDetailDialog({
       lastName?: string;
       phone?: string;
       jobTitle?: string;
-      image?: string | null;
     }) => {
       const response = await adminClient.users[":id"].$put({
         param: { id: specialist.userId },
@@ -438,7 +438,8 @@ export function SpecialistDetailDialog({
         });
       }
 
-      await updateUserMutation.mutateAsync({ image: imageUrl });
+      // Update the specialist's image instead of user's image
+      await updateSpecialistMutation.mutateAsync({ image: imageUrl });
       toast.success(imageUrl ? "Image uploaded successfully" : "Image removed successfully");
     } catch (error) {
       toast.error("Failed to update image");
@@ -540,7 +541,7 @@ export function SpecialistDetailDialog({
                 {/* Profile Section */}
                 <div className="flex flex-col items-center space-y-4 pb-6 border-b">
                   <SpecialistImageUpload
-                    currentImageUrl={user.image}
+                    currentImageUrl={specialist.image}
                     userName={specialist.name}
                     onImageChange={handleImageUpload}
                     isUploading={isUploadingImage}

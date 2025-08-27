@@ -23,6 +23,7 @@ function getSpecialistFields(
     acuityCalendarId: string;
     name: string;
     slug: string;
+    image?: string | null;
     location: SpecialistLocation | null;
     acceptsInPerson: boolean;
     acceptsTelehealth: boolean;
@@ -43,6 +44,7 @@ function getSpecialistFields(
     id: specialist.id,
     name: specialist.name,
     slug: specialist.slug,
+    image: specialist.image,
     location: specialist.location,
     acceptsInPerson: specialist.acceptsInPerson,
     acceptsTelehealth: specialist.acceptsTelehealth,
@@ -83,6 +85,7 @@ const syncSpecialistSchema = type({
 const updateSpecialistSchema = type({
   "name?": "string",
   "slug?": "string",
+  "image?": "string | null",
   "location?": LocationInput.or("null"),
   "acceptsInPerson?": "boolean",
   "acceptsTelehealth?": "boolean",

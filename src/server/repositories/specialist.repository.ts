@@ -28,6 +28,7 @@ export const CreateSpecialistInput = type({
 export const UpdateSpecialistInput = type({
   name: "string | undefined",
   slug: "string | undefined",
+  image: "string | null | undefined",
   location: LocationInput.or("null | undefined"),
   acceptsInPerson: "boolean | undefined",
   acceptsTelehealth: "boolean | undefined",

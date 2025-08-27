@@ -9,15 +9,19 @@ export interface SpecialistLocation {
 
 export interface Specialist {
   id: string;
+  userId: string;
+  acuityCalendarId: string;
   name: string;
+  slug: string;
+  image?: string | null;
   position: number;
   email?: string;
   phone?: string;
   location?: SpecialistLocation | null;
   acceptsInPerson: boolean;
   acceptsTelehealth: boolean;
-  active: boolean;
-  organizationId: string;
+  isActive: boolean;
+  organizationId?: string;
   user?: {
     id: string;
     firstName: string;

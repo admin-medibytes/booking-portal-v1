@@ -33,6 +33,7 @@ export const specialists = pgTable(
     acuityCalendarId: text("acuity_calendar_id").notNull().unique(),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
+    image: text("image"),
     location: jsonb("location").$type<SpecialistLocation>(),
     acceptsInPerson: boolean("accepts_in_person").default(false).notNull(),
     acceptsTelehealth: boolean("accepts_telehealth").default(true).notNull(),
