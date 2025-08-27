@@ -9,7 +9,26 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MapPin, Video, User, MapPinned, Check, Eye, Search, Star } from "lucide-react";
+import {
+  MapPin,
+  Video,
+  User,
+  MapPinned,
+  Check,
+  Eye,
+  Search,
+  Star,
+  Mail,
+  Phone,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { specialistsClient } from "@/lib/hono-client";
 import {
   formatLocationShort,
@@ -19,14 +38,17 @@ import {
 import { handleApiResponse } from "@/lib/hono-utils";
 import { cn } from "@/lib/utils";
 import type { Specialist } from "@/types/specialist";
+import Link from "next/link";
 
 interface SpecialistSelectProps {
-  onSelect: (specialist: Specialist) => void;
+  onSelect: (specialist: Specialist | null) => void;
   selectedSpecialist: Specialist | null;
 }
 
 export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSelectProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [modalSpecialist, setModalSpecialist] = useState<Specialist | null>(null);
 
   const {
     data: specialists,
@@ -140,7 +162,15 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                   ? "bg-gradient-to-r from-primary/5 to-primary/10 border-primary/30 shadow-md shadow-primary/20"
                   : "bg-white border-slate-200 hover:border-primary/50 hover:bg-slate-50/50"
               )}
-              onClick={() => onSelect(specialist)}
+              onClick={() => {
+                if (!specialist.acceptsTelehealth && !specialist.acceptsInPerson) {
+                  setModalSpecialist(specialist);
+                  setShowContactModal(true);
+                  onSelect(null);
+                } else {
+                  onSelect(specialist);
+                }
+              }}
             >
               {/* Selection indicator bar */}
               <div
@@ -212,14 +242,6 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {specialist.acceptsInPerson && (
-                        <Badge
-                          variant="secondary"
-                          className="text-xs px-3 py-1 font-medium border bg-violet-50 text-violet-700 border-violet-200"
-                        >
-                          In-person
-                        </Badge>
-                      )}
                       {specialist.acceptsTelehealth && (
                         <Badge
                           variant="secondary"
@@ -228,21 +250,28 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                           Telehealth
                         </Badge>
                       )}
+                      {specialist.acceptsInPerson && (
+                        <Badge
+                          variant="secondary"
+                          className="text-xs px-3 py-1 font-medium border bg-violet-50 text-violet-700 border-violet-200"
+                        >
+                          In-person
+                        </Badge>
+                      )}
+                      {!specialist.acceptsTelehealth && !specialist.acceptsInPerson && (
+                        <Badge
+                          variant="secondary"
+                          className="text-xs px-3 py-1 font-medium border bg-gray-50 text-gray-700 border-gray-300"
+                        >
+                          Availability on request
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex flex-col items-center gap-3 flex-shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded gap-2 border-slate-300 text-slate-600 hover:bg-slate-50 bg-white"
-                  >
-                    <Eye className="h-4 w-4" />
-                    View CV
-                  </Button>
-
                   <Button
                     size="sm"
                     className={cn(
@@ -264,6 +293,23 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                       </>
                     )}
                   </Button>
+
+                  {specialist.slug && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded gap-2 border-slate-300 text-slate-600 hover:bg-slate-50 bg-white"
+                      asChild
+                    >
+                      <Link
+                        href={`https://medibytes.com.au/our-panel/${specialist.slug}`}
+                        target="_blank"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View CV
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -283,6 +329,55 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
           <p className="text-slate-400 text-sm">Try adjusting your search terms</p>
         </div>
       )}
+
+      {/* Contact Information Modal */}
+      <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Contact for Availability</DialogTitle>
+            <DialogDescription>
+              {modalSpecialist?.name} is available on request. Please contact our office to schedule
+              an appointment.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="flex items-center space-x-3 p-4 bg-slate-50 rounded-lg">
+              <Mail className="h-5 w-5 text-slate-600" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-900">Email</p>
+                <a
+                  href="mailto:appointments@medibytes.com"
+                  className="text-sm text-primary hover:underline"
+                >
+                  admin@medibytes.com.au
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3 p-4 bg-slate-50 rounded-lg">
+              <Phone className="h-5 w-5 text-slate-600" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-900">Phone</p>
+                <a href="tel:1800603920" className="text-sm text-primary hover:underline">
+                  1800 603 920
+                </a>
+              </div>
+            </div>
+
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> When contacting us, please mention that you would like to
+                schedule an appointment with {modalSpecialist?.name}.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setShowContactModal(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -12,7 +12,7 @@ export interface Specialist {
   userId: string;
   acuityCalendarId: string;
   name: string;
-  slug: string;
+  slug: string | null;
   image?: string | null;
   position: number;
   email?: string;

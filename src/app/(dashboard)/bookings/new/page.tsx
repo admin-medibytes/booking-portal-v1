@@ -96,9 +96,8 @@ export default function NewBookingPage() {
     }
   };
 
-  const handleSpecialistSelect = (specialist: Specialist) => {
+  const handleSpecialistSelect = (specialist: Specialist | null) => {
     setSelectedSpecialist(specialist);
-    // handleNext();
   };
 
   const handleAppointmentTypeSelect = (appointmentType: {
