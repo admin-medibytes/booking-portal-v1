@@ -5,7 +5,6 @@ import { arktypeValidator } from "@/server/middleware/validate.middleware";
 import {
   specialistRepository,
   LocationInput,
-  type UpdateSpecialistInputType,
   type UpdatePositionsInputType,
 } from "@/server/repositories/specialist.repository";
 import { acuityService } from "@/server/services/acuity.service";
@@ -80,16 +79,6 @@ function getSpecialistFields(
 const syncSpecialistSchema = type({
   userId: "string",
   acuityCalendarId: "string",
-});
-
-const updateSpecialistSchema = type({
-  "name?": "string",
-  "slug?": "string",
-  "image?": "string | null",
-  "location?": LocationInput.or("null"),
-  "acceptsInPerson?": "boolean",
-  "acceptsTelehealth?": "boolean",
-  "isActive?": "boolean",
 });
 
 const checkSlugSchema = type({
@@ -409,7 +398,18 @@ const specialistsRoutes = new Hono()
   .put(
     "/:id",
     requireRole("admin"),
-    arktypeValidator("json", updateSpecialistSchema),
+    arktypeValidator(
+      "json",
+      type({
+        "name?": "string",
+        "slug?": "string",
+        "image?": "string | null",
+        "location?": LocationInput.or("null"),
+        "acceptsInPerson?": "boolean",
+        "acceptsTelehealth?": "boolean",
+        "isActive?": "boolean",
+      })
+    ),
     async (c) => {
       try {
         const id = c.req.param("id");
@@ -427,11 +427,16 @@ const specialistsRoutes = new Hono()
           );
         }
 
-        // Update specialist
-        const updated = await specialistRepository.update(
-          id,
-          updateData as UpdateSpecialistInputType
-        );
+        // Update specialist - updateData now matches UpdateSpecialistInputType
+        const updated = await specialistRepository.update(id, {
+          name: updateData.name,
+          slug: updateData.slug,
+          image: updateData.image,
+          isActive: updateData.isActive,
+          acceptsInPerson: updateData.acceptsInPerson,
+          acceptsTelehealth: updateData.acceptsTelehealth,
+          location: updateData.location ?? null,
+        });
 
         // Audit log the update
         const authContext = c.get("auth");

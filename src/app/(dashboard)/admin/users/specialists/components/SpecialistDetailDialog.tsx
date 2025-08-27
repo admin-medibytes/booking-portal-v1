@@ -283,6 +283,7 @@ export function SpecialistDetailDialog({
     mutationFn: async (values: {
       name?: string;
       slug?: string;
+      image?: string | null;
       location?: SpecialistLocation | null;
       acceptsInPerson?: boolean;
       acceptsTelehealth?: boolean;
@@ -290,7 +291,24 @@ export function SpecialistDetailDialog({
     }) => {
       const response = await specialistsClient[":id"].$put({
         param: { id: specialist.id },
-        json: values as any,
+        json: {
+          name: values.name,
+          slug: values.slug,
+          image: values.image,
+          location: values.location
+            ? {
+                streetAddress: values.location.streetAddress,
+                suburb: values.location.suburb,
+                city: values.location.city,
+                state: values.location.state,
+                postalCode: values.location.postalCode,
+                country: values.location.country,
+              }
+            : null,
+          acceptsInPerson: values.acceptsInPerson,
+          acceptsTelehealth: values.acceptsTelehealth,
+          isActive: values.isActive,
+        },
       });
       if (!response.ok) throw new Error("Failed to update specialist");
       return response.json();
@@ -815,19 +833,6 @@ export function SpecialistDetailDialog({
                             />
                           </div>
                           <Input
-                            placeholder="Street Address (optional)"
-                            value={specialistForm.location?.streetAddress || ""}
-                            onChange={(e) =>
-                              setSpecialistForm({
-                                ...specialistForm,
-                                location: {
-                                  ...specialistForm.location!,
-                                  streetAddress: e.target.value,
-                                },
-                              })
-                            }
-                          />
-                          <Input
                             placeholder="Suburb (optional)"
                             value={specialistForm.location?.suburb || ""}
                             onChange={(e) =>
@@ -836,6 +841,19 @@ export function SpecialistDetailDialog({
                                 location: {
                                   ...specialistForm.location!,
                                   suburb: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <Input
+                            placeholder="Street Address (optional)"
+                            value={specialistForm.location?.streetAddress || ""}
+                            onChange={(e) =>
+                              setSpecialistForm({
+                                ...specialistForm,
+                                location: {
+                                  ...specialistForm.location!,
+                                  streetAddress: e.target.value,
                                 },
                               })
                             }

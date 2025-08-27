@@ -22,7 +22,7 @@ export interface Specialist {
   acceptsTelehealth: boolean;
   isActive: boolean;
   organizationId?: string;
-  user?: {
+  user: {
     id: string;
     firstName: string;
     lastName: string;

@@ -154,9 +154,11 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                 {/* Professional Avatar Section */}
                 <div className="relative flex-shrink-0">
                   <Avatar className="w-16 h-16 ring-2 ring-white shadow-lg">
-                    {specialist.image && <AvatarImage src={specialist.image} alt={specialist.name} />}
+                    {specialist.image && (
+                      <AvatarImage src={specialist.image} alt={specialist.name} />
+                    )}
                     <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/30 text-xl font-semibold text-primary/80">
-                      {getInitials(specialist.name)}
+                      {getInitials(`${specialist.user.firstName} ${specialist.user.lastName}`)}
                     </AvatarFallback>
                   </Avatar>
                   {isSelected && (

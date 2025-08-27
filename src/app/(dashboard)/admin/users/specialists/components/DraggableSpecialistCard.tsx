@@ -91,7 +91,9 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
             <div className="flex gap-3">
               <Avatar className="h-12 w-12">
                 <AvatarImage src={specialist.user.image || ""} alt={specialist.name} />
-                <AvatarFallback>{getInitials(specialist.name)}</AvatarFallback>
+                <AvatarFallback>
+                  {getInitials(`${specialist.user.firstName} ${specialist.user.lastName}`)}
+                </AvatarFallback>
               </Avatar>
               <div>
                 <h3 className="font-semibold text-lg">{specialist.name}</h3>
