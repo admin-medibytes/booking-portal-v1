@@ -15,6 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import Brand from "@/components/brand";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +68,22 @@ export function AppSidebar({ user }: AppUserProps) {
       icon: Shield,
     },
   ];
+
+  const { setOpen } = useSidebar();
+
+  React.useEffect(() => {
+    const getCookie = (name: string) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(";").shift();
+      return null;
+    };
+
+    const sidebarState = getCookie("sidebar_state");
+    if (!!sidebarState) {
+      setOpen(sidebarState === "false" ? false : true);
+    }
+  }, []);
 
   return (
     <Sidebar>

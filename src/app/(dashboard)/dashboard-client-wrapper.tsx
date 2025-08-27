@@ -24,9 +24,11 @@ export function DashboardClientWrapper({ children, user }: DashboardClientWrappe
       }
     >
       <AppSidebar user={user} />
-      <SidebarInset>
+      <SidebarInset className="flex flex-col h-screen overflow-hidden">
         <AppTopbar user={user} />
-        <main className="flex flex-1 flex-col gap-4 p-4 pt-0 bg-white">{children}</main>
+        <main className="flex flex-1 flex-col gap-4 p-4 pt-0 bg-white overflow-y-auto">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );
