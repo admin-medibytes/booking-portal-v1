@@ -57,9 +57,9 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} style={style} className="h-full">
       <Card
-        className={`p-4 relative ${isDragging ? "shadow-lg" : ""} cursor-pointer hover:shadow-md transition-shadow`}
+        className={`p-4 relative h-full flex flex-col ${isDragging ? "shadow-lg" : ""} cursor-pointer hover:shadow-md transition-shadow`}
         onClick={(e) => {
           // Don't trigger click when dragging
           const target = e.target as HTMLElement;
@@ -85,9 +85,9 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
           </Badge>
         </div>
 
-        <div className="mt-8 space-y-3">
+        <div className="mt-8 flex flex-col h-full">
           {/* Name and Status */}
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between mb-3">
             <div className="flex gap-3">
               <Avatar className="h-12 w-12">
                 <AvatarImage src={specialist.user.image || ""} alt={specialist.name} />
@@ -105,7 +105,7 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
                 {specialist.isActive ? "Active" : "Inactive"}
               </Badge>
               {/* Appointment Type Badges */}
-              <div className="flex gap-1 mt-2">
+              <div className="flex flex-wrap gap-1 mt-2 justify-end min-h-[3.5rem] items-start">
                 {specialist.acceptsInPerson && (
                   <Badge variant="outline" className="text-xs">
                     <MapPinned className="w-3 h-3 mr-1" />
@@ -128,10 +128,10 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
             </div>
           </div>
 
-          <Separator />
+          <Separator className="mb-3" />
 
           {/* Contact Info */}
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 text-sm flex-grow">
             <div className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-muted-foreground" />
               <span className="truncate">{specialist.user.email}</span>
@@ -157,7 +157,7 @@ export function DraggableSpecialistCard({ specialist, onClick }: DraggableSpecia
           </div>
 
           {/* Footer */}
-          <div className="pt-2 border-t">
+          <div className="pt-2 mt-3 border-t">
             <p className="text-xs text-muted-foreground">
               Calendar ID: {specialist.acuityCalendarId}
             </p>
