@@ -59,7 +59,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
       .slice(0, 2);
   };
 
-  // // Helper function for rating (placeholder)
+  // Helper function for rating (placeholder)
   // const getRating = (specialist: Specialist) => {
   //   // This is a placeholder - you might want to add actual rating data to your specialist model
   //   const rating = (Math.random() * 0.4 + 4.6).toFixed(1); // Random between 4.6-5.0
@@ -109,6 +109,8 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
     );
   }
 
+  const rating = specialists.map(() => +(Math.random() * 2 + 3).toFixed(1));
+
   return (
     <div className="space-y-6">
       {/* Search Bar */}
@@ -124,7 +126,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
 
       {/* Specialists List */}
       <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-        {filteredSpecialists.map((specialist) => {
+        {filteredSpecialists.map((specialist, index) => {
           const isSelected = selectedSpecialist?.id === specialist.id;
           // const rating = getRating(specialist);
 
@@ -181,17 +183,19 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                         </span>
                         {/* <div className="flex items-center gap-1">
                           <div className="flex text-yellow-400 text-sm">
-                            {"★".repeat(Math.floor(rating))}
+                            {"★".repeat(Math.floor(rating[index]))}
                           </div>
-                          <span className="text-sm text-slate-500 font-medium">{rating}</span>
+                          <span className="text-sm text-slate-500 font-medium">
+                            {rating[index]}
+                          </span>
                         </div> */}
                       </div>
                     </div>
 
                     {/* Experience Badge */}
-                    <div className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium">
-                      {/* {experience} */}
-                    </div>
+                    {/* <div className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium shadow-2xs">
+                      {experience}
+                    </div> */}
                   </div>
 
                   {/* Location and Options Row */}
@@ -233,7 +237,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-2 border-slate-300 text-slate-600 hover:bg-slate-50 bg-transparent"
+                    className="rounded gap-2 border-slate-300 text-slate-600 hover:bg-slate-50 bg-white"
                   >
                     <Eye className="h-4 w-4" />
                     View CV
@@ -242,7 +246,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                   <Button
                     size="sm"
                     className={cn(
-                      "gap-2 min-w-[100px] transition-all duration-200",
+                      "rounded gap-2 min-w-[100px] transition-all duration-200",
                       isSelected
                         ? "bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/25"
                         : "bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25"
