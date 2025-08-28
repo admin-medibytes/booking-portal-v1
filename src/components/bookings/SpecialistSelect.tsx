@@ -222,25 +222,6 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                       </div>
                     </div>
 
-                    {/* Experience Badge */}
-                    {/* <div className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium shadow-2xs">
-                      {experience}
-                    </div> */}
-                  </div>
-
-                  {/* Location and Options Row */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <MapPin className="h-4 w-4 text-slate-400" />
-                      <span className="text-sm font-medium">
-                        {getLocationDisplay(
-                          specialist.acceptsInPerson || false,
-                          specialist.acceptsTelehealth || true,
-                          specialist.location ?? null
-                        )}
-                      </span>
-                    </div>
-
                     <div className="flex items-center gap-2">
                       {specialist.acceptsTelehealth && (
                         <Badge
@@ -268,10 +249,29 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                       )}
                     </div>
                   </div>
+
+                  {/* Location and Options Row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <MapPin className="h-4 w-4 text-slate-400" />
+                      <span className="text-sm font-medium">
+                        {getLocationDisplay(
+                          specialist.acceptsInPerson || false,
+                          specialist.acceptsTelehealth || true,
+                          specialist.location ?? null
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Experience Badge */}
+                    {/* <div className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium shadow-2xs">
+                      {experience}
+                    </div> */}
+                  </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex flex-col items-center gap-3 flex-shrink-0">
+                <div className="flex flex-col items-start justify-start gap-3 flex-shrink-0">
                   <Button
                     size="sm"
                     className={cn(
@@ -294,7 +294,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                     )}
                   </Button>
 
-                  {specialist.slug && (
+                  {specialist.slug ? (
                     <Button
                       variant="outline"
                       size="sm"
@@ -309,6 +309,8 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                         View CV
                       </Link>
                     </Button>
+                  ) : (
+                    <div className="h-[36px]" />
                   )}
                 </div>
               </div>
