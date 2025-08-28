@@ -1,3 +1,5 @@
+<!-- Powered by BMAD™ Core -->
+
 # risk-profile
 
 Generate a comprehensive risk assessment matrix for a story implementation using probability × impact analysis.
@@ -105,7 +107,7 @@ Evaluate each risk using probability × impact:
 - `Medium (2)`: Moderate consequences (degraded performance, minor data issues)
 - `Low (1)`: Minor consequences (cosmetic issues, slight inconvenience)
 
-**Risk Score = Probability × Impact**
+### Risk Score = Probability × Impact
 
 - 9: Critical Risk (Red)
 - 6: High Risk (Orange)
@@ -182,7 +184,7 @@ risk_summary:
 
 ### Output 2: Markdown Report
 
-**Save to:** `docs/qa/assessments/{epic}.{story}-risk-{YYYYMMDD}.md`
+**Save to:** `qa.qaLocation/assessments/{epic}.{story}-risk-{YYYYMMDD}.md`
 
 ```markdown
 # Risk Profile: Story {epic}.{story}
@@ -290,7 +292,7 @@ Review and update risk profile when:
 
 Calculate overall story risk score:
 
-```
+```text
 Base Score = 100
 For each risk:
   - Critical (9): Deduct 20 points
@@ -339,8 +341,8 @@ Based on risk profile, recommend:
 
 **Print this line for review task to quote:**
 
-```
-Risk profile: docs/qa/assessments/{epic}.{story}-risk-{YYYYMMDD}.md
+```text
+Risk profile: qa.qaLocation/assessments/{epic}.{story}-risk-{YYYYMMDD}.md
 ```
 
 ## Key Principles

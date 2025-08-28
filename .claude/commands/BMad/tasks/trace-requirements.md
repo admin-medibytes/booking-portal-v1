@@ -2,6 +2,8 @@
 
 When this command is used, execute the following task:
 
+<!-- Powered by BMAD™ Core -->
+
 # trace-requirements
 
 Map story requirements to test cases using Given-When-Then patterns for comprehensive traceability.
@@ -99,16 +101,16 @@ trace:
     full: Y
     partial: Z
     none: W
-  planning_ref: 'docs/qa/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md'
+  planning_ref: 'qa.qaLocation/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md'
   uncovered:
     - ac: 'AC3'
       reason: 'No test found for password reset timing'
-  notes: 'See docs/qa/assessments/{epic}.{story}-trace-{YYYYMMDD}.md'
+  notes: 'See qa.qaLocation/assessments/{epic}.{story}-trace-{YYYYMMDD}.md'
 ```
 
 ### Output 2: Traceability Report
 
-**Save to:** `docs/qa/assessments/{epic}.{story}-trace-{YYYYMMDD}.md`
+**Save to:** `qa.qaLocation/assessments/{epic}.{story}-trace-{YYYYMMDD}.md`
 
 Create a traceability report with:
 
@@ -254,7 +256,7 @@ This traceability feeds into quality gates:
 **Print this line for review task to quote:**
 
 ```text
-Trace matrix: docs/qa/assessments/{epic}.{story}-trace-{YYYYMMDD}.md
+Trace matrix: qa.qaLocation/assessments/{epic}.{story}-trace-{YYYYMMDD}.md
 ```
 
 - Full coverage → PASS contribution

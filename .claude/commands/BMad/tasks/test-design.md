@@ -2,6 +2,8 @@
 
 When this command is used, execute the following task:
 
+<!-- Powered by BMAD™ Core -->
+
 # test-design
 
 Create comprehensive test scenarios with appropriate test level recommendations for story implementation.
@@ -88,7 +90,7 @@ Ensure:
 
 ### Output 1: Test Design Document
 
-**Save to:** `docs/qa/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md`
+**Save to:** `qa.qaLocation/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md`
 
 ```markdown
 # Test Design: Story {epic}.{story}
@@ -154,7 +156,7 @@ test_design:
 Print for use by trace-requirements task:
 
 ```text
-Test design matrix: docs/qa/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md
+Test design matrix: qa.qaLocation/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md
 P0 tests identified: {count}
 ```
 
