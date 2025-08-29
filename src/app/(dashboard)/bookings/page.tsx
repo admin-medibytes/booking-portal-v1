@@ -129,7 +129,7 @@ export default function BookingsPage() {
           <BookingFilters specialists={specialists || []} onFiltersChange={handleFiltersChange} />
 
           {/* View Toggle - Button Group Style */}
-          <div className="flex gap-1 p-1 rounded-md bg-muted flex-shrink-0">
+          <div className="flex gap-1 p-1 rounded-xl bg-muted w-fit border">
             <Button
               variant={view === "list" ? "default" : "ghost"}
               size="sm"

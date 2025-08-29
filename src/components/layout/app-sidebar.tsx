@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { AppUserProps } from "./type";
 import Image from "next/image";
+import Link from "next/link";
 
 interface NavItem {
   href: string;
@@ -136,7 +137,6 @@ export function AppSidebar({ user }: AppUserProps) {
         {user.role !== "specialist" && (
           <>
             <SidebarSeparator />
-
             <SidebarGroup>
               <div className="px-3 pb-3">
                 <Card className="rounded-[.5rem] border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20">
@@ -153,8 +153,8 @@ export function AppSidebar({ user }: AppUserProps) {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button asChild size="sm" className="w-full mt-auto">
-                      <a href="/bookings/new">Book Now</a>
+                    <Button asChild size="sm" className="w-full mt-auto rounded">
+                      <Link href="/bookings/new">Book Now</Link>
                     </Button>
                   </CardFooter>
                 </Card>
