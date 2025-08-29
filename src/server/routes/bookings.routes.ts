@@ -99,6 +99,7 @@ const bookingsRoutes = new Hono()
       "json",
       type({
         specialistId: "string.uuid",
+        appointmentTypeId: "string.uuid",
         appointmentDateTime: "string.date",
         examineeName: "string>0",
         examineePhone: "string>0",

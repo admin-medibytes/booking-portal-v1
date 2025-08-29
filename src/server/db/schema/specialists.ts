@@ -58,9 +58,74 @@ export const specialists = pgTable(
   })
 );
 
-export const specialistsRelations = relations(specialists, ({ one }) => ({
+export const specialistsRelations = relations(specialists, ({ one, many }) => ({
   user: one(users, {
     fields: [specialists.userId],
     references: [users.id],
+  }),
+  appointmentTypes: many(specialistAppointmentTypes),
+}));
+
+export const appointmentTypes = pgTable(
+  "appointment_types",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    acuityAppointmentTypeId: integer("acuity_appointment_type_id").notNull().unique(),
+    acuityName: text("acuity_name").notNull(),
+    acuityDescription: text("acuity_description"),
+    durationMinutes: integer("duration_minutes").notNull(),
+    category: text("category"),
+    active: boolean("active").default(true).notNull(),
+    lastSyncedAt: timestamp("last_synced_at"),
+    raw: jsonb("raw"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    acuityAppointmentTypeIdIdx: index("appointment_types_acuity_id_idx").on(table.acuityAppointmentTypeId),
+    activeIdx: index("appointment_types_active_idx").on(table.active),
+    categoryIdx: index("appointment_types_category_idx").on(table.category),
+  })
+);
+
+export const appointmentTypesRelations = relations(appointmentTypes, ({ many }) => ({
+  specialists: many(specialistAppointmentTypes),
+}));
+
+export const specialistAppointmentTypes = pgTable(
+  "specialist_appointment_types",
+  {
+    specialistId: text("specialist_id")
+      .notNull()
+      .references(() => specialists.id, { onDelete: "cascade" }),
+    appointmentTypeId: text("appointment_type_id")
+      .notNull()
+      .references(() => appointmentTypes.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").default(true).notNull(),
+    customDisplayName: text("custom_display_name"),
+    customDescription: text("custom_description"),
+    customPrice: integer("custom_price"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: unique("specialist_appointment_types_pk").on(table.specialistId, table.appointmentTypeId),
+    specialistIdIdx: index("specialist_appointment_types_specialist_id_idx").on(table.specialistId),
+    appointmentTypeIdIdx: index("specialist_appointment_types_appointment_type_id_idx").on(table.appointmentTypeId),
+    enabledIdx: index("specialist_appointment_types_enabled_idx").on(table.enabled),
+  })
+);
+
+export const specialistAppointmentTypesRelations = relations(specialistAppointmentTypes, ({ one }) => ({
+  specialist: one(specialists, {
+    fields: [specialistAppointmentTypes.specialistId],
+    references: [specialists.id],
+  }),
+  appointmentType: one(appointmentTypes, {
+    fields: [specialistAppointmentTypes.appointmentTypeId],
+    references: [appointmentTypes.id],
   }),
 }));

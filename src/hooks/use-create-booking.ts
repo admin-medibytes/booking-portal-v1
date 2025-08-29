@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 interface CreateBookingData {
   specialistId: string;
+  appointmentTypeId: string;
   appointmentDateTime: string;
   examineeName: string;
   examineePhone: string;

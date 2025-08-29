@@ -7,6 +7,7 @@ import {
   LocationInput,
   type UpdatePositionsInputType,
 } from "@/server/repositories/specialist.repository";
+import { appointmentTypeRepository } from "@/server/repositories/appointment-type.repository";
 import { acuityService } from "@/server/services/acuity.service";
 import { logger } from "@/server/utils/logger";
 import { generateSlug } from "@/lib/utils/slug";
@@ -274,7 +275,7 @@ const specialistsRoutes = new Hono()
         }
 
         // Generate a unique slug based on calendar name
-        let baseSlug = generateSlug(acuityCalendar.name);
+        const baseSlug = generateSlug(acuityCalendar.name);
         let slug = baseSlug;
         let counter = 1;
 
@@ -558,11 +559,12 @@ const specialistsRoutes = new Hono()
     }
   })
 
-  // GET /api/specialists/:id/availability - Get specialist availability
+  // GET /api/specialists/:id/appointment-types - Get specialist appointment types
   .get("/:id/appointment-types", async (c) => {
     try {
       const authContext = c.get("auth");
       const specialistId = c.req.param("id");
+      const refresh = c.req.query("refresh") === "true";
 
       if (!authContext?.user) {
         return c.json(
@@ -586,18 +588,32 @@ const specialistsRoutes = new Hono()
         );
       }
 
-      // Fetch appointment types from Acuity
-      const appointmentTypes = await acuityService.getAppointmentTypes();
+      // Refresh from Acuity if requested
+      if (refresh) {
+        const acuityTypes = await acuityService.getAppointmentTypes();
+        await appointmentTypeRepository.upsertFromAcuity(acuityTypes);
+      }
 
-      // Return appointment types with relevant information
+      // Get specialist-specific appointment types with overrides
+      const appointmentTypes = await appointmentTypeRepository.getSpecialistAppointmentTypes(
+        specialistId,
+        true // enabledOnly
+      );
+
+      // Return appointment types with effective and source information
       return c.json({
         success: true,
         data: appointmentTypes.map((type) => ({
           id: type.id,
-          name: type.name,
-          duration: type.duration,
-          description: type.description,
+          acuityAppointmentTypeId: type.acuityAppointmentTypeId,
+          name: type.effectiveName,
+          description: type.effectiveDescription,
+          duration: type.durationMinutes,
           category: type.category,
+          source: {
+            name: type.sourceName,
+            description: type.sourceDescription,
+          },
         })),
       });
     } catch (error) {
@@ -611,6 +627,220 @@ const specialistsRoutes = new Hono()
       );
     }
   })
+
+  // GET /api/specialists/:id/appointment-types/admin - Get all appointment types for admin management
+  .get("/:id/appointment-types/admin", requireRole("admin"), async (c) => {
+    try {
+      const specialistId = c.req.param("id");
+
+      // Verify specialist exists
+      const specialistData = await specialistRepository.findById(specialistId);
+      if (!specialistData) {
+        return c.json(
+          {
+            success: false,
+            error: "Specialist not found",
+          },
+          404
+        );
+      }
+
+      // Get ALL appointment types with optional specialist mappings
+      const appointmentTypes =
+        await appointmentTypeRepository.getAllAppointmentTypesForSpecialist(specialistId);
+
+      // Return with full data including Acuity originals
+      return c.json({
+        success: true,
+        data: appointmentTypes.map((type) => ({
+          id: type.id,
+          acuityAppointmentTypeId: type.acuityAppointmentTypeId,
+          acuityName: type.acuityName,
+          acuityDescription: type.acuityDescription,
+          name: type.effectiveName,
+          description: type.effectiveDescription,
+          duration: type.durationMinutes,
+          category: type.category,
+          enabled: type.enabled ?? false,
+          customDisplayName: type.customDisplayName,
+          customDescription: type.customDescription,
+          customPrice: type.customPrice,
+          notes: type.notes,
+          source: {
+            name: type.sourceName,
+            description: type.sourceDescription,
+          },
+        })),
+      });
+    } catch (error) {
+      logger.error("Failed to fetch appointment types for admin", error as Error);
+      return c.json(
+        {
+          success: false,
+          error: "Failed to fetch appointment types",
+        },
+        500
+      );
+    }
+  })
+
+  // POST /api/specialists/:id/appointment-types/sync - Sync appointment types from Acuity (Admin only)
+  .post(
+    "/:id/appointment-types/sync",
+    requireRole("admin"),
+    arktypeValidator(
+      "json",
+      type({
+        strategy: '"none" | "auto-enable-by-category"',
+      })
+    ),
+    async (c) => {
+      try {
+        const specialistId = c.req.param("id");
+        const { strategy } = c.req.valid("json");
+        const authContext = c.get("auth");
+        const adminUser = authContext?.user;
+
+        // Verify specialist exists
+        const specialistData = await specialistRepository.findById(specialistId);
+        if (!specialistData) {
+          return c.json(
+            {
+              success: false,
+              error: "Specialist not found",
+            },
+            404
+          );
+        }
+
+        // Sync from Acuity
+        const acuityTypes = await acuityService.getAppointmentTypes();
+        const synced = await appointmentTypeRepository.upsertFromAcuity(
+          acuityTypes.filter((types) =>
+            types.calendarIDs.includes(parseInt(specialistData.specialist.acuityCalendarId))
+          )
+        );
+
+        let enabledChanged = 0;
+        if (strategy === "auto-enable-by-category") {
+          // Auto-enable appointment types based on common categories
+          const commonCategories = ["General", "Initial", "Follow-up"];
+          enabledChanged = await appointmentTypeRepository.autoEnableByCategory(
+            specialistId,
+            commonCategories
+          );
+        }
+
+        // Audit log
+        if (adminUser) {
+          logger.audit(
+            "sync_specialist_appointment_types",
+            adminUser.id,
+            "specialist",
+            specialistId,
+            {
+              strategy,
+              syncedCount: synced.length,
+              enabledChanged,
+            }
+          );
+        }
+
+        return c.json({
+          success: true,
+          synced: synced.length,
+          enabledChanged: strategy === "auto-enable-by-category" ? enabledChanged : undefined,
+          lastSyncedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        logger.error("Failed to sync appointment types", error as Error);
+        return c.json(
+          {
+            success: false,
+            error: "Failed to sync appointment types",
+          },
+          500
+        );
+      }
+    }
+  )
+
+  // PUT /api/specialists/:id/appointment-types - Bulk update appointment type mappings (Admin only)
+  .put(
+    "/:id/appointment-types",
+    requireRole("admin"),
+    arktypeValidator(
+      "json",
+      type({
+        items: type({
+          appointmentTypeId: "string",
+          "enabled?": "boolean",
+          "customDisplayName?": "string | null",
+          "customDescription?": "string | null",
+          "customPrice?": "number | null",
+          "notes?": "string | null",
+        }).array(),
+      })
+    ),
+    async (c) => {
+      try {
+        const specialistId = c.req.param("id");
+        const { items } = c.req.valid("json");
+        const authContext = c.get("auth");
+        const adminUser = authContext?.user;
+
+        // Verify specialist exists
+        const specialistData = await specialistRepository.findById(specialistId);
+        if (!specialistData) {
+          return c.json(
+            {
+              success: false,
+              error: "Specialist not found",
+            },
+            404
+          );
+        }
+
+        // Bulk update mappings
+        const results = await appointmentTypeRepository.bulkUpdateSpecialistMappings(
+          specialistId,
+          items
+        );
+
+        // Audit log
+        if (adminUser) {
+          logger.audit(
+            "update_specialist_appointment_types",
+            adminUser.id,
+            "specialist",
+            specialistId,
+            {
+              updatedCount: results.length,
+              items: items.map((item) => ({
+                appointmentTypeId: item.appointmentTypeId,
+                enabled: item.enabled,
+                hasOverrides: !!(item.customDisplayName || item.customDescription),
+              })),
+            }
+          );
+        }
+
+        return c.json({
+          success: true,
+          updated: results.length,
+        });
+      } catch (error) {
+        logger.error("Failed to update appointment type mappings", error as Error);
+        return c.json(
+          {
+            success: false,
+            error: "Failed to update appointment type mappings",
+          },
+          500
+        );
+      }
+    }
+  )
   .get("/:id/availability", async (c) => {
     try {
       const authContext = c.get("auth");

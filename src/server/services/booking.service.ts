@@ -1,4 +1,5 @@
 import { bookingRepository } from "@/server/repositories/booking.repository";
+import { appointmentTypeRepository } from "@/server/repositories/appointment-type.repository";
 import { db } from "@/server/db";
 import { specialists, members, teamMembers, bookings, users, bookingProgress } from "@/server/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
@@ -305,6 +306,7 @@ export class BookingService {
   // Create a new booking
   async createBooking(data: {
     specialistId: string;
+    appointmentTypeId: string;
     appointmentDateTime: Date;
     examineeName: string;
     examineePhone: string;
@@ -334,6 +336,16 @@ export class BookingService {
 
     if (!specialist) {
       throw new Error("Specialist not found or inactive");
+    }
+
+    // Validate appointment type is enabled for this specialist
+    const isValidAppointmentType = await appointmentTypeRepository.validateAppointmentTypeForBooking(
+      sanitizedData.specialistId,
+      sanitizedData.appointmentTypeId
+    );
+
+    if (!isValidAppointmentType) {
+      throw new Error("Selected appointment type is not available for this specialist");
     }
 
     // Begin transaction

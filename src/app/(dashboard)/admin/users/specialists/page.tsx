@@ -17,7 +17,6 @@ import { Search, Users, Stethoscope, MapPinned, Video, Filter, AlertCircle } fro
 import { toast } from "sonner";
 import { adminClient, specialistsClient } from "@/lib/hono-client";
 import { SortableSpecialistGrid } from "./components/SortableSpecialistGrid";
-import { SpecialistDetailDialog } from "./components/SpecialistDetailDialog";
 import type { SpecialistLocation } from "@/types/specialist";
 
 interface Specialist {
@@ -58,7 +57,6 @@ export default function AdminSpecialistsPage() {
     position: number;
   }> | null>(null);
   const [localSpecialists, setLocalSpecialists] = useState<Specialist[] | null>(null);
-  const [selectedSpecialist, setSelectedSpecialist] = useState<Specialist | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch specialists
@@ -122,7 +120,7 @@ export default function AdminSpecialistsPage() {
   // Filter and sort specialists
   const filteredSpecialists = useMemo(() => {
     if (!displaySpecialists) return [];
-    let filtered = displaySpecialists.filter((specialist) => {
+    const filtered = displaySpecialists.filter((specialist) => {
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch =
         specialist.name.toLowerCase().includes(searchLower) ||
@@ -355,18 +353,10 @@ export default function AdminSpecialistsPage() {
         <SortableSpecialistGrid
           specialists={filteredSpecialists}
           onReorder={handleReorder}
-          onSpecialistClick={setSelectedSpecialist}
+          onSpecialistClick={(specialist) => router.push(`/admin/users/specialists/${specialist.id}`)}
         />
       )}
 
-      {/* Specialist Detail Dialog */}
-      {selectedSpecialist && (
-        <SpecialistDetailDialog
-          specialist={selectedSpecialist}
-          open={!!selectedSpecialist}
-          onOpenChange={(open) => !open && setSelectedSpecialist(null)}
-        />
-      )}
     </div>
   );
 }

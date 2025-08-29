@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminClient, specialistsClient } from "@/lib/hono-client";
-import { generateSlug } from "@/lib/utils/slug";
 import { debounce } from "@/lib/debounce";
 import {
   Dialog,
@@ -48,6 +47,7 @@ import type { SpecialistLocation } from "@/server/db/schema/specialists";
 import { formatLocationFull, formatLocationShort } from "@/lib/utils/location";
 import SpecialistImageUpload from "@/components/specialists/SpecialistImageUpload";
 import Link from "next/link";
+import { AppointmentTypesManagement } from "./AppointmentTypesManagement";
 
 interface Specialist {
   id: string;
@@ -525,10 +525,11 @@ export function SpecialistDetailDialog({
         </div>
 
         <Tabs defaultValue="specialist" className="mt-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="specialist">Specialist Info</TabsTrigger>
             <TabsTrigger value="user">User Details</TabsTrigger>
             <TabsTrigger value="organizations">Organizations</TabsTrigger>
+            <TabsTrigger value="appointment-types">Appointment Types</TabsTrigger>
           </TabsList>
 
           <TabsContent value="specialist" className="space-y-4">
@@ -1120,6 +1121,10 @@ export function SpecialistDetailDialog({
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="appointment-types" className="space-y-4">
+            <AppointmentTypesManagement specialistId={specialist.id} />
           </TabsContent>
         </Tabs>
       </DialogContent>

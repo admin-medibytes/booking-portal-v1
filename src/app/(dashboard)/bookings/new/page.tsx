@@ -62,11 +62,16 @@ export default function NewBookingPage() {
 
   const [selectedSpecialist, setSelectedSpecialist] = useState<Specialist | null>(null);
   const [selectedAppointmentType, setSelectedAppointmentType] = useState<{
-    id: number;
+    id: string;
+    acuityAppointmentTypeId: number;
     name: string;
     duration: number;
-    description?: string;
-    category: string;
+    description: string | null;
+    category: string | null;
+    source: {
+      name: "acuity" | "override";
+      description: "acuity" | "override";
+    };
   } | null>(null);
   const [selectedDateTime, setSelectedDateTime] = useState<Date | null>(null);
   const [examineeData, setExamineeData] = useState<{
@@ -101,11 +106,16 @@ export default function NewBookingPage() {
   };
 
   const handleAppointmentTypeSelect = (appointmentType: {
-    id: number;
+    id: string;
+    acuityAppointmentTypeId: number;
     name: string;
     duration: number;
-    description?: string;
-    category: string;
+    description: string | null;
+    category: string | null;
+    source: {
+      name: "acuity" | "override";
+      description: "acuity" | "override";
+    };
   }) => {
     setSelectedAppointmentType(appointmentType);
     handleNext();
@@ -165,7 +175,7 @@ export default function NewBookingPage() {
         return selectedSpecialist && selectedAppointmentType ? (
           <TimeSlotPicker
             specialistId={selectedSpecialist.id}
-            appointmentTypeId={selectedAppointmentType.id}
+            appointmentTypeId={selectedAppointmentType.acuityAppointmentTypeId}
             onSelect={handleTimeSlotSelect}
             selectedDateTime={selectedDateTime}
           />

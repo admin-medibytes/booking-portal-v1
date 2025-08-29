@@ -31,11 +31,16 @@ import type { Specialist } from "@/types/specialist";
 interface BookingConfirmationProps {
   specialist: Specialist;
   appointmentType: {
-    id: number;
+    id: string;
+    acuityAppointmentTypeId: number;
     name: string;
     duration: number;
-    description?: string;
-    category: string;
+    description: string | null;
+    category: string | null;
+    source: {
+      name: "acuity" | "override";
+      description: "acuity" | "override";
+    };
   };
   dateTime: Date;
   examineeData: {
@@ -65,6 +70,7 @@ export function BookingConfirmation({
       const response = await bookingsClient.$post({
         json: {
           specialistId: specialist.id,
+          appointmentTypeId: appointmentType.id,
           appointmentType: examineeData.appointmentType || "telehealth",
           appointmentDateTime: dateTime.toISOString(),
           examineeName: examineeData.examineeName,

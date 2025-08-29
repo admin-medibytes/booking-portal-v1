@@ -11,11 +11,16 @@ import { specialistsClient } from "@/lib/hono-client";
 import { handleApiResponse } from "@/lib/hono-utils";
 
 interface AppointmentType {
-  id: number;
+  id: string;
+  acuityAppointmentTypeId: number;
   name: string;
+  description: string | null;
   duration: number;
-  description?: string;
-  category: string;
+  category: string | null;
+  source: {
+    name: "acuity" | "override";
+    description: "acuity" | "override";
+  };
 }
 
 interface AppointmentTypeSelectProps {
@@ -93,7 +98,14 @@ export function AppointmentTypeSelect({
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div>
-                  <h3 className="font-semibold text-base mb-1">{appointmentType.name}</h3>
+                  <div className="flex items-start gap-2 mb-1">
+                    <h3 className="font-semibold text-base">{appointmentType.name}</h3>
+                    {appointmentType.source.name === "override" && (
+                      <Badge variant="outline" className="text-xs">
+                        Customized
+                      </Badge>
+                    )}
+                  </div>
                   {appointmentType.category && (
                     <Badge variant="secondary" className="mb-2">
                       {appointmentType.category}

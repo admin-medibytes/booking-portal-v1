@@ -44,6 +44,7 @@ export const AcuityAppointmentType = type({
   color: "string",
   private: "boolean",
   type: "string",
+  calendarIDs: "number[]",
 });
 
 export const AcuityAppointment = type({
@@ -105,10 +106,10 @@ export class AcuityService {
   constructor() {
     this.baseUrl = env.ACUITY_BASE_URL;
     const authString = `${env.ACUITY_USER_ID}:${env.ACUITY_API_KEY}`;
-    this.authHeader = `Basic ${Buffer.from(authString).toString("base64")}`;
+    this.authHeader = `Basic ${btoa(authString)}`;
     this.rateLimitPerSecond = Number(env.ACUITY_RATE_LIMIT_PER_SECOND);
     this.rateLimitPerHour = Number(env.ACUITY_RATE_LIMIT_PER_HOUR);
-    
+
     this.rateLimitState = {
       requestsThisSecond: 0,
       requestsThisHour: 0,
@@ -136,7 +137,7 @@ export class AcuityService {
     if (this.rateLimitState.requestsThisSecond >= this.rateLimitPerSecond) {
       const waitTime = this.rateLimitState.secondResetTime - now;
       logger.warn(`Rate limit per second reached, waiting ${waitTime}ms`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
       return this.checkRateLimit(); // Recheck after waiting
     }
 
@@ -154,11 +155,7 @@ export class AcuityService {
   }
 
   // Generic API request method
-  private async request<T>(
-    method: string,
-    endpoint: string,
-    data?: unknown
-  ): Promise<T> {
+  private async request<T>(method: string, endpoint: string, data?: unknown): Promise<T> {
     await this.checkRateLimit();
 
     const url = `${this.baseUrl}${endpoint}`;
@@ -181,13 +178,13 @@ export class AcuityService {
       }
 
       logger.debug({ method, url }, "Making Acuity API request");
-      
+
       const response = await fetch(url, options);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = `Acuity API error: ${response.status} ${response.statusText}`;
-        
+
         // Parse error details if JSON
         try {
           const errorData = JSON.parse(errorText);
@@ -223,10 +220,9 @@ export class AcuityService {
 
       const result = await response.json();
       return result as T;
-      
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       if (error instanceof AcuityAPIError) {
         throw error;
       }
@@ -264,26 +260,29 @@ export class AcuityService {
   async getCalendars(): Promise<AcuityCalendarType[]> {
     const calendars = await this.request<unknown[]>("GET", "/calendars");
     const results: AcuityCalendarType[] = [];
-    
+
     for (const cal of calendars) {
       const parsed = AcuityCalendar(cal);
       if (parsed instanceof type.errors) {
-        logger.error({ 
-          errors: parsed.map(e => ({ path: e.path, message: e.message })), 
-          data: cal 
-        }, "Invalid calendar data from Acuity");
+        logger.error(
+          {
+            errors: parsed.map((e) => ({ path: e.path, message: e.message })),
+            data: cal,
+          },
+          "Invalid calendar data from Acuity"
+        );
         throw new AcuityAPIError("Invalid calendar data received from Acuity");
       }
       results.push(parsed);
     }
-    
+
     return results;
   }
 
   async getCalendarById(calendarId: string): Promise<AcuityCalendarType | null> {
     try {
       const calendars = await this.getCalendars();
-      return calendars.find(cal => cal.id.toString() === calendarId) || null;
+      return calendars.find((cal) => cal.id.toString() === calendarId) || null;
     } catch (error) {
       logger.error({ error, calendarId }, "Error fetching calendar by ID");
       throw error;
@@ -292,31 +291,27 @@ export class AcuityService {
 
   // Appointment type operations
   async getAppointmentTypes(): Promise<AcuityAppointmentTypeType[]> {
-    // Check cache first
-    const cached = await getCachedAppointmentTypes();
-    if (cached) {
-      logger.debug("Returning cached appointment types");
-      return cached as AcuityAppointmentTypeType[];
-    }
-
     const types = await this.request<unknown[]>("GET", "/appointment-types");
     const results: AcuityAppointmentTypeType[] = [];
-    
+
     for (const appointmentType of types) {
       const parsed = AcuityAppointmentType(appointmentType);
       if (parsed instanceof type.errors) {
-        logger.error({ 
-          errors: parsed.map(e => ({ path: e.path, message: e.message })), 
-          data: appointmentType 
-        }, "Invalid appointment type data from Acuity");
+        logger.error(
+          {
+            errors: parsed.map((e) => ({ path: e.path, message: e.message })),
+            data: appointmentType,
+          },
+          "Invalid appointment type data from Acuity"
+        );
         throw new AcuityAPIError("Invalid appointment type data received from Acuity");
       }
       results.push(parsed);
     }
-    
+
     // Cache the results
     await cacheAppointmentTypes(results);
-    
+
     return results;
   }
 
@@ -333,12 +328,15 @@ export class AcuityService {
       params.date,
       params.appointmentTypeId
     );
-    
+
     if (cached) {
-      logger.debug({ 
-        calendarId: params.calendarId, 
-        date: params.date 
-      }, "Returning cached availability");
+      logger.debug(
+        {
+          calendarId: params.calendarId,
+          date: params.date,
+        },
+        "Returning cached availability"
+      );
       return cached as AcuityTimeSlotType[];
     }
 
@@ -355,19 +353,22 @@ export class AcuityService {
     );
 
     const results: AcuityTimeSlotType[] = [];
-    
+
     for (const slot of slots) {
       const parsed = AcuityTimeSlot(slot);
       if (parsed instanceof type.errors) {
-        logger.error({ 
-          errors: parsed.map(e => ({ path: e.path, message: e.message })), 
-          data: slot 
-        }, "Invalid time slot data from Acuity");
+        logger.error(
+          {
+            errors: parsed.map((e) => ({ path: e.path, message: e.message })),
+            data: slot,
+          },
+          "Invalid time slot data from Acuity"
+        );
         throw new AcuityAPIError("Invalid time slot data received from Acuity");
       }
       results.push(parsed);
     }
-    
+
     // Cache the results
     await cacheAvailability(
       params.calendarId.toString(),
@@ -375,7 +376,7 @@ export class AcuityService {
       params.appointmentTypeId,
       results
     );
-    
+
     return results;
   }
 
@@ -393,18 +394,21 @@ export class AcuityService {
   }): Promise<AcuityAppointmentType> {
     const appointment = await this.request<unknown>("POST", "/appointments", data);
     const parsed = AcuityAppointment(appointment);
-    
+
     if (parsed instanceof type.errors) {
-      logger.error({ 
-        errors: parsed.map(e => ({ path: e.path, message: e.message })), 
-        data: appointment 
-      }, "Invalid appointment data from Acuity");
+      logger.error(
+        {
+          errors: parsed.map((e) => ({ path: e.path, message: e.message })),
+          data: appointment,
+        },
+        "Invalid appointment data from Acuity"
+      );
       throw new AcuityAPIError("Invalid appointment data received from Acuity");
     }
-    
+
     // Invalidate availability cache for this calendar
     await invalidateAvailabilityCache(data.calendarID.toString());
-    
+
     return parsed;
   }
 
@@ -419,24 +423,23 @@ export class AcuityService {
       notes: string;
     }>
   ): Promise<AcuityAppointmentType> {
-    const appointment = await this.request<unknown>(
-      "PUT",
-      `/appointments/${appointmentId}`,
-      data
-    );
+    const appointment = await this.request<unknown>("PUT", `/appointments/${appointmentId}`, data);
     const parsed = AcuityAppointment(appointment);
-    
+
     if (parsed instanceof type.errors) {
-      logger.error({ 
-        errors: parsed.map(e => ({ path: e.path, message: e.message })), 
-        data: appointment 
-      }, "Invalid appointment data from Acuity");
+      logger.error(
+        {
+          errors: parsed.map((e) => ({ path: e.path, message: e.message })),
+          data: appointment,
+        },
+        "Invalid appointment data from Acuity"
+      );
       throw new AcuityAPIError("Invalid appointment data received from Acuity");
     }
-    
+
     // Invalidate availability cache for this calendar
     await invalidateAvailabilityCache(parsed.calendarID.toString());
-    
+
     return parsed;
   }
 
@@ -445,7 +448,7 @@ export class AcuityService {
     try {
       const appointment = await this.getAppointment(appointmentId);
       await this.request("DELETE", `/appointments/${appointmentId}`);
-      
+
       // Invalidate availability cache for this calendar
       await invalidateAvailabilityCache(appointment.calendarID.toString());
     } catch {
@@ -459,15 +462,18 @@ export class AcuityService {
   async getAppointment(appointmentId: number): Promise<AcuityAppointmentType> {
     const appointment = await this.request<unknown>("GET", `/appointments/${appointmentId}`);
     const parsed = AcuityAppointment(appointment);
-    
+
     if (parsed instanceof type.errors) {
-      logger.error({ 
-        errors: parsed.map(e => ({ path: e.path, message: e.message })), 
-        data: appointment 
-      }, "Invalid appointment data from Acuity");
+      logger.error(
+        {
+          errors: parsed.map((e) => ({ path: e.path, message: e.message })),
+          data: appointment,
+        },
+        "Invalid appointment data from Acuity"
+      );
       throw new AcuityAPIError("Invalid appointment data received from Acuity");
     }
-    
+
     return parsed;
   }
 
@@ -477,12 +483,9 @@ export class AcuityService {
       .createHmac("sha256", env.ACUITY_WEBHOOK_SECRET)
       .update(payload)
       .digest("base64");
-    
+
     // Use constant-time comparison to prevent timing attacks
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
   }
 }
 

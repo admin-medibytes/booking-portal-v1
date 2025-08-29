@@ -106,7 +106,7 @@ export function CreateOrganizationDialog({
           setCheckingSlug(false);
         }
       }, 500),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     []
   );
 
