@@ -57,8 +57,8 @@ interface Specialist {
   slug: string | null;
   image?: string | null;
   location: SpecialistLocation | null;
-  acceptsInPerson: boolean;
-  acceptsTelehealth: boolean;
+  acceptsInPerson?: boolean;
+  acceptsTelehealth?: boolean;
   position: number;
   isActive: boolean;
   user: {
@@ -133,8 +133,6 @@ export function SpecialistDetailDialog({
       specialistForm: {
         name: specialist.name,
         slug: specialist.slug,
-        acceptsInPerson: !!specialist.acceptsInPerson,
-        acceptsTelehealth: !!specialist.acceptsTelehealth,
         location: specialist.location || null,
         isActive: !!specialist.isActive,
       },
@@ -331,8 +329,6 @@ export function SpecialistDetailDialog({
         const updatedForm = {
           name: data.name,
           slug: data.slug || "",
-          acceptsInPerson: data.acceptsInPerson,
-          acceptsTelehealth: data.acceptsTelehealth,
           location: data.location || null,
           isActive: data.isActive,
         };
@@ -352,8 +348,6 @@ export function SpecialistDetailDialog({
         Object.assign(specialist, {
           name: data.name,
           slug: data.slug,
-          acceptsInPerson: data.acceptsInPerson,
-          acceptsTelehealth: data.acceptsTelehealth,
           location: data.location,
           isActive: data.isActive,
           updatedAt: new Date().toISOString(),
@@ -689,58 +683,10 @@ export function SpecialistDetailDialog({
                         )}
                     </div>
                   </div>
-                  {isEditingSpecialist ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="telehealth"
-                          checked={!!specialistForm.acceptsTelehealth}
-                          onCheckedChange={(checked) =>
-                            setSpecialistForm({
-                              ...specialistForm,
-                              acceptsTelehealth: checked,
-                            })
-                          }
-                        />
-                        <Label
-                          htmlFor="telehealth"
-                          className="flex items-center gap-2 cursor-pointer"
-                        >
-                          <Video className="w-4 h-4" />
-                          Telehealth appointments
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="in-person"
-                          checked={!!specialistForm.acceptsInPerson}
-                          onCheckedChange={(checked) =>
-                            setSpecialistForm({
-                              ...specialistForm,
-                              acceptsInPerson: checked,
-                            })
-                          }
-                        />
-                        <Label
-                          htmlFor="in-person"
-                          className="flex items-center gap-2 cursor-pointer"
-                        >
-                          <MapPinned className="w-4 h-4" />
-                          In-person appointments
-                        </Label>
-                      </div>
-
-                      {!specialistForm.acceptsInPerson && !specialistForm.acceptsTelehealth && (
-                        <Alert>
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            This specialist will be marked as "Availability on Request" - bookings
-                            will need to be coordinated directly
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                    </div>
-                  ) : null}
+                  <p className="text-sm text-muted-foreground">
+                    Appointment modes are determined by the enabled appointment types. 
+                    To change these settings, please manage the appointment types in the Configuration tab.
+                  </p>
                 </div>
 
                 {/* Location Section */}
@@ -754,7 +700,7 @@ export function SpecialistDetailDialog({
                       </Badge>
                     )}
                   </div>
-                  {isEditingSpecialist && specialistForm.acceptsInPerson ? (
+                  {isEditingSpecialist && specialist.acceptsInPerson ? (
                     <div className="space-y-3">
                       {!showLocationFields || !specialistForm.location ? (
                         <Button
@@ -902,7 +848,7 @@ export function SpecialistDetailDialog({
                     </div>
                   ) : (
                     <p className="text-sm">
-                      {specialistForm.acceptsInPerson
+                      {specialist.acceptsInPerson
                         ? specialistForm.location
                           ? formatLocation(specialistForm.location)
                           : "Location TBD"

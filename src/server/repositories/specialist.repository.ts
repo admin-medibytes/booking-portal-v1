@@ -1,5 +1,5 @@
 import { db } from "@/server/db";
-import { specialists, users, type SpecialistLocation } from "@/server/db/schema";
+import { specialists, users, specialistAppointmentTypes, type SpecialistLocation } from "@/server/db/schema";
 import { eq, sql, asc, and, or } from "drizzle-orm";
 import { type } from "arktype";
 
@@ -20,8 +20,6 @@ export const CreateSpecialistInput = type({
   name: "string",
   slug: "string",
   location: LocationInput.or("null | undefined"),
-  acceptsInPerson: "boolean | undefined",
-  acceptsTelehealth: "boolean | undefined",
   isActive: "boolean | undefined",
 });
 
@@ -30,8 +28,6 @@ export const UpdateSpecialistInput = type({
   slug: "string | undefined | null",
   image: "string | null | undefined",
   location: LocationInput.or("null | undefined"),
-  acceptsInPerson: "boolean | undefined",
-  acceptsTelehealth: "boolean | undefined",
   isActive: "boolean | undefined",
 });
 
@@ -61,10 +57,6 @@ export class SpecialistRepository {
       throw new Error(`Invalid specialist data: ${validated[0]?.message}`);
     }
 
-    // Validate at least one appointment type is selected
-    const acceptsInPerson = validated.acceptsInPerson ?? false;
-    const acceptsTelehealth = validated.acceptsTelehealth ?? true;
-
     // Get the next position
     const maxPosition = await this.getMaxPosition();
     const position = maxPosition + 1;
@@ -77,8 +69,6 @@ export class SpecialistRepository {
         name: validated.name,
         slug: validated.slug,
         location: (validated.location as SpecialistLocation | null) ?? null,
-        acceptsInPerson,
-        acceptsTelehealth,
         position,
         isActive: validated.isActive ?? true,
       })
@@ -94,42 +84,20 @@ export class SpecialistRepository {
       throw new Error(`Invalid update data: ${validated[0]?.message}`);
     }
 
-    // If appointment types are being updated, validate at least one is selected
-    if (validated.acceptsInPerson !== undefined || validated.acceptsTelehealth !== undefined) {
-      const [existing] = await db
-        .select({
-          acceptsInPerson: specialists.acceptsInPerson,
-          acceptsTelehealth: specialists.acceptsTelehealth,
-        })
-        .from(specialists)
-        .where(eq(specialists.id, id));
-
-      if (!existing) {
-        throw new Error("Specialist not found");
-      }
-
-      const newAcceptsInPerson = validated.acceptsInPerson ?? existing.acceptsInPerson;
-      const newAcceptsTelehealth = validated.acceptsTelehealth ?? existing.acceptsTelehealth;
-    }
-
     // Build update object dynamically
     const updateData: Partial<{
       name: string;
       slug: string | null;
+      image: string | null;
       location: SpecialistLocation | null;
-      acceptsInPerson: boolean;
-      acceptsTelehealth: boolean;
       isActive: boolean;
       updatedAt: Date;
     }> = {};
     if (validated.name !== undefined) updateData.name = validated.name;
     if (validated.slug !== undefined) updateData.slug = validated.slug;
+    if (validated.image !== undefined) updateData.image = validated.image;
     if (validated.location !== undefined)
       updateData.location = validated.location as SpecialistLocation | null;
-    if (validated.acceptsInPerson !== undefined)
-      updateData.acceptsInPerson = validated.acceptsInPerson;
-    if (validated.acceptsTelehealth !== undefined)
-      updateData.acceptsTelehealth = validated.acceptsTelehealth;
     if (validated.isActive !== undefined) updateData.isActive = validated.isActive;
 
     // Always update the updatedAt timestamp
@@ -198,13 +166,35 @@ export class SpecialistRepository {
           lastName: users.lastName,
           jobTitle: users.jobTitle,
         },
+        // Computed fields based on appointment types
+        hasInPersonAppointments: sql<boolean>`EXISTS (
+          SELECT 1 FROM ${specialistAppointmentTypes} 
+          WHERE ${specialistAppointmentTypes.specialistId} = ${specialists.id}
+          AND ${specialistAppointmentTypes.enabled} = true
+          AND ${specialistAppointmentTypes.appointmentMode} = 'in-person'
+        )`,
+        hasTelehealthAppointments: sql<boolean>`EXISTS (
+          SELECT 1 FROM ${specialistAppointmentTypes}
+          WHERE ${specialistAppointmentTypes.specialistId} = ${specialists.id}
+          AND ${specialistAppointmentTypes.enabled} = true
+          AND ${specialistAppointmentTypes.appointmentMode} = 'telehealth'
+        )`,
       })
       .from(specialists)
       .innerJoin(users, eq(specialists.userId, users.id))
       .where(eq(specialists.id, id))
       .limit(1);
 
-    return result[0] || null;
+    if (!result[0]) return null;
+
+    // Add computed fields to specialist
+    const specialist = {
+      ...result[0].specialist,
+      acceptsInPerson: result[0].hasInPersonAppointments,
+      acceptsTelehealth: result[0].hasTelehealthAppointments,
+    };
+
+    return { specialist, user: result[0].user };
   }
 
   // Get all active specialists
@@ -219,13 +209,33 @@ export class SpecialistRepository {
           lastName: users.lastName,
           jobTitle: users.jobTitle,
         },
+        // Computed fields based on appointment types
+        hasInPersonAppointments: sql<boolean>`EXISTS (
+          SELECT 1 FROM ${specialistAppointmentTypes} 
+          WHERE ${specialistAppointmentTypes.specialistId} = ${specialists.id}
+          AND ${specialistAppointmentTypes.enabled} = true
+          AND ${specialistAppointmentTypes.appointmentMode} = 'in-person'
+        )`,
+        hasTelehealthAppointments: sql<boolean>`EXISTS (
+          SELECT 1 FROM ${specialistAppointmentTypes}
+          WHERE ${specialistAppointmentTypes.specialistId} = ${specialists.id}
+          AND ${specialistAppointmentTypes.enabled} = true
+          AND ${specialistAppointmentTypes.appointmentMode} = 'telehealth'
+        )`,
       })
       .from(specialists)
       .innerJoin(users, eq(specialists.userId, users.id))
       .where(eq(specialists.isActive, true))
       .orderBy(asc(specialists.position));
 
-    return results;
+    return results.map(r => ({
+      specialist: {
+        ...r.specialist,
+        acceptsInPerson: r.hasInPersonAppointments,
+        acceptsTelehealth: r.hasTelehealthAppointments,
+      },
+      user: r.user,
+    }));
   }
 
   // Get all specialists (active and inactive)
@@ -240,12 +250,32 @@ export class SpecialistRepository {
           lastName: users.lastName,
           jobTitle: users.jobTitle,
         },
+        // Computed fields based on appointment types
+        hasInPersonAppointments: sql<boolean>`EXISTS (
+          SELECT 1 FROM ${specialistAppointmentTypes} 
+          WHERE ${specialistAppointmentTypes.specialistId} = ${specialists.id}
+          AND ${specialistAppointmentTypes.enabled} = true
+          AND ${specialistAppointmentTypes.appointmentMode} = 'in-person'
+        )`,
+        hasTelehealthAppointments: sql<boolean>`EXISTS (
+          SELECT 1 FROM ${specialistAppointmentTypes}
+          WHERE ${specialistAppointmentTypes.specialistId} = ${specialists.id}
+          AND ${specialistAppointmentTypes.enabled} = true
+          AND ${specialistAppointmentTypes.appointmentMode} = 'telehealth'
+        )`,
       })
       .from(specialists)
       .innerJoin(users, eq(specialists.userId, users.id))
       .orderBy(asc(specialists.position));
 
-    return results;
+    return results.map(r => ({
+      specialist: {
+        ...r.specialist,
+        acceptsInPerson: r.hasInPersonAppointments,
+        acceptsTelehealth: r.hasTelehealthAppointments,
+      },
+      user: r.user,
+    }));
   }
 
   // Check if a user is already a specialist
@@ -376,19 +406,7 @@ export class SpecialistRepository {
 
   // Filter specialists by appointment type
   async findByAppointmentType(type: "in_person" | "telehealth" | "both") {
-    let whereClause;
-    if (type === "in_person") {
-      whereClause = and(eq(specialists.acceptsInPerson, true), eq(specialists.isActive, true));
-    } else if (type === "telehealth") {
-      whereClause = and(eq(specialists.acceptsTelehealth, true), eq(specialists.isActive, true));
-    } else {
-      whereClause = and(
-        eq(specialists.acceptsInPerson, true),
-        eq(specialists.acceptsTelehealth, true),
-        eq(specialists.isActive, true)
-      );
-    }
-
+    // This method now needs to use EXISTS queries with appointment types
     const results = await db
       .select({
         specialist: specialists,
@@ -399,13 +417,41 @@ export class SpecialistRepository {
           lastName: users.lastName,
           jobTitle: users.jobTitle,
         },
+        hasInPersonAppointments: sql<boolean>`EXISTS (
+          SELECT 1 FROM ${specialistAppointmentTypes} 
+          WHERE ${specialistAppointmentTypes.specialistId} = ${specialists.id}
+          AND ${specialistAppointmentTypes.enabled} = true
+          AND ${specialistAppointmentTypes.appointmentMode} = 'in-person'
+        )`,
+        hasTelehealthAppointments: sql<boolean>`EXISTS (
+          SELECT 1 FROM ${specialistAppointmentTypes}
+          WHERE ${specialistAppointmentTypes.specialistId} = ${specialists.id}
+          AND ${specialistAppointmentTypes.enabled} = true
+          AND ${specialistAppointmentTypes.appointmentMode} = 'telehealth'
+        )`,
       })
       .from(specialists)
       .innerJoin(users, eq(specialists.userId, users.id))
-      .where(whereClause)
+      .where(eq(specialists.isActive, true))
       .orderBy(asc(specialists.position));
 
-    return results;
+    // Filter results based on appointment type
+    return results.filter(r => {
+      if (type === "in_person") {
+        return r.hasInPersonAppointments;
+      } else if (type === "telehealth") {
+        return r.hasTelehealthAppointments;
+      } else {
+        return r.hasInPersonAppointments && r.hasTelehealthAppointments;
+      }
+    }).map(r => ({
+      specialist: {
+        ...r.specialist,
+        acceptsInPerson: r.hasInPersonAppointments,
+        acceptsTelehealth: r.hasTelehealthAppointments,
+      },
+      user: r.user,
+    }));
   }
 
   // Search specialists by location

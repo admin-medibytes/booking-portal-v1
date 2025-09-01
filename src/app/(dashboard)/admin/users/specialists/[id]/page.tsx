@@ -159,8 +159,6 @@ export default function SpecialistDetailPage() {
       specialistForm: {
         name: specialist.name,
         slug: specialist.slug,
-        acceptsInPerson: !!specialist.acceptsInPerson,
-        acceptsTelehealth: !!specialist.acceptsTelehealth,
         location: specialist.location || null,
         isActive: !!specialist.isActive,
       },
@@ -176,8 +174,6 @@ export default function SpecialistDetailPage() {
     initialValues?.specialistForm || {
       name: "",
       slug: null,
-      acceptsInPerson: false,
-      acceptsTelehealth: false,
       location: null,
       isActive: false,
     }
@@ -324,8 +320,6 @@ export default function SpecialistDetailPage() {
       slug?: string | null;
       image?: string | null;
       location?: SpecialistLocation | null;
-      acceptsInPerson?: boolean;
-      acceptsTelehealth?: boolean;
       isActive?: boolean;
     }) => {
       const payload = {
@@ -342,8 +336,6 @@ export default function SpecialistDetailPage() {
               country: values.location.country,
             }
           : null,
-        acceptsInPerson: values.acceptsInPerson,
-        acceptsTelehealth: values.acceptsTelehealth,
         isActive: values.isActive,
       };
 
@@ -368,8 +360,6 @@ export default function SpecialistDetailPage() {
         const updatedForm = {
           name: data.name,
           slug: data.slug || "",
-          acceptsInPerson: data.acceptsInPerson,
-          acceptsTelehealth: data.acceptsTelehealth,
           location: data.location || null,
           isActive: data.isActive,
         };
@@ -389,8 +379,6 @@ export default function SpecialistDetailPage() {
           Object.assign(specialist, {
             name: data.name,
             slug: data.slug,
-            acceptsInPerson: data.acceptsInPerson,
-            acceptsTelehealth: data.acceptsTelehealth,
             location: data.location,
             isActive: data.isActive,
             updatedAt: new Date().toISOString(),
@@ -624,18 +612,17 @@ export default function SpecialistDetailPage() {
       {/* Main Content */}
       <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="gap-2">
-          <TabsTrigger value="profile">Specialist Profile</TabsTrigger>
-          <TabsTrigger value="appointments">Appointments & Scheduling</TabsTrigger>
-          <TabsTrigger value="account">Account & Access</TabsTrigger>
+          <TabsTrigger value="profile">Profile & Identity</TabsTrigger>
+          <TabsTrigger value="configuration">Configuration & Settings</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Specialist Profile */}
+        {/* Tab 1: Profile & Identity */}
         <TabsContent value="profile" className="space-y-6">
-          {/* Profile Card */}
+          {/* Profile Information Card */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Profile</CardTitle>
+                <CardTitle>Profile Information</CardTitle>
                 <CardDescription>Basic information and display settings</CardDescription>
               </div>
               {!isEditingSpecialist ? (
@@ -789,337 +776,17 @@ export default function SpecialistDetailPage() {
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Practice Details Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Practice Details</CardTitle>
-              <CardDescription>Appointment types and location settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Appointment Settings */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base font-medium">Appointment Types</Label>
-                  <div className="flex gap-2">
-                    {!isEditingSpecialist && specialist.acceptsInPerson && (
-                      <Badge variant="outline" className="text-xs">
-                        <MapPinned className="w-3 h-3 mr-1" />
-                        In-person
-                      </Badge>
-                    )}
-                    {!isEditingSpecialist && specialist.acceptsTelehealth && (
-                      <Badge variant="outline" className="text-xs">
-                        <Video className="w-3 h-3 mr-1" />
-                        Telehealth
-                      </Badge>
-                    )}
-                    {!isEditingSpecialist &&
-                      !specialist.acceptsInPerson &&
-                      !specialist.acceptsTelehealth && (
-                        <Badge variant="secondary" className="text-xs">
-                          <AlertCircle className="w-3 h-3 mr-1" />
-                          On Request
-                        </Badge>
-                      )}
-                  </div>
-                </div>
-                {isEditingSpecialist ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="telehealth"
-                        checked={!!specialistForm.acceptsTelehealth}
-                        onCheckedChange={(checked) =>
-                          setSpecialistForm({
-                            ...specialistForm,
-                            acceptsTelehealth: checked,
-                          })
-                        }
-                      />
-                      <Label
-                        htmlFor="telehealth"
-                        className="flex items-center gap-2 cursor-pointer"
-                      >
-                        <Video className="w-4 h-4" />
-                        Telehealth appointments
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="in-person"
-                        checked={!!specialistForm.acceptsInPerson}
-                        onCheckedChange={(checked) =>
-                          setSpecialistForm({
-                            ...specialistForm,
-                            acceptsInPerson: checked,
-                          })
-                        }
-                      />
-                      <Label htmlFor="in-person" className="flex items-center gap-2 cursor-pointer">
-                        <MapPinned className="w-4 h-4" />
-                        In-person appointments
-                      </Label>
-                    </div>
-
-                    {!specialistForm.acceptsInPerson && !specialistForm.acceptsTelehealth && (
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          This specialist will be marked as "Availability on Request" - bookings
-                          will need to be coordinated directly
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                ) : null}
-              </div>
 
               <Separator />
 
-              {/* Location */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <Label className="text-base font-medium">Practice Location</Label>
-                  </div>
-                  {!isEditingSpecialist && specialist.location && (
-                    <Badge variant="outline" className="text-xs">
-                      {formatLocationShort(specialist.location)}
-                    </Badge>
-                  )}
-                </div>
-                {isEditingSpecialist && specialistForm.acceptsInPerson ? (
-                  <div className="space-y-3">
-                    {!showLocationFields || !specialistForm.location ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setShowLocationFields(true);
-                          setSelectedCountryCode("AU");
-                          setSpecialistForm({
-                            ...specialistForm,
-                            location: {
-                              streetAddress: "",
-                              suburb: "",
-                              city: "",
-                              state: "",
-                              postalCode: "",
-                              country: "Australia",
-                            },
-                          });
-                        }}
-                      >
-                        <MapPin className="w-4 h-4 mr-2" />
-                        Add Location
-                      </Button>
-                    ) : (
-                      <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
-                        <div className="grid grid-cols-2 gap-3">
-                          <Select value={selectedCountryCode} onValueChange={handleCountryChange}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Country *" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {allCountries.map((country) => (
-                                <SelectItem key={country.isoCode} value={country.isoCode}>
-                                  {country.flag} {country.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Select
-                            value={specialistForm.location?.state || ""}
-                            onValueChange={handleStateChange}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="State/Province *" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableStates.map((state) => (
-                                <SelectItem key={state.isoCode} value={state.isoCode}>
-                                  {state.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <Select
-                            value={specialistForm.location?.city || ""}
-                            onValueChange={(value) =>
-                              setSpecialistForm({
-                                ...specialistForm,
-                                location: {
-                                  ...specialistForm.location!,
-                                  city: value,
-                                },
-                              })
-                            }
-                            disabled={!specialistForm.location?.state}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue
-                                placeholder={
-                                  !specialistForm.location?.state ? "Select state first" : "City *"
-                                }
-                              />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableCities.map((city) => (
-                                <SelectItem key={city.name} value={city.name}>
-                                  {city.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            placeholder="Postal Code"
-                            value={specialistForm.location?.postalCode || ""}
-                            onChange={(e) =>
-                              setSpecialistForm({
-                                ...specialistForm,
-                                location: {
-                                  ...specialistForm.location!,
-                                  postalCode: e.target.value,
-                                },
-                              })
-                            }
-                          />
-                        </div>
-                        <Input
-                          placeholder="Suburb (optional)"
-                          value={specialistForm.location?.suburb || ""}
-                          onChange={(e) =>
-                            setSpecialistForm({
-                              ...specialistForm,
-                              location: {
-                                ...specialistForm.location!,
-                                suburb: e.target.value,
-                              },
-                            })
-                          }
-                        />
-                        <Input
-                          placeholder="Street Address (optional)"
-                          value={specialistForm.location?.streetAddress || ""}
-                          onChange={(e) =>
-                            setSpecialistForm({
-                              ...specialistForm,
-                              location: {
-                                ...specialistForm.location!,
-                                streetAddress: e.target.value,
-                              },
-                            })
-                          }
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => {
-                            setShowLocationFields(false);
-                            setSpecialistForm({
-                              ...specialistForm,
-                              location: null,
-                            });
-                          }}
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Remove Location
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm">
-                    {specialistForm.acceptsInPerson
-                      ? specialistForm.location
-                        ? formatLocation(specialistForm.location)
-                        : "Location TBD"
-                      : "Online only"}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* System Settings Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>System Settings</CardTitle>
-              <CardDescription>Display order and metadata</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Hash className="w-4 h-4" />
-                    <p className="text-xs">Display Position</p>
-                  </div>
-                  <p className="text-sm font-medium">Position #{specialist.position}</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="w-4 h-4" />
-                    <p className="text-xs">Last Updated</p>
-                  </div>
-                  <p className="text-sm font-medium">
-                    {formatDistanceToNow(new Date(specialist.updatedAt), { addSuffix: true })}
-                  </p>
-                </div>
-              </div>
-              <Separator className="my-4" />
+              {/* Timestamps */}
               <div className="text-xs text-muted-foreground">
-                Created {format(new Date(specialist.createdAt), "PP 'at' p")}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab 2: Appointments & Scheduling */}
-        <TabsContent value="appointments" className="space-y-6">
-          {/* Scheduling Configuration Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Scheduling Configuration</CardTitle>
-              <CardDescription>Calendar integration and sync settings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    <p className="text-xs">Acuity Calendar ID</p>
-                  </div>
-                  <p className="font-mono text-sm bg-muted px-2 py-1 rounded inline-block">
-                    {specialist.acuityCalendarId}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="w-4 h-4" />
-                    <p className="text-xs">Sync Status</p>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    Connected
-                  </Badge>
-                </div>
+                Created {format(new Date(specialist.createdAt), "PP 'at' p")} • Last updated{" "}
+                {formatDistanceToNow(new Date(specialist.updatedAt), { addSuffix: true })}
               </div>
             </CardContent>
           </Card>
 
-          {/* Appointment Types Management */}
-          <AppointmentTypesManagement specialistId={specialist.id} />
-        </TabsContent>
-
-        {/* Tab 3: Account & Access */}
-        <TabsContent value="account" className="space-y-6">
           {/* User Account Card */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -1277,6 +944,284 @@ export default function SpecialistDetailPage() {
                   <p className="text-sm text-muted-foreground">No organization memberships found</p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 2: Configuration & Settings */}
+        <TabsContent value="configuration" className="space-y-6">
+          {/* Scheduling Configuration Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Scheduling Configuration</CardTitle>
+              <CardDescription>Calendar integration and sync settings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="w-4 h-4" />
+                    <p className="text-xs">Acuity Calendar ID</p>
+                  </div>
+                  <p className="font-mono text-sm bg-muted px-2 py-1 rounded inline-block">
+                    {specialist.acuityCalendarId}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Clock className="w-4 h-4" />
+                    <p className="text-xs">Sync Status</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    Connected
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Appointment Types Management */}
+          <AppointmentTypesManagement specialistId={specialist.id} />
+
+          {/* Practice Details Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Practice Details</CardTitle>
+              <CardDescription>Appointment types and location settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Appointment Settings - Derived from appointment types */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-medium">Available Appointment Modes</Label>
+                  <div className="flex gap-2">
+                    {specialist.acceptsInPerson && (
+                      <Badge variant="outline" className="text-xs">
+                        <MapPinned className="w-3 h-3 mr-1" />
+                        In-person
+                      </Badge>
+                    )}
+                    {specialist.acceptsTelehealth && (
+                      <Badge variant="outline" className="text-xs">
+                        <Video className="w-3 h-3 mr-1" />
+                        Telehealth
+                      </Badge>
+                    )}
+                    {!specialist.acceptsInPerson && !specialist.acceptsTelehealth && (
+                      <Badge variant="secondary" className="text-xs">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        No Active Types
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  These modes are automatically determined by the enabled appointment types above.
+                  To change availability, enable or disable specific appointment types.
+                </p>
+              </div>
+
+              <Separator />
+
+              {/* Location */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-muted-foreground" />
+                    <Label className="text-base font-medium">Practice Location</Label>
+                  </div>
+                  {!isEditingSpecialist && specialist.location && (
+                    <Badge variant="outline" className="text-xs">
+                      {formatLocationShort(specialist.location)}
+                    </Badge>
+                  )}
+                </div>
+                {isEditingSpecialist && specialist.acceptsInPerson ? (
+                  <div className="space-y-3">
+                    {!showLocationFields || !specialistForm.location ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowLocationFields(true);
+                          setSelectedCountryCode("AU");
+                          setSpecialistForm({
+                            ...specialistForm,
+                            location: {
+                              streetAddress: "",
+                              suburb: "",
+                              city: "",
+                              state: "",
+                              postalCode: "",
+                              country: "Australia",
+                            },
+                          });
+                        }}
+                      >
+                        <MapPin className="w-4 h-4 mr-2" />
+                        Add Location
+                      </Button>
+                    ) : (
+                      <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                        <div className="grid grid-cols-2 gap-3">
+                          <Select value={selectedCountryCode} onValueChange={handleCountryChange}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Country *" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allCountries.map((country) => (
+                                <SelectItem key={country.isoCode} value={country.isoCode}>
+                                  {country.flag} {country.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={specialistForm.location?.state || ""}
+                            onValueChange={handleStateChange}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="State/Province *" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableStates.map((state) => (
+                                <SelectItem key={state.isoCode} value={state.isoCode}>
+                                  {state.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Select
+                            value={specialistForm.location?.city || ""}
+                            onValueChange={(value) =>
+                              setSpecialistForm({
+                                ...specialistForm,
+                                location: {
+                                  ...specialistForm.location!,
+                                  city: value,
+                                },
+                              })
+                            }
+                            disabled={!specialistForm.location?.state}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue
+                                placeholder={
+                                  !specialistForm.location?.state ? "Select state first" : "City *"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableCities.map((city) => (
+                                <SelectItem key={city.name} value={city.name}>
+                                  {city.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            placeholder="Postal Code"
+                            value={specialistForm.location?.postalCode || ""}
+                            onChange={(e) =>
+                              setSpecialistForm({
+                                ...specialistForm,
+                                location: {
+                                  ...specialistForm.location!,
+                                  postalCode: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                        <Input
+                          placeholder="Suburb (optional)"
+                          value={specialistForm.location?.suburb || ""}
+                          onChange={(e) =>
+                            setSpecialistForm({
+                              ...specialistForm,
+                              location: {
+                                ...specialistForm.location!,
+                                suburb: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                        <Input
+                          placeholder="Street Address (optional)"
+                          value={specialistForm.location?.streetAddress || ""}
+                          onChange={(e) =>
+                            setSpecialistForm({
+                              ...specialistForm,
+                              location: {
+                                ...specialistForm.location!,
+                                streetAddress: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            setShowLocationFields(false);
+                            setSpecialistForm({
+                              ...specialistForm,
+                              location: null,
+                            });
+                          }}
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Remove Location
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm">
+                    {specialist.acceptsInPerson
+                      ? specialistForm.location
+                        ? formatLocation(specialistForm.location)
+                        : "Location TBD"
+                      : "Online only"}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* System Settings Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>System Settings</CardTitle>
+              <CardDescription>Display order and metadata</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Hash className="w-4 h-4" />
+                    <p className="text-xs">Display Position</p>
+                  </div>
+                  <p className="text-sm font-medium">Position #{specialist.position}</p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Clock className="w-4 h-4" />
+                    <p className="text-xs">Last Updated</p>
+                  </div>
+                  <p className="text-sm font-medium">
+                    {formatDistanceToNow(new Date(specialist.updatedAt), { addSuffix: true })}
+                  </p>
+                </div>
+              </div>
+              <Separator className="my-4" />
+              <div className="text-xs text-muted-foreground">
+                Created {format(new Date(specialist.createdAt), "PP 'at' p")}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

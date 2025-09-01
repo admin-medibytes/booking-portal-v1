@@ -97,6 +97,7 @@ export class AppointmentTypeRepository {
         category: appointmentTypes.category,
         active: appointmentTypes.active,
         enabled: specialistAppointmentTypes.enabled,
+        appointmentMode: specialistAppointmentTypes.appointmentMode,
         customDisplayName: specialistAppointmentTypes.customDisplayName,
         customDescription: specialistAppointmentTypes.customDescription,
         customPrice: specialistAppointmentTypes.customPrice,
@@ -135,6 +136,7 @@ export class AppointmentTypeRepository {
         category: appointmentTypes.category,
         active: appointmentTypes.active,
         enabled: sql<boolean>`COALESCE(${specialistAppointmentTypes.enabled}, false)`.as("enabled"),
+        appointmentMode: specialistAppointmentTypes.appointmentMode,
         customDisplayName: specialistAppointmentTypes.customDisplayName,
         customDescription: specialistAppointmentTypes.customDescription,
         customPrice: specialistAppointmentTypes.customPrice,
@@ -176,6 +178,7 @@ export class AppointmentTypeRepository {
     appointmentTypeId: string,
     data: {
       enabled?: boolean;
+      appointmentMode?: "in-person" | "telehealth";
       customDisplayName?: string | null;
       customDescription?: string | null;
       customPrice?: number | null;
@@ -214,6 +217,7 @@ export class AppointmentTypeRepository {
         .values({
           specialistId,
           appointmentTypeId,
+          appointmentMode: data.appointmentMode || "in-person",
           ...data,
         })
         .returning();
@@ -226,6 +230,7 @@ export class AppointmentTypeRepository {
     updates: Array<{
       appointmentTypeId: string;
       enabled?: boolean;
+      appointmentMode: "in-person" | "telehealth";
       customDisplayName?: string | null;
       customDescription?: string | null;
       customPrice?: number | null;
@@ -271,6 +276,7 @@ export class AppointmentTypeRepository {
               specialistId,
               appointmentTypeId,
               enabled: data.enabled ?? true,
+              appointmentMode: data.appointmentMode || "in-person",
               customDisplayName: data.customDisplayName,
               customDescription: data.customDescription,
               customPrice: data.customPrice,
@@ -301,6 +307,7 @@ export class AppointmentTypeRepository {
       typesInCategories.map((t) => ({
         appointmentTypeId: t.id,
         enabled: true,
+        appointmentMode: "in-person" as const,
       }))
     );
 

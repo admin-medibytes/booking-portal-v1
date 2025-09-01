@@ -25,8 +25,8 @@ function getSpecialistFields(
     slug: string | null;
     image?: string | null;
     location: SpecialistLocation | null;
-    acceptsInPerson: boolean;
-    acceptsTelehealth: boolean;
+    acceptsInPerson?: boolean;
+    acceptsTelehealth?: boolean;
     position: number;
     isActive: boolean;
     createdAt: Date;
@@ -46,8 +46,8 @@ function getSpecialistFields(
     slug: specialist.slug,
     image: specialist.image,
     location: specialist.location,
-    acceptsInPerson: specialist.acceptsInPerson,
-    acceptsTelehealth: specialist.acceptsTelehealth,
+    acceptsInPerson: specialist.acceptsInPerson ?? false,
+    acceptsTelehealth: specialist.acceptsTelehealth ?? true,
     position: specialist.position,
     isActive: specialist.isActive,
     user: {
@@ -292,8 +292,6 @@ const specialistsRoutes = new Hono()
           name: acuityCalendar.name,
           slug,
           location: null,
-          acceptsInPerson: false,
-          acceptsTelehealth: true,
           isActive: true,
         });
 
@@ -434,8 +432,6 @@ const specialistsRoutes = new Hono()
           slug: updateData.slug ?? null,
           image: updateData.image,
           isActive: updateData.isActive,
-          acceptsInPerson: updateData.acceptsInPerson,
-          acceptsTelehealth: updateData.acceptsTelehealth,
           location: updateData.location ?? null,
         });
 
@@ -662,6 +658,7 @@ const specialistsRoutes = new Hono()
           duration: type.durationMinutes,
           category: type.category,
           enabled: type.enabled ?? false,
+          appointmentMode: type.appointmentMode,
           customDisplayName: type.customDisplayName,
           customDescription: type.customDescription,
           customPrice: type.customPrice,
@@ -775,6 +772,7 @@ const specialistsRoutes = new Hono()
         items: type({
           appointmentTypeId: "string",
           "enabled?": "boolean",
+          appointmentMode: type("'in-person' | 'telehealth'"),
           "customDisplayName?": "string | null",
           "customDescription?": "string | null",
           "customPrice?": "number | null",

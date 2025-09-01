@@ -35,8 +35,6 @@ export const specialists = pgTable(
     slug: text("slug").unique(),
     image: text("image"),
     location: jsonb("location").$type<SpecialistLocation>(),
-    acceptsInPerson: boolean("accepts_in_person").default(false).notNull(),
-    acceptsTelehealth: boolean("accepts_telehealth").default(true).notNull(),
     position: integer("position").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -84,7 +82,9 @@ export const appointmentTypes = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => ({
-    acuityAppointmentTypeIdIdx: index("appointment_types_acuity_id_idx").on(table.acuityAppointmentTypeId),
+    acuityAppointmentTypeIdIdx: index("appointment_types_acuity_id_idx").on(
+      table.acuityAppointmentTypeId
+    ),
     activeIdx: index("appointment_types_active_idx").on(table.active),
     categoryIdx: index("appointment_types_category_idx").on(table.category),
   })
@@ -104,6 +104,8 @@ export const specialistAppointmentTypes = pgTable(
       .notNull()
       .references(() => appointmentTypes.id, { onDelete: "cascade" }),
     enabled: boolean("enabled").default(true).notNull(),
+    appointmentMode: text("appointment_mode", { enum: ["in-person", "telehealth"] })
+      .notNull(),
     customDisplayName: text("custom_display_name"),
     customDescription: text("custom_description"),
     customPrice: integer("custom_price"),
@@ -114,18 +116,26 @@ export const specialistAppointmentTypes = pgTable(
   (table) => ({
     pk: unique("specialist_appointment_types_pk").on(table.specialistId, table.appointmentTypeId),
     specialistIdIdx: index("specialist_appointment_types_specialist_id_idx").on(table.specialistId),
-    appointmentTypeIdIdx: index("specialist_appointment_types_appointment_type_id_idx").on(table.appointmentTypeId),
+    appointmentTypeIdIdx: index("specialist_appointment_types_appointment_type_id_idx").on(
+      table.appointmentTypeId
+    ),
     enabledIdx: index("specialist_appointment_types_enabled_idx").on(table.enabled),
+    appointmentModeIdx: index("specialist_appointment_types_appointment_mode_idx").on(
+      table.appointmentMode
+    ),
   })
 );
 
-export const specialistAppointmentTypesRelations = relations(specialistAppointmentTypes, ({ one }) => ({
-  specialist: one(specialists, {
-    fields: [specialistAppointmentTypes.specialistId],
-    references: [specialists.id],
-  }),
-  appointmentType: one(appointmentTypes, {
-    fields: [specialistAppointmentTypes.appointmentTypeId],
-    references: [appointmentTypes.id],
-  }),
-}));
+export const specialistAppointmentTypesRelations = relations(
+  specialistAppointmentTypes,
+  ({ one }) => ({
+    specialist: one(specialists, {
+      fields: [specialistAppointmentTypes.specialistId],
+      references: [specialists.id],
+    }),
+    appointmentType: one(appointmentTypes, {
+      fields: [specialistAppointmentTypes.appointmentTypeId],
+      references: [appointmentTypes.id],
+    }),
+  })
+);

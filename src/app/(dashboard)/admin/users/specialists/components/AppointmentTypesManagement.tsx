@@ -3,13 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { specialistsClient } from "@/lib/hono-client";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,16 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import {
-  RefreshCcw,
-  Edit2,
-  Save,
-  Clock,
-  AlertCircle,
-  Info,
-  Filter,
-  Loader2,
-} from "lucide-react";
+import { RefreshCcw, Edit2, Save, Clock, AlertCircle, Info, Filter, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface AppointmentType {
@@ -67,6 +52,7 @@ interface AppointmentType {
     description: "override" | "acuity";
   };
   enabled: boolean;
+  appointmentMode?: "in-person" | "telehealth";
   customDisplayName: string | null;
   customDescription: string | null;
   customPrice: number | null;
@@ -77,9 +63,7 @@ interface AppointmentTypesManagementProps {
   specialistId: string;
 }
 
-export function AppointmentTypesManagement({
-  specialistId,
-}: AppointmentTypesManagementProps) {
+export function AppointmentTypesManagement({ specialistId }: AppointmentTypesManagementProps) {
   const queryClient = useQueryClient();
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [editingItems, setEditingItems] = useState<Record<string, any>>({});
@@ -89,7 +73,11 @@ export function AppointmentTypesManagement({
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   // Fetch appointment types (for admin, we need all types, not just enabled)
-  const { data: appointmentData, isLoading, refetch } = useQuery({
+  const {
+    data: appointmentData,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["admin-appointment-types", specialistId],
     queryFn: async () => {
       // Get all appointment types with specialist mappings for admin
@@ -124,12 +112,17 @@ export function AppointmentTypesManagement({
 
   // Bulk update mutation
   const updateMutation = useMutation({
-    mutationFn: async (items: Array<{
-      appointmentTypeId: string;
-      enabled?: boolean;
-      customDisplayName?: string | null;
-      customDescription?: string | null;
-    }>) => {
+    mutationFn: async (
+      items: Array<{
+        appointmentTypeId: string;
+        enabled?: boolean;
+        appointmentMode: "in-person" | "telehealth";
+        customDisplayName?: string | null;
+        customDescription?: string | null;
+        customPrice?: number | null;
+        notes?: string | null;
+      }>
+    ) => {
       const response = await specialistsClient[":id"]["appointment-types"].$put({
         param: { id: specialistId },
         json: { items },
@@ -141,17 +134,20 @@ export function AppointmentTypesManagement({
       // Optimistic update
       await queryClient.cancelQueries({ queryKey: ["admin-appointment-types", specialistId] });
       const previousData = queryClient.getQueryData(["admin-appointment-types", specialistId]);
-      
+
       queryClient.setQueryData(["admin-appointment-types", specialistId], (old: any) => {
         if (!old?.data) return old;
         const updatedData = old.data.map((type: AppointmentType) => {
-          const update = items.find(item => item.appointmentTypeId === type.id);
+          const update = items.find((item) => item.appointmentTypeId === type.id);
           if (update) {
             return {
               ...type,
               ...update,
               name: update.customDisplayName || type.name,
-              description: update.customDescription !== undefined ? update.customDescription : type.description,
+              description:
+                update.customDescription !== undefined
+                  ? update.customDescription
+                  : type.description,
               source: {
                 name: update.customDisplayName ? "override" : "acuity",
                 description: update.customDescription !== undefined ? "override" : "acuity",
@@ -162,7 +158,7 @@ export function AppointmentTypesManagement({
         });
         return { ...old, data: updatedData };
       });
-      
+
       return { previousData };
     },
     onError: (_err, _variables, context) => {
@@ -171,6 +167,11 @@ export function AppointmentTypesManagement({
         queryClient.setQueryData(["admin-appointment-types", specialistId], context.previousData);
       }
       toast.error("Failed to update appointment types");
+      toast(
+        <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
+          <code className="text-white">{JSON.stringify(_variables, null, 2)}</code>
+        </pre>
+      );
     },
     onSuccess: (data) => {
       toast.success(`Updated ${data.updated} appointment types`);
@@ -190,6 +191,7 @@ export function AppointmentTypesManagement({
     duration: number;
     category: string | null;
     enabled: boolean;
+    appointmentMode?: "in-person" | "telehealth";
     customDisplayName: string | null;
     customDescription: string | null;
     customPrice: number | null;
@@ -200,8 +202,9 @@ export function AppointmentTypesManagement({
     };
   }
 
-  const appointmentTypes: AppointmentType[] = (appointmentData?.data || []).map((type: ApiAppointmentType) => ({
+  const appointmentTypes: AppointmentType[] = (appointmentData?.data || []).map((type: any) => ({
     ...type,
+    appointmentMode: type.appointmentMode || undefined,
     source: {
       name: type.source?.name as "override" | "acuity",
       description: type.source?.description as "override" | "acuity",
@@ -214,14 +217,23 @@ export function AppointmentTypesManagement({
   );
 
   // Filter appointment types by category
-  const filteredTypes = categoryFilter === "all" 
-    ? appointmentTypes 
-    : appointmentTypes.filter((type: AppointmentType) => type.category === categoryFilter);
+  const filteredTypes =
+    categoryFilter === "all"
+      ? appointmentTypes
+      : appointmentTypes.filter((type: AppointmentType) => type.category === categoryFilter);
 
   const handleToggleEnabled = (typeId: string, enabled: boolean) => {
     const newChanges = new Map(pendingChanges);
     const existing = newChanges.get(typeId) || {};
-    newChanges.set(typeId, { ...existing, appointmentTypeId: typeId, enabled });
+    const type = appointmentTypes.find((t) => t.id === typeId);
+    const updates: any = { 
+      ...existing, 
+      appointmentTypeId: typeId, 
+      enabled,
+      // Always include appointmentMode - use existing value or default to in-person
+      appointmentMode: existing.appointmentMode || type?.appointmentMode || "in-person"
+    };
+    newChanges.set(typeId, updates);
     setPendingChanges(newChanges);
   };
 
@@ -230,20 +242,24 @@ export function AppointmentTypesManagement({
     setEditingItems({
       customDisplayName: type.customDisplayName || "",
       customDescription: type.customDescription || "",
+      appointmentMode: type.appointmentMode || "in-person",
     });
     setIsEditDialogOpen(true);
   };
 
   const handleSaveOverride = () => {
     if (!selectedType) return;
-    
+
     const newChanges = new Map(pendingChanges);
     const existing = newChanges.get(selectedType.id) || {};
     newChanges.set(selectedType.id, {
       ...existing,
       appointmentTypeId: selectedType.id,
+      appointmentMode: editingItems.appointmentMode || "in-person",
       customDisplayName: editingItems.customDisplayName || null,
       customDescription: editingItems.customDescription || null,
+      customPrice: null,
+      notes: null,
     });
     setPendingChanges(newChanges);
     setIsEditDialogOpen(false);
@@ -262,11 +278,14 @@ export function AppointmentTypesManagement({
     const newChanges = new Map(pendingChanges);
     filteredTypes.forEach((type: AppointmentType) => {
       const existing = newChanges.get(type.id) || {};
-      newChanges.set(type.id, {
+      const updates: any = {
         ...existing,
         appointmentTypeId: type.id,
         enabled: enable,
-      });
+        // Always include appointmentMode - use existing value or type's current value or default
+        appointmentMode: existing.appointmentMode || type.appointmentMode || "in-person"
+      };
+      newChanges.set(type.id, updates);
     });
     setPendingChanges(newChanges);
   };
@@ -325,7 +344,10 @@ export function AppointmentTypesManagement({
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   {categories.map((category) => (
-                    <SelectItem key={category || "uncategorized"} value={category || "uncategorized"}>
+                    <SelectItem
+                      key={category || "uncategorized"}
+                      value={category || "uncategorized"}
+                    >
                       {category || "Uncategorized"}
                     </SelectItem>
                   ))}
@@ -333,18 +355,10 @@ export function AppointmentTypesManagement({
               </Select>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleBulkToggle(true)}
-              >
+              <Button variant="outline" size="sm" onClick={() => handleBulkToggle(true)}>
                 Enable All
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleBulkToggle(false)}
-              >
+              <Button variant="outline" size="sm" onClick={() => handleBulkToggle(false)}>
                 Disable All
               </Button>
             </div>
@@ -357,11 +371,7 @@ export function AppointmentTypesManagement({
               <AlertDescription className="flex items-center justify-between">
                 <span>You have {pendingChanges.size} unsaved changes</span>
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPendingChanges(new Map())}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => setPendingChanges(new Map())}>
                     Discard
                   </Button>
                   <Button
@@ -389,7 +399,7 @@ export function AppointmentTypesManagement({
           ) : filteredTypes.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">
-                {categoryFilter === "all" 
+                {categoryFilter === "all"
                   ? "No appointment types found. Click 'Sync from Acuity' to import."
                   : "No appointment types found in this category."}
               </p>
@@ -401,6 +411,7 @@ export function AppointmentTypesManagement({
                   <TableRow>
                     <TableHead className="w-[50px]">Enabled</TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead>Mode</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Description</TableHead>
@@ -411,9 +422,8 @@ export function AppointmentTypesManagement({
                   {filteredTypes.map((type: AppointmentType) => {
                     const hasChanges = pendingChanges.has(type.id);
                     const pendingChange = pendingChanges.get(type.id);
-                    const isEnabled = pendingChange?.enabled !== undefined 
-                      ? pendingChange.enabled 
-                      : type.enabled;
+                    const isEnabled =
+                      pendingChange?.enabled !== undefined ? pendingChange.enabled : type.enabled;
 
                     return (
                       <TableRow key={type.id} className={hasChanges ? "bg-muted/50" : ""}>
@@ -429,7 +439,8 @@ export function AppointmentTypesManagement({
                               <span className="font-medium">
                                 {pendingChange?.customDisplayName || type.name}
                               </span>
-                              {(type.source.name === "override" || pendingChange?.customDisplayName) && (
+                              {(type.source.name === "override" ||
+                                pendingChange?.customDisplayName) && (
                                 <Badge variant="outline" className="text-xs">
                                   <Edit2 className="w-3 h-3 mr-1" />
                                   Override
@@ -443,20 +454,24 @@ export function AppointmentTypesManagement({
                             )}
                           </div>
                         </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {pendingChange?.appointmentMode || type.appointmentMode || "Not Set"}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{formatDuration(type.duration)}</TableCell>
                         <TableCell>
-                          {type.category && (
-                            <Badge variant="secondary">{type.category}</Badge>
-                          )}
+                          {type.category && <Badge variant="secondary">{type.category}</Badge>}
                         </TableCell>
                         <TableCell className="max-w-[300px]">
                           <div className="space-y-1">
                             <p className="text-sm truncate">
-                              {pendingChange?.customDescription !== undefined 
-                                ? (pendingChange.customDescription || "—")
-                                : (type.description || "—")}
+                              {pendingChange?.customDescription !== undefined
+                                ? pendingChange.customDescription || "—"
+                                : type.description || "—"}
                             </p>
-                            {(type.source.description === "override" || pendingChange?.customDescription !== undefined) && (
+                            {(type.source.description === "override" ||
+                              pendingChange?.customDescription !== undefined) && (
                               <Badge variant="outline" className="text-xs">
                                 <Edit2 className="w-3 h-3 mr-1" />
                                 Override
@@ -489,16 +504,39 @@ export function AppointmentTypesManagement({
           <DialogHeader>
             <DialogTitle>Edit Appointment Type Override</DialogTitle>
             <DialogDescription>
-              Customize how this appointment type appears for this specialist. Leave fields empty to use Acuity defaults.
+              Customize how this appointment type appears for this specialist. Leave fields empty to
+              use Acuity defaults.
             </DialogDescription>
           </DialogHeader>
           {selectedType && (
             <div className="space-y-4">
               <div className="space-y-2">
+                <Label>Appointment Mode</Label>
+                <Select
+                  value={editingItems.appointmentMode || "in-person"}
+                  onValueChange={(value: "in-person" | "telehealth") =>
+                    setEditingItems({ ...editingItems, appointmentMode: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select appointment mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in-person">In-Person</SelectItem>
+                    <SelectItem value="telehealth">Telehealth</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Specify whether this appointment type is available for in-person or telehealth
+                </p>
+              </div>
+              <div className="space-y-2">
                 <Label>Display Name</Label>
                 <Input
                   value={editingItems.customDisplayName || ""}
-                  onChange={(e) => setEditingItems({ ...editingItems, customDisplayName: e.target.value })}
+                  onChange={(e) =>
+                    setEditingItems({ ...editingItems, customDisplayName: e.target.value })
+                  }
                   placeholder={selectedType.acuityName}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -509,7 +547,9 @@ export function AppointmentTypesManagement({
                 <Label>Description</Label>
                 <Textarea
                   value={editingItems.customDescription || ""}
-                  onChange={(e) => setEditingItems({ ...editingItems, customDescription: e.target.value })}
+                  onChange={(e) =>
+                    setEditingItems({ ...editingItems, customDescription: e.target.value })
+                  }
                   placeholder={selectedType.acuityDescription || "No description"}
                   rows={3}
                 />
@@ -520,7 +560,8 @@ export function AppointmentTypesManagement({
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  These overrides only affect how this appointment type is displayed for this specialist. The original Acuity values are preserved.
+                  These overrides only affect how this appointment type is displayed for this
+                  specialist. The original Acuity values are preserved.
                 </AlertDescription>
               </Alert>
             </div>
@@ -529,9 +570,7 @@ export function AppointmentTypesManagement({
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveOverride}>
-              Save Override
-            </Button>
+            <Button onClick={handleSaveOverride}>Save Override</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
