@@ -34,6 +34,11 @@ export const AcuityTimeSlot = type({
   canBook: "boolean",
 });
 
+// Actual response from /availability/times endpoint
+export const AcuityAvailabilityTime = type({
+  time: "string", // ISO datetime like "2016-02-04T13:00:00-0800"
+});
+
 export const AcuityAppointmentType = type({
   id: "number",
   name: "string",
@@ -71,6 +76,7 @@ export const AcuityAppointment = type({
 
 export type AcuityCalendarType = typeof AcuityCalendar.infer;
 export type AcuityTimeSlotType = typeof AcuityTimeSlot.infer;
+export type AcuityAvailabilityTimeType = typeof AcuityAvailabilityTime.infer;
 export type AcuityAppointmentTypeType = typeof AcuityAppointmentType.infer;
 export type AcuityAppointmentType = typeof AcuityAppointment.infer;
 
@@ -315,13 +321,34 @@ export class AcuityService {
     return results;
   }
 
-  // Availability operations
-  async getAvailability(params: {
+  // Get available dates for a month
+  async getAvailabilityDates(params: {
+    month: string; // YYYY-MM format
+    appointmentTypeId: number;
+    calendarId?: number;
+  }): Promise<string[]> {
+    const queryParams = new URLSearchParams({
+      month: params.month,
+      appointmentTypeID: params.appointmentTypeId.toString(),
+      ...(params.calendarId && { calendarID: params.calendarId.toString() }),
+    });
+
+    const response = await this.request<Array<{ date: string }>>(
+      "GET",
+      `/availability/dates?${queryParams.toString()}`
+    );
+
+    // Extract just the date strings from the response
+    return response.map((item) => item.date);
+  }
+
+  // Get availability times for a specific date
+  async getAvailabilityTimes(params: {
     appointmentTypeId: number;
     calendarId: number;
     date: string; // YYYY-MM-DD format
     timezone?: string;
-  }): Promise<AcuityTimeSlotType[]> {
+  }): Promise<AcuityAvailabilityTimeType[]> {
     // Check cache first (using calendarId as specialist identifier)
     const cached = await getCachedAvailability(
       params.calendarId.toString(),
@@ -337,7 +364,7 @@ export class AcuityService {
         },
         "Returning cached availability"
       );
-      return cached as AcuityTimeSlotType[];
+      return cached as AcuityAvailabilityTimeType[];
     }
 
     const queryParams = new URLSearchParams({
@@ -347,37 +374,20 @@ export class AcuityService {
       ...(params.timezone && { timezone: params.timezone }),
     });
 
-    const slots = await this.request<unknown[]>(
+    const times = await this.request<AcuityAvailabilityTimeType[]>(
       "GET",
       `/availability/times?${queryParams.toString()}`
     );
-
-    const results: AcuityTimeSlotType[] = [];
-
-    for (const slot of slots) {
-      const parsed = AcuityTimeSlot(slot);
-      if (parsed instanceof type.errors) {
-        logger.error(
-          {
-            errors: parsed.map((e) => ({ path: e.path, message: e.message })),
-            data: slot,
-          },
-          "Invalid time slot data from Acuity"
-        );
-        throw new AcuityAPIError("Invalid time slot data received from Acuity");
-      }
-      results.push(parsed);
-    }
 
     // Cache the results
     await cacheAvailability(
       params.calendarId.toString(),
       params.date,
       params.appointmentTypeId,
-      results
+      times
     );
 
-    return results;
+    return times;
   }
 
   // Appointment operations

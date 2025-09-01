@@ -76,16 +76,6 @@ function getSpecialistFields(
   return baseFields;
 }
 
-// Validation schemas
-const syncSpecialistSchema = type({
-  userId: "string",
-  acuityCalendarId: "string",
-});
-
-const checkSlugSchema = type({
-  slug: "string",
-});
-
 const specialistsRoutes = new Hono()
 
   // Apply auth middleware to all routes
@@ -96,7 +86,12 @@ const specialistsRoutes = new Hono()
   .post(
     "/check-slug",
     requireRole("admin"),
-    arktypeValidator("json", checkSlugSchema),
+    arktypeValidator(
+      "json",
+      type({
+        slug: "string",
+      })
+    ),
     async (c) => {
       const { slug } = c.req.valid("json");
 
@@ -233,7 +228,13 @@ const specialistsRoutes = new Hono()
   .post(
     "/sync",
     requireRole("admin"),
-    arktypeValidator("json", syncSpecialistSchema),
+    arktypeValidator(
+      "json",
+      type({
+        userId: "string",
+        acuityCalendarId: "string",
+      })
+    ),
     async (c) => {
       try {
         const data = c.req.valid("json");
@@ -840,200 +841,378 @@ const specialistsRoutes = new Hono()
       }
     }
   )
-  .get("/:id/availability", async (c) => {
-    try {
-      const authContext = c.get("auth");
-      const user = authContext?.user;
-      if (!user) {
-        return c.json({ error: "Unauthorized" }, 401);
-      }
+  .get(
+    "/:id/availability",
+    arktypeValidator(
+      "query",
+      type({
+        startDate: "string.date",
+        endDate: "string.date",
+        appointmentTypeId: "string",
+        "timezone?": "string",
+      })
+    ),
+    async (c) => {
+      try {
+        const authContext = c.get("auth");
+        const user = authContext.user;
+        if (!user) {
+          return c.json({ error: "Unauthorized" }, 401);
+        }
 
-      const specialistId = c.req.param("id");
-      const { startDate, endDate, appointmentTypeId, timezone } = c.req.query();
+        const specialistId = c.req.param("id");
+        const { startDate, endDate, appointmentTypeId, timezone } = c.req.valid("query");
 
-      // Validate UUID format
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(specialistId)) {
-        return c.json(
-          {
-            success: false,
-            error: "Invalid specialist ID format",
-          },
-          400
-        );
-      }
-
-      // Validate required parameters
-      if (!startDate || !endDate) {
-        return c.json(
-          {
-            success: false,
-            error: "Start date and end date are required",
-          },
-          400
-        );
-      }
-
-      // Validate date format (YYYY-MM-DD)
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
-        return c.json(
-          {
-            success: false,
-            error: "Dates must be in YYYY-MM-DD format",
-          },
-          400
-        );
-      }
-
-      // Get specialist details
-      const specialistData = await specialistRepository.findById(specialistId);
-      if (!specialistData) {
-        return c.json(
-          {
-            success: false,
-            error: "Specialist not found",
-          },
-          404
-        );
-      }
-
-      if (!specialistData.specialist.isActive) {
-        return c.json(
-          {
-            success: false,
-            error: "Specialist is not active",
-          },
-          400
-        );
-      }
-
-      // Get appointment types if not specified
-      let appointmentTypes;
-      if (!appointmentTypeId) {
-        appointmentTypes = await acuityService.getAppointmentTypes();
-        if (appointmentTypes.length === 0) {
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(specialistId)) {
           return c.json(
             {
               success: false,
-              error: "No appointment types available",
+              error: "Invalid specialist ID format",
+            },
+            400
+          );
+        }
+
+        // Get specialist details
+        const specialistData = await specialistRepository.findById(specialistId);
+        if (!specialistData) {
+          return c.json(
+            {
+              success: false,
+              error: "Specialist not found",
             },
             404
           );
         }
-      }
 
-      // Fetch availability for each date in the range
-      const availability: SpecialistAvailabilityResponse = {
-        specialistId: specialistData.specialist.id,
-        calendarId: specialistData.specialist.acuityCalendarId,
-        timeSlots: [],
-      };
+        if (!specialistData.specialist.isActive) {
+          return c.json(
+            {
+              success: false,
+              error: "Specialist is not active",
+            },
+            400
+          );
+        }
 
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+        // Fetch availability for each date in the range
+        const availability: SpecialistAvailabilityResponse = {
+          specialistId: specialistData.specialist.id,
+          calendarId: specialistData.specialist.acuityCalendarId,
+          timeSlots: [],
+        };
 
-      // Validate date range (max 30 days)
-      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysDiff > 30) {
-        return c.json(
-          {
-            success: false,
-            error: "Date range cannot exceed 30 days",
-          },
-          400
-        );
-      }
+        const start = new Date(startDate);
+        const end = new Date(endDate);
 
-      // Iterate through each date
-      for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
-        const dateStr = date.toISOString().split("T")[0];
+        // Validate date range (max 30 days)
+        const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 30) {
+          return c.json(
+            {
+              success: false,
+              error: "Date range cannot exceed 30 days",
+            },
+            400
+          );
+        }
 
-        // If appointmentTypeId is provided, fetch for that specific type
-        if (appointmentTypeId) {
-          try {
-            const slots = await acuityService.getAvailability({
-              appointmentTypeId: parseInt(appointmentTypeId, 10),
-              calendarId: parseInt(specialistData.specialist.acuityCalendarId, 10),
-              date: dateStr,
-              timezone,
-            });
+        // Iterate through each date
+        for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+          const dateStr = date.toISOString().split("T")[0];
 
-            availability.timeSlots.push(
-              ...slots.map((slot) => ({
-                date: slot.date,
-                time: slot.time,
-                datetime: slot.datetime,
-                duration: slot.duration,
-                appointmentTypeId: slot.appointmentTypeID,
-                available: slot.canBook && slot.slotsAvailable > 0,
-              }))
-            );
-          } catch (error) {
-            logger.warn("Failed to fetch availability for date", { error, date: dateStr });
-            // Continue to next date instead of failing entire request
-          }
-        } else {
-          // Fetch for all appointment types
-          for (const appointmentType of appointmentTypes!) {
+          // If appointmentTypeId is provided, fetch for that specific type
+          if (appointmentTypeId) {
             try {
-              const slots = await acuityService.getAvailability({
-                appointmentTypeId: appointmentType.id,
+              const times = await acuityService.getAvailabilityTimes({
+                appointmentTypeId: parseInt(appointmentTypeId, 10),
                 calendarId: parseInt(specialistData.specialist.acuityCalendarId, 10),
                 date: dateStr,
                 timezone,
               });
 
               availability.timeSlots.push(
-                ...slots.map((slot) => ({
-                  date: slot.date,
+                ...times.map((slot) => ({
+                  date: dateStr,
                   time: slot.time,
-                  datetime: slot.datetime,
-                  duration: slot.duration,
-                  appointmentTypeId: slot.appointmentTypeID,
-                  available: slot.canBook && slot.slotsAvailable > 0,
+                  datetime: slot.time, // time field contains full ISO datetime
+                  duration: 30, // Default duration, adjust as needed
+                  appointmentTypeId: parseInt(appointmentTypeId, 10),
+                  available: true, // If returned by Acuity, it's available
                 }))
               );
             } catch (error) {
-              logger.warn("Failed to fetch availability for appointment type", {
-                error,
-                date: dateStr,
-                appointmentTypeId: appointmentType.id,
-              });
-              // Continue to next appointment type
+              logger.warn("Failed to fetch availability for date", { error, date: dateStr });
+              // Continue to next date instead of failing entire request
+            }
+          } else {
+            // Fetch for all appointment types
+            const appointmentTypes = await acuityService.getAppointmentTypes();
+            for (const appointmentType of appointmentTypes) {
+              try {
+                const times = await acuityService.getAvailabilityTimes({
+                  appointmentTypeId: appointmentType.id,
+                  calendarId: parseInt(specialistData.specialist.acuityCalendarId, 10),
+                  date: dateStr,
+                  timezone,
+                });
+
+                availability.timeSlots.push(
+                  ...times.map((slot) => ({
+                    date: dateStr,
+                    time: slot.time,
+                    datetime: slot.time, // time field contains full ISO datetime
+                    duration: appointmentType.duration, // Use actual duration from appointment type
+                    appointmentTypeId: appointmentType.id,
+                    available: true, // If returned by Acuity, it's available
+                  }))
+                );
+              } catch (error) {
+                logger.warn("Failed to fetch availability for appointment type", {
+                  error,
+                  date: dateStr,
+                  appointmentTypeId: appointmentType.id,
+                });
+                // Continue to next appointment type
+              }
             }
           }
         }
+
+        // Sort time slots by datetime
+        availability.timeSlots.sort(
+          (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+        );
+
+        // Audit log the availability access
+        logger.audit("view_specialist_availability", user.id, "specialist", specialistId, {
+          userRole: user.role,
+          dateRange: { startDate, endDate },
+          appointmentTypeId,
+          timezone,
+          slotsFound: availability.timeSlots.length,
+        });
+
+        return c.json({
+          success: true,
+          data: availability,
+        });
+      } catch (error) {
+        logger.error("Failed to get specialist availability", error as Error);
+        return c.json(
+          {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to retrieve availability",
+          },
+          500
+        );
       }
-
-      // Sort time slots by datetime
-      availability.timeSlots.sort(
-        (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
-      );
-
-      // Audit log the availability access
-      logger.audit("view_specialist_availability", user.id, "specialist", specialistId, {
-        userRole: user.role,
-        dateRange: { startDate, endDate },
-        appointmentTypeId,
-        timezone,
-        slotsFound: availability.timeSlots.length,
-      });
-
-      return c.json({
-        success: true,
-        data: availability,
-      });
-    } catch (error) {
-      logger.error("Failed to get specialist availability", error as Error);
-      return c.json(
-        {
-          success: false,
-          error: error instanceof Error ? error.message : "Failed to retrieve availability",
-        },
-        500
-      );
     }
-  });
+  )
+
+  // GET /api/specialists/:id/available-dates - Get dates with availability for a month
+  .get(
+    "/:id/available-dates",
+    arktypeValidator(
+      "query",
+      type({
+        month: "string", // YYYY-MM format
+        appointmentTypeId: "string",
+      })
+    ),
+    async (c) => {
+      try {
+        const authContext = c.get("auth");
+        const user = authContext?.user;
+        if (!user) {
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+
+        const specialistId = c.req.param("id");
+        const { month, appointmentTypeId } = c.req.valid("query");
+
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(specialistId)) {
+          return c.json(
+            {
+              success: false,
+              error: "Invalid specialist ID format",
+            },
+            400
+          );
+        }
+
+        // Validate month format (YYYY-MM)
+        const monthRegex = /^\d{4}-\d{2}$/;
+        if (!monthRegex.test(month)) {
+          return c.json(
+            {
+              success: false,
+              error: "Month must be in YYYY-MM format",
+            },
+            400
+          );
+        }
+
+        // Get specialist details
+        const specialistData = await specialistRepository.findById(specialistId);
+        if (!specialistData) {
+          return c.json(
+            {
+              success: false,
+              error: "Specialist not found",
+            },
+            404
+          );
+        }
+
+        if (!specialistData.specialist.isActive) {
+          return c.json(
+            {
+              success: false,
+              error: "Specialist is not active",
+            },
+            400
+          );
+        }
+
+        // Fetch available dates from Acuity (single API call)
+        const availableDates = await acuityService.getAvailabilityDates({
+          month,
+          appointmentTypeId: parseInt(appointmentTypeId, 10),
+          calendarId: parseInt(specialistData.specialist.acuityCalendarId, 10),
+        });
+
+        // Audit log the availability access
+        logger.audit("view_specialist_available_dates", user.id, "specialist", specialistId, {
+          userRole: user.role,
+          month,
+          appointmentTypeId,
+          datesFound: availableDates.length,
+        });
+
+        return c.json({
+          success: true,
+          data: {
+            specialistId: specialistData.specialist.id,
+            month,
+            dates: availableDates,
+          },
+        });
+      } catch (error) {
+        logger.error("Failed to get specialist available dates", error as Error);
+        return c.json(
+          {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to retrieve available dates",
+          },
+          500
+        );
+      }
+    }
+  )
+
+  // GET /api/specialists/:id/time-slots - Get time slots for a specific date
+  .get(
+    "/:id/time-slots",
+    arktypeValidator(
+      "query",
+      type({
+        date: "string.date",
+        appointmentTypeId: "string",
+        "timezone?": "string",
+      })
+    ),
+    async (c) => {
+      try {
+        const authContext = c.get("auth");
+        const user = authContext?.user;
+        if (!user) {
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+
+        const specialistId = c.req.param("id");
+        const { date, appointmentTypeId, timezone } = c.req.valid("query");
+
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(specialistId)) {
+          return c.json(
+            {
+              success: false,
+              error: "Invalid specialist ID format",
+            },
+            400
+          );
+        }
+
+        // Get specialist details
+        const specialistData = await specialistRepository.findById(specialistId);
+        if (!specialistData) {
+          return c.json(
+            {
+              success: false,
+              error: "Specialist not found",
+            },
+            404
+          );
+        }
+
+        if (!specialistData.specialist.isActive) {
+          return c.json(
+            {
+              success: false,
+              error: "Specialist is not active",
+            },
+            400
+          );
+        }
+
+        // Fetch time slots for the specific date
+        const times = await acuityService.getAvailabilityTimes({
+          appointmentTypeId: parseInt(appointmentTypeId, 10),
+          calendarId: parseInt(specialistData.specialist.acuityCalendarId, 10),
+          date,
+          timezone,
+        });
+
+        // Transform to a simpler format for the frontend
+        const timeSlots = times.map((slot) => ({
+          datetime: slot.time, // The time field contains the full ISO datetime
+          appointmentTypeId: parseInt(appointmentTypeId, 10),
+        }));
+
+        // Audit log the time slots access
+        logger.audit("view_specialist_time_slots", user.id, "specialist", specialistId, {
+          userRole: user.role,
+          date,
+          appointmentTypeId,
+          timezone,
+          slotsFound: timeSlots.length,
+        });
+
+        return c.json({
+          success: true,
+          data: {
+            specialistId: specialistData.specialist.id,
+            date,
+            timeSlots,
+          },
+        });
+      } catch (error) {
+        logger.error("Failed to get specialist time slots", error as Error);
+        return c.json(
+          {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to retrieve time slots",
+          },
+          500
+        );
+      }
+    }
+  );
 
 export { specialistsRoutes };

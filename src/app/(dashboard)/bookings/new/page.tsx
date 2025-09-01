@@ -68,6 +68,7 @@ export default function NewBookingPage() {
     duration: number;
     description: string | null;
     category: string | null;
+    appointmentMode?: "in-person" | "telehealth";
     source: {
       name: "acuity" | "override";
       description: "acuity" | "override";
@@ -176,6 +177,12 @@ export default function NewBookingPage() {
             appointmentTypeId={selectedAppointmentType.acuityAppointmentTypeId}
             onSelect={handleTimeSlotSelect}
             selectedDateTime={selectedDateTime}
+            specialist={selectedSpecialist}
+            appointmentType={{
+              name: selectedAppointmentType.name,
+              duration: selectedAppointmentType.duration,
+              appointmentMode: selectedAppointmentType.appointmentMode,
+            }}
           />
         ) : (
           <div className="text-center text-muted-foreground">
