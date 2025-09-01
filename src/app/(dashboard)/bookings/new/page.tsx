@@ -118,12 +118,10 @@ export default function NewBookingPage() {
     };
   }) => {
     setSelectedAppointmentType(appointmentType);
-    handleNext();
   };
 
   const handleTimeSlotSelect = (dateTime: Date) => {
     setSelectedDateTime(dateTime);
-    handleNext();
   };
 
   const handleExamineeSubmit = (data: typeof examineeData) => {

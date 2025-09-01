@@ -39,6 +39,7 @@ import { handleApiResponse } from "@/lib/hono-utils";
 import { cn } from "@/lib/utils";
 import type { Specialist } from "@/types/specialist";
 import Link from "next/link";
+import { getInitials } from "@/lib/utils/initials";
 
 interface SpecialistSelectProps {
   onSelect: (specialist: Specialist | null) => void;
@@ -70,16 +71,6 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
         specialist.location?.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         specialist.location?.state?.toLowerCase().includes(searchTerm.toLowerCase())
     ) || [];
-
-  // Helper function to generate initials from name
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
 
   // Helper function for rating (placeholder)
   // const getRating = (specialist: Specialist) => {
@@ -193,11 +184,6 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                       {getInitials(`${specialist.user.firstName} ${specialist.user.lastName}`)}
                     </AvatarFallback>
                   </Avatar>
-                  {isSelected && (
-                    <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-1.5 shadow-lg">
-                      <Check className="h-3 w-3" />
-                    </div>
-                  )}
                 </div>
 
                 {/* Main Information */}
@@ -208,9 +194,35 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                         {specialist.name}
                       </h3>
                       <div className="flex items-center gap-3">
-                        <span className="text-primary font-medium text-sm uppercase tracking-wide">
+                        <span className="text-primary font-medium text-sm tracking-wide">
                           {specialist.user?.jobTitle || "Specialist"}
                         </span>
+                        <div className="flex items-center gap-2">
+                          {specialist.acceptsTelehealth && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs px-3 py-1 font-medium border bg-blue-50 text-blue-700 border-blue-200"
+                            >
+                              Telehealth
+                            </Badge>
+                          )}
+                          {specialist.acceptsInPerson && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs px-3 py-1 font-medium border bg-violet-50 text-violet-700 border-violet-200"
+                            >
+                              In-person
+                            </Badge>
+                          )}
+                          {!specialist.acceptsTelehealth && !specialist.acceptsInPerson && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs px-3 py-1 font-medium border bg-gray-50 text-gray-700 border-gray-300"
+                            >
+                              Availability on request
+                            </Badge>
+                          )}
+                        </div>
                         {/* <div className="flex items-center gap-1">
                           <div className="flex text-yellow-400 text-sm">
                             {"★".repeat(Math.floor(rating[index]))}
@@ -220,33 +232,6 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                           </span>
                         </div> */}
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {specialist.acceptsTelehealth && (
-                        <Badge
-                          variant="secondary"
-                          className="text-xs px-3 py-1 font-medium border bg-blue-50 text-blue-700 border-blue-200"
-                        >
-                          Telehealth
-                        </Badge>
-                      )}
-                      {specialist.acceptsInPerson && (
-                        <Badge
-                          variant="secondary"
-                          className="text-xs px-3 py-1 font-medium border bg-violet-50 text-violet-700 border-violet-200"
-                        >
-                          In-person
-                        </Badge>
-                      )}
-                      {!specialist.acceptsTelehealth && !specialist.acceptsInPerson && (
-                        <Badge
-                          variant="secondary"
-                          className="text-xs px-3 py-1 font-medium border bg-gray-50 text-gray-700 border-gray-300"
-                        >
-                          Availability on request
-                        </Badge>
-                      )}
                     </div>
                   </div>
 
@@ -271,7 +256,24 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex flex-col items-start justify-start gap-3 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {specialist.slug && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded gap-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+                      asChild
+                    >
+                      <Link
+                        href={`https://medibytes.com.au/our-panel/${specialist.slug}`}
+                        target="_blank"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View CV
+                      </Link>
+                    </Button>
+                  )}
+
                   <Button
                     size="sm"
                     className={cn(
@@ -293,25 +295,6 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                       </>
                     )}
                   </Button>
-
-                  {specialist.slug ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded gap-2 border-slate-300 text-slate-600 hover:bg-slate-50 bg-white"
-                      asChild
-                    >
-                      <Link
-                        href={`https://medibytes.com.au/our-panel/${specialist.slug}`}
-                        target="_blank"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View CV
-                      </Link>
-                    </Button>
-                  ) : (
-                    <div className="h-[36px]" />
-                  )}
                 </div>
               </div>
 

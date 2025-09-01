@@ -606,6 +606,7 @@ const specialistsRoutes = new Hono()
           description: type.effectiveDescription,
           duration: type.durationMinutes,
           category: type.category,
+          appointmentMode: type.appointmentMode,
           source: {
             name: type.sourceName,
             description: type.sourceDescription,
