@@ -101,6 +101,7 @@ export default function SpecialistDetailPage() {
 
   const [isEditingSpecialist, setIsEditingSpecialist] = useState(false);
   const [isEditingUser, setIsEditingUser] = useState(false);
+  const [isEditingPracticeDetails, setIsEditingPracticeDetails] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [checkingSlug, setCheckingSlug] = useState(false);
@@ -186,6 +187,23 @@ export default function SpecialistDetailPage() {
   );
   const [availableStates, setAvailableStates] = useState(initialValues?.states || []);
   const [availableCities, setAvailableCities] = useState(initialValues?.cities || []);
+  
+  // Practice Details form state
+  const [practiceDetailsForm, setPracticeDetailsForm] = useState({
+    location: initialValues?.specialistForm.location || null,
+  });
+  const [practiceShowLocationFields, setPracticeShowLocationFields] = useState(
+    initialValues?.showLocationFields || false
+  );
+  const [practiceSelectedCountryCode, setPracticeSelectedCountryCode] = useState(
+    initialValues?.countryCode || "AU"
+  );
+  const [practiceAvailableStates, setPracticeAvailableStates] = useState(
+    initialValues?.states || []
+  );
+  const [practiceAvailableCities, setPracticeAvailableCities] = useState(
+    initialValues?.cities || []
+  );
 
   const allCountries = Country.getAllCountries();
 
@@ -235,6 +253,15 @@ export default function SpecialistDetailPage() {
       setAvailableCities(initialValues.cities);
       setIsEditingSpecialist(false);
       setIsEditingUser(false);
+      setIsEditingPracticeDetails(false);
+      // Reset practice details form
+      setPracticeDetailsForm({
+        location: initialValues.specialistForm.location || null,
+      });
+      setPracticeShowLocationFields(initialValues.showLocationFields);
+      setPracticeSelectedCountryCode(initialValues.countryCode);
+      setPracticeAvailableStates(initialValues.states);
+      setPracticeAvailableCities(initialValues.cities);
     }
   }, [initialValues]);
 
@@ -514,6 +541,89 @@ export default function SpecialistDetailPage() {
         jobTitle: userToRevert.jobTitle || "",
       });
     }
+  };
+
+  // Practice Details handlers
+  const handlePracticeCountryChange = useCallback(
+    (countryCode: string) => {
+      setPracticeSelectedCountryCode(countryCode);
+      const states = State.getStatesOfCountry(countryCode);
+      setPracticeAvailableStates(states);
+
+      const country = Country.getCountryByCode(countryCode);
+      if (practiceDetailsForm.location) {
+        setPracticeDetailsForm((prev) => ({
+          ...prev,
+          location: {
+            ...prev.location!,
+            country: country?.name || "Australia",
+            state: "",
+            city: "",
+          },
+        }));
+        setPracticeAvailableCities([]);
+      }
+    },
+    [practiceDetailsForm.location]
+  );
+
+  const handlePracticeStateChange = useCallback(
+    (stateCode: string) => {
+      setPracticeDetailsForm((prev) => ({
+        ...prev,
+        location: {
+          ...prev.location!,
+          state: stateCode,
+          city: "",
+        },
+      }));
+
+      const cities = City.getCitiesOfState(practiceSelectedCountryCode, stateCode);
+      setPracticeAvailableCities(cities);
+    },
+    [practiceSelectedCountryCode]
+  );
+
+  const handleSavePracticeDetails = () => {
+    // Validate location fields if location is provided
+    if (practiceShowLocationFields && practiceDetailsForm.location) {
+      if (
+        !practiceDetailsForm.location.city ||
+        !practiceDetailsForm.location.state ||
+        !practiceDetailsForm.location.country
+      ) {
+        toast.error("City, state, and country are required when adding a location");
+        return;
+      }
+    }
+
+    const dataToSend = {
+      location: practiceShowLocationFields ? practiceDetailsForm.location : null,
+    };
+
+    updateSpecialistMutation.mutate(dataToSend, {
+      onSuccess: () => {
+        setIsEditingPracticeDetails(false);
+        // Update the main specialist form state to reflect the saved changes
+        setSpecialistForm(prev => ({
+          ...prev,
+          location: dataToSend.location
+        }));
+        setShowLocationFields(practiceShowLocationFields);
+      }
+    });
+  };
+
+  const handleCancelPracticeDetailsEdit = () => {
+    if (!initialValues) return;
+    setIsEditingPracticeDetails(false);
+    setPracticeDetailsForm({
+      location: initialValues.specialistForm.location || null,
+    });
+    setPracticeShowLocationFields(initialValues.showLocationFields);
+    setPracticeSelectedCountryCode(initialValues.countryCode);
+    setPracticeAvailableStates(initialValues.states);
+    setPracticeAvailableCities(initialValues.cities);
   };
 
   const user: ExtendedUser | null =
@@ -985,9 +1095,41 @@ export default function SpecialistDetailPage() {
 
           {/* Practice Details Card */}
           <Card>
-            <CardHeader>
-              <CardTitle>Practice Details</CardTitle>
-              <CardDescription>Appointment types and location settings</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Practice Details</CardTitle>
+                <CardDescription>Appointment types and location settings</CardDescription>
+              </div>
+              {!isEditingPracticeDetails ? (
+                <Button variant="outline" size="sm" onClick={() => setIsEditingPracticeDetails(true)}>
+                  <Edit2 className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelPracticeDetailsEdit}
+                    disabled={updateSpecialistMutation.isPending}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSavePracticeDetails}
+                    disabled={updateSpecialistMutation.isPending}
+                  >
+                    {updateSpecialistMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4 mr-2" />
+                    )}
+                    Save
+                  </Button>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Appointment Settings - Derived from appointment types */}
@@ -1036,17 +1178,17 @@ export default function SpecialistDetailPage() {
                     </Badge>
                   )}
                 </div>
-                {isEditingSpecialist && specialist.acceptsInPerson ? (
+                {isEditingPracticeDetails ? (
                   <div className="space-y-3">
-                    {!showLocationFields || !specialistForm.location ? (
+                    {!practiceShowLocationFields || !practiceDetailsForm.location ? (
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => {
-                          setShowLocationFields(true);
-                          setSelectedCountryCode("AU");
-                          setSpecialistForm({
-                            ...specialistForm,
+                          setPracticeShowLocationFields(true);
+                          setPracticeSelectedCountryCode("AU");
+                          setPracticeDetailsForm({
+                            ...practiceDetailsForm,
                             location: {
                               streetAddress: "",
                               suburb: "",
@@ -1064,7 +1206,7 @@ export default function SpecialistDetailPage() {
                     ) : (
                       <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
                         <div className="grid grid-cols-2 gap-3">
-                          <Select value={selectedCountryCode} onValueChange={handleCountryChange}>
+                          <Select value={practiceSelectedCountryCode} onValueChange={handlePracticeCountryChange}>
                             <SelectTrigger className="w-full">
                               <SelectValue placeholder="Country *" />
                             </SelectTrigger>
@@ -1077,14 +1219,14 @@ export default function SpecialistDetailPage() {
                             </SelectContent>
                           </Select>
                           <Select
-                            value={specialistForm.location?.state || ""}
-                            onValueChange={handleStateChange}
+                            value={practiceDetailsForm.location?.state || ""}
+                            onValueChange={handlePracticeStateChange}
                           >
                             <SelectTrigger className="w-full">
                               <SelectValue placeholder="State/Province *" />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableStates.map((state) => (
+                              {practiceAvailableStates.map((state) => (
                                 <SelectItem key={state.isoCode} value={state.isoCode}>
                                   {state.name}
                                 </SelectItem>
@@ -1094,27 +1236,27 @@ export default function SpecialistDetailPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <Select
-                            value={specialistForm.location?.city || ""}
+                            value={practiceDetailsForm.location?.city || ""}
                             onValueChange={(value) =>
-                              setSpecialistForm({
-                                ...specialistForm,
+                              setPracticeDetailsForm({
+                                ...practiceDetailsForm,
                                 location: {
-                                  ...specialistForm.location!,
+                                  ...practiceDetailsForm.location!,
                                   city: value,
                                 },
                               })
                             }
-                            disabled={!specialistForm.location?.state}
+                            disabled={!practiceDetailsForm.location?.state}
                           >
                             <SelectTrigger className="w-full">
                               <SelectValue
                                 placeholder={
-                                  !specialistForm.location?.state ? "Select state first" : "City *"
+                                  !practiceDetailsForm.location?.state ? "Select state first" : "City *"
                                 }
                               />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableCities.map((city) => (
+                              {practiceAvailableCities.map((city) => (
                                 <SelectItem key={city.name} value={city.name}>
                                   {city.name}
                                 </SelectItem>
@@ -1123,12 +1265,12 @@ export default function SpecialistDetailPage() {
                           </Select>
                           <Input
                             placeholder="Postal Code"
-                            value={specialistForm.location?.postalCode || ""}
+                            value={practiceDetailsForm.location?.postalCode || ""}
                             onChange={(e) =>
-                              setSpecialistForm({
-                                ...specialistForm,
+                              setPracticeDetailsForm({
+                                ...practiceDetailsForm,
                                 location: {
-                                  ...specialistForm.location!,
+                                  ...practiceDetailsForm.location!,
                                   postalCode: e.target.value,
                                 },
                               })
@@ -1137,12 +1279,12 @@ export default function SpecialistDetailPage() {
                         </div>
                         <Input
                           placeholder="Suburb (optional)"
-                          value={specialistForm.location?.suburb || ""}
+                          value={practiceDetailsForm.location?.suburb || ""}
                           onChange={(e) =>
-                            setSpecialistForm({
-                              ...specialistForm,
+                            setPracticeDetailsForm({
+                              ...practiceDetailsForm,
                               location: {
-                                ...specialistForm.location!,
+                                ...practiceDetailsForm.location!,
                                 suburb: e.target.value,
                               },
                             })
@@ -1150,12 +1292,12 @@ export default function SpecialistDetailPage() {
                         />
                         <Input
                           placeholder="Street Address (optional)"
-                          value={specialistForm.location?.streetAddress || ""}
+                          value={practiceDetailsForm.location?.streetAddress || ""}
                           onChange={(e) =>
-                            setSpecialistForm({
-                              ...specialistForm,
+                            setPracticeDetailsForm({
+                              ...practiceDetailsForm,
                               location: {
-                                ...specialistForm.location!,
+                                ...practiceDetailsForm.location!,
                                 streetAddress: e.target.value,
                               },
                             })
@@ -1167,9 +1309,9 @@ export default function SpecialistDetailPage() {
                           size="sm"
                           className="w-full"
                           onClick={() => {
-                            setShowLocationFields(false);
-                            setSpecialistForm({
-                              ...specialistForm,
+                            setPracticeShowLocationFields(false);
+                            setPracticeDetailsForm({
+                              ...practiceDetailsForm,
                               location: null,
                             });
                           }}
@@ -1182,11 +1324,11 @@ export default function SpecialistDetailPage() {
                   </div>
                 ) : (
                   <p className="text-sm">
-                    {specialist.acceptsInPerson
-                      ? specialistForm.location
-                        ? formatLocation(specialistForm.location)
-                        : "Location TBD"
-                      : "Online only"}
+                    {specialist.location
+                      ? formatLocation(specialist.location)
+                      : specialist.acceptsInPerson
+                        ? "Location TBD"
+                        : "No location configured"}
                   </p>
                 )}
               </div>
