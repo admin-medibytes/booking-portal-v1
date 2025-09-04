@@ -13,10 +13,12 @@ export function CalendarGrid({
   state,
   offset = {},
   availableDates = [],
+  isLoading = false,
 }: {
   state: CalendarState;
   offset?: DateDuration;
-  availableDates?: Date[];
+  availableDates?: string[];
+  isLoading?: boolean;
 }) {
   const { locale } = useLocale();
   const startDate = state.visibleRange.start.add(offset);
@@ -35,14 +37,9 @@ export function CalendarGrid({
 
   // Helper to check if a calendar date has availability
   const hasAvailability = (calendarDate: CalendarDate) => {
-    return availableDates.some((availableDate) => {
-      const availableCalendarDate = new Date(availableDate);
-      return (
-        calendarDate.day === availableCalendarDate.getDate() &&
-        calendarDate.month === availableCalendarDate.getMonth() + 1 &&
-        calendarDate.year === availableCalendarDate.getFullYear()
-      );
-    });
+    // Format CalendarDate to YYYY-MM-DD string for comparison
+    const dateStr = `${calendarDate.year}-${String(calendarDate.month).padStart(2, '0')}-${String(calendarDate.day).padStart(2, '0')}`;
+    return availableDates.includes(dateStr);
   };
 
   return (
@@ -71,6 +68,7 @@ export function CalendarGrid({
                   date={date}
                   currentMonth={startDate}
                   hasAvailability={hasAvailability(date)}
+                  isLoading={isLoading}
                 />
               );
             })}

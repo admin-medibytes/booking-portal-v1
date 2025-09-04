@@ -16,11 +16,13 @@ export function CalendarCell({
   date,
   currentMonth,
   hasAvailability = false,
+  isLoading = false,
 }: {
   state: CalendarState;
   date: CalendarDate;
   currentMonth: CalendarDate;
   hasAvailability?: boolean;
+  isLoading?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const { cellProps, buttonProps, isSelected, isDisabled, formattedDate } =
@@ -58,23 +60,25 @@ export function CalendarCell({
           className={cn(
             "size-full rounded-md flex items-center justify-center",
             "text-gray-900 text-sm font-semibold",
-            !isInteractive
+            // Loading state
+            isLoading && "animate-pulse bg-gray-200",
+            !isLoading && !isInteractive
               ? isDateToday
                 ? "cursor-not-allowed text-gray-500"
                 : "text-gray-400 cursor-not-allowed"
-              : "cursor-pointer bg-white border border-gray-200",
+              : !isLoading && "cursor-pointer bg-white border border-gray-200",
             // Focus ring, visible while the cell has keyboard focus.
-            isFocusVisible && isInteractive &&
+            isFocusVisible && isInteractive && !isLoading &&
               "ring-2 group-focus:z-2 ring-gray-900 ring-offset-1",
             // Darker selection background for the start and end.
-            isSelected && isInteractive && "bg-gray-900 text-white border-gray-900",
+            isSelected && isInteractive && !isLoading && "bg-gray-900 text-white border-gray-900",
             // Hover state for interactive cells.
-            !isSelected && isInteractive && "hover:border-gray-400",
+            !isSelected && isInteractive && !isLoading && "hover:border-gray-400",
             // Show availability indicator
-            hasAvailability && !isSelected && "border-gray-300"
+            hasAvailability && !isSelected && !isLoading && "border-gray-300"
           )}
         >
-          {formattedDate}
+          {!isLoading && formattedDate}
           {isDateToday && (
             <div
               className={cn(
