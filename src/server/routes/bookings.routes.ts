@@ -104,7 +104,7 @@ const bookingsRoutes = new Hono()
         examineeName: "string>0",
         examineePhone: "string>0",
         "examineeEmail?": "string.email|null",
-        appointmentType: "'in_person'|'telehealth'",
+        appointmentType: "'in-person'|'telehealth'",
         "notes?": "string|null",
       })
     ),

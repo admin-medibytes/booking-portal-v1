@@ -17,7 +17,7 @@ import {
 import { SpecialistSelect } from "@/components/bookings/SpecialistSelect";
 import { AppointmentTypeSelect } from "@/components/bookings/AppointmentTypeSelect";
 import { TimeSlotPicker } from "@/components/bookings/TimeSlotPicker";
-import { ExamineeForm } from "@/components/bookings/ExamineeForm";
+import { IntakeForm } from "@/components/bookings/IntakeForm";
 import { BookingConfirmation } from "@/components/bookings/BookingConfirmation";
 import { MultiStepForm } from "@/components/forms/MultiStepForm";
 import type { Specialist } from "@/types/specialist";
@@ -43,8 +43,8 @@ const steps = [
   },
   {
     id: "details",
-    title: "Examinee Details",
-    description: "Provide information about the examinee",
+    title: "Intake Form",
+    description: "Provide information about the booking",
     icon: FileText,
   },
   {
@@ -75,12 +75,26 @@ export default function NewBookingPage() {
     };
   } | null>(null);
   const [selectedDateTime, setSelectedDateTime] = useState<Date | null>(null);
-  const [examineeData, setExamineeData] = useState<{
-    examineeName: string;
+  const [selectedTimezone, setSelectedTimezone] = useState<string>("Australia/Sydney");
+  const [intakeFormData, setIntakeFormData] = useState<{
+    // Referrer Information
+    referrerFirstName: string;
+    referrerLastName: string;
+    referrerEmail: string;
+    referrerPhone: string;
+    // Examinee Information
+    examineeFirstName: string;
+    examineeLastName: string;
+    examineeDateOfBirth: string;
     examineePhone: string;
     examineeEmail?: string | null;
-    appointmentType: "in_person" | "telehealth";
-    notes?: string | null;
+    examineeAddress: string;
+    // Medical & Case Information
+    conditions: string;
+    caseType: string;
+    contactAuthorisation: boolean;
+    termsAccepted: boolean;
+    specialNotes?: string | null;
   } | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
 
@@ -121,12 +135,14 @@ export default function NewBookingPage() {
     setSelectedAppointmentType(appointmentType);
   };
 
-  const handleTimeSlotSelect = (dateTime: Date) => {
+  const handleTimeSlotSelect = (dateTime: Date, timezone: string) => {
+    console.log("NewBookingPage - Received timezone:", timezone);
     setSelectedDateTime(dateTime);
+    setSelectedTimezone(timezone);
   };
 
-  const handleExamineeSubmit = (data: typeof examineeData) => {
-    setExamineeData(data);
+  const handleIntakeFormSubmit = (data: typeof intakeFormData) => {
+    setIntakeFormData(data);
     handleNext();
   };
 
@@ -143,7 +159,7 @@ export default function NewBookingPage() {
       case 3:
         return selectedDateTime !== null;
       case 4:
-        return examineeData !== null;
+        return intakeFormData !== null;
       case 5:
         return bookingId !== null;
       default:
@@ -177,6 +193,7 @@ export default function NewBookingPage() {
             appointmentTypeId={selectedAppointmentType.acuityAppointmentTypeId}
             onSelect={handleTimeSlotSelect}
             selectedDateTime={selectedDateTime}
+            selectedTimezone={selectedTimezone}
             specialist={selectedSpecialist}
             appointmentType={{
               name: selectedAppointmentType.name,
@@ -191,19 +208,34 @@ export default function NewBookingPage() {
         );
       case 4:
         return selectedSpecialist && selectedAppointmentType && selectedDateTime ? (
-          <ExamineeForm onSubmit={handleExamineeSubmit} defaultValues={examineeData || undefined} />
+          <IntakeForm
+            onSubmit={handleIntakeFormSubmit}
+            defaultValues={intakeFormData || undefined}
+            specialist={selectedSpecialist}
+            appointmentType={{
+              id: selectedAppointmentType.id,
+              name: selectedAppointmentType.name,
+              duration: selectedAppointmentType.duration,
+              appointmentMode: selectedAppointmentType.appointmentMode,
+            }}
+            dateTime={selectedDateTime}
+            timezone={selectedTimezone}
+          />
         ) : (
           <div className="text-center text-muted-foreground">
             Please complete previous steps first
           </div>
         );
       case 5:
-        return selectedSpecialist && selectedAppointmentType && selectedDateTime && examineeData ? (
+        return selectedSpecialist &&
+          selectedAppointmentType &&
+          selectedDateTime &&
+          intakeFormData ? (
           <BookingConfirmation
             specialist={selectedSpecialist}
             appointmentType={selectedAppointmentType}
             dateTime={selectedDateTime}
-            examineeData={examineeData}
+            intakeFormData={intakeFormData}
             onConfirm={handleBookingConfirm}
             bookingId={bookingId}
           />

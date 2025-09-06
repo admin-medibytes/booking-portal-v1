@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO, isSameDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
@@ -21,7 +21,7 @@ import { Calendar as CalendarIcon, Clock, Video, MapPin } from "lucide-react";
 import { specialistsClient } from "@/lib/hono-client";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/calendar";
-import { today, CalendarDate } from "@internationalized/date";
+import { today, CalendarDate, parseDate } from "@internationalized/date";
 import { timeZones } from "@/lib/utils/timezones";
 
 interface TimeSlot {
@@ -38,8 +38,9 @@ interface AvailabilityResponse {
 interface TimeSlotPickerProps {
   specialistId: string;
   appointmentTypeId: number;
-  onSelect: (dateTime: Date) => void;
+  onSelect: (dateTime: Date, timezone: string) => void;
   selectedDateTime: Date | null;
+  selectedTimezone?: string;
   specialist?: {
     id: string;
     name: string;
@@ -76,12 +77,29 @@ export function TimeSlotPicker({
   appointmentTypeId,
   onSelect,
   selectedDateTime,
+  selectedTimezone,
   specialist,
   appointmentType,
 }: TimeSlotPickerProps) {
-  const [selectedDate, setSelectedDate] = useState<CalendarDate>(today("Australia/Sydney"));
-  const [timeZone, setTimeZone] = useState("Australia/Sydney");
+  const todayDate = today("Australia/Sydney");
+  
+  // Initialize with selected date if returning to this step
+  const initialDate = selectedDateTime 
+    ? new CalendarDate(
+        selectedDateTime.getFullYear(),
+        selectedDateTime.getMonth() + 1, // JS months are 0-indexed
+        selectedDateTime.getDate()
+      )
+    : todayDate;
+  
+  const [selectedDate, setSelectedDate] = useState<CalendarDate>(initialDate);
+  const [timeZone, setTimeZone] = useState(selectedTimezone || "Australia/Sydney");
   const [timeFormat, setTimeFormat] = useState<"12" | "24">("12");
+  const [visibleMonth, setVisibleMonth] = useState({ 
+    month: initialDate.month, 
+    year: initialDate.year 
+  });
+  const hasUserSelectedDate = useRef(!!selectedDateTime);
 
   const userTimezone = timeZone;
 
@@ -95,12 +113,12 @@ export function TimeSlotPicker({
       "specialist-available-dates",
       specialistId,
       appointmentTypeId,
-      selectedDate.month,
-      selectedDate.year,
+      visibleMonth.month,
+      visibleMonth.year,
     ],
     queryFn: async () => {
       // Format month as YYYY-MM
-      const monthStr = `${selectedDate.year}-${String(selectedDate.month).padStart(2, "0")}`;
+      const monthStr = `${visibleMonth.year}-${String(visibleMonth.month).padStart(2, "0")}`;
 
       const response = await specialistsClient[":id"]["available-dates"].$get({
         param: { id: specialistId },
@@ -153,19 +171,40 @@ export function TimeSlotPicker({
     enabled: !!specialistId && !!appointmentTypeId && !!selectedDate,
   });
 
-  // Convert date strings to Date objects for calendar
-  const availableDates = (availableDatesData || []).map((dateStr) => {
-    const [year, month, day] = dateStr.split("-").map(Number);
-    return new Date(year, month - 1, day);
-  });
+  // Pass date strings directly to calendar (expects YYYY-MM-DD format)
+  const availableDates = availableDatesData || [];
+
+  // Auto-select first available date if user hasn't selected one
+  useEffect(() => {
+    if (!hasUserSelectedDate.current && availableDates.length > 0) {
+      // Find the first available date in the current visible month
+      const currentMonthDates = availableDates.filter((dateStr) => {
+        const [year, month] = dateStr.split('-').map(Number);
+        return year === visibleMonth.year && month === visibleMonth.month;
+      });
+      
+      if (currentMonthDates.length > 0) {
+        // Sort dates and pick the first one
+        const firstDate = currentMonthDates.sort()[0];
+        const calendarDate = parseDate(firstDate);
+        setSelectedDate(calendarDate);
+      }
+    }
+  }, [availableDates, visibleMonth]);
 
   const handleDateSelect = (value: any) => {
     setSelectedDate(value);
+    hasUserSelectedDate.current = true;
+  };
+
+  const handleVisibleRangeChange = (month: number, year: number) => {
+    setVisibleMonth({ month, year });
   };
 
   const handleTimeSelect = (slot: any) => {
     const dateTime = parseISO(slot.datetime);
-    onSelect(dateTime);
+    console.log("TimeSlotPicker - Selecting time with timezone:", timeZone);
+    onSelect(dateTime, timeZone);
   };
 
   const formatTime = (date: Date) => {
@@ -176,8 +215,9 @@ export function TimeSlotPicker({
   };
 
   const selectedDateSlots = timeSlotsData || [];
-  const jsSelectedDate = selectedDate.toDate(userTimezone);
-  const isLoading = isDatesLoading || isSlotsLoading;
+  // Convert CalendarDate to JS Date properly to avoid timezone issues
+  const jsSelectedDate = new Date(selectedDate.year, selectedDate.month - 1, selectedDate.day);
+  const isTimeSlotsLoading = isSlotsLoading;
   const error = datesError || slotsError;
 
   if (error) {
@@ -239,7 +279,14 @@ export function TimeSlotPicker({
                 </>
               )}
             </div>
-            <Select value={timeZone} onValueChange={setTimeZone}>
+            <Select value={timeZone} onValueChange={(newTimezone) => {
+              setTimeZone(newTimezone);
+              // If a time was already selected, update with new timezone
+              if (selectedDateTime) {
+                console.log("TimeSlotPicker - Timezone changed to:", newTimezone);
+                onSelect(selectedDateTime, newTimezone);
+              }
+            }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select time zone">{timeZone}</SelectValue>
               </SelectTrigger>
@@ -255,18 +302,15 @@ export function TimeSlotPicker({
         </div>
 
         {/* Center Panel - Calendar */}
-        {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="w-[400px] h-[350px]" />
-          </div>
-        ) : (
-          <Calendar
-            minValue={today(userTimezone)}
-            value={selectedDate}
-            onChange={handleDateSelect}
-            availableDates={availableDates}
-          />
-        )}
+        <Calendar
+          minValue={today(userTimezone)}
+          value={selectedDate}
+          defaultFocusedValue={initialDate}
+          onChange={handleDateSelect}
+          availableDates={availableDates}
+          onVisibleRangeChange={handleVisibleRangeChange}
+          isLoading={isDatesLoading}
+        />
 
         {/* Right Panel - Time Slots */}
         <div className="flex flex-col gap-4 w-[280px] border-l pl-6">
@@ -290,7 +334,7 @@ export function TimeSlotPicker({
               </TabsList>
             </Tabs>
           </div>
-          {isLoading ? (
+          {isTimeSlotsLoading ? (
             <div className="grid gap-2">
               {[1, 2, 3, 4].map((i) => (
                 <Skeleton key={i} className="w-full h-10" />

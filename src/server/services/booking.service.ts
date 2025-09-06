@@ -1,7 +1,14 @@
 import { bookingRepository } from "@/server/repositories/booking.repository";
 import { appointmentTypeRepository } from "@/server/repositories/appointment-type.repository";
 import { db } from "@/server/db";
-import { specialists, members, teamMembers, bookings, users, bookingProgress } from "@/server/db/schema";
+import {
+  specialists,
+  members,
+  teamMembers,
+  bookings,
+  users,
+  bookingProgress,
+} from "@/server/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import type { User } from "@/types/user";
 import type { BookingWithSpecialist, BookingFilters } from "@/types/booking";
@@ -159,31 +166,27 @@ export class BookingService {
 
   async getBookingForAccess(bookingId: string) {
     // Get booking without access checks for internal use
-    const result = await db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
-    
+    const result = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+
     return result[0];
   }
 
   async isUserInTeams(userId: string, teamIds: string[]): Promise<boolean> {
     if (teamIds.length === 0) return false;
-    
+
     const result = await db
       .select()
       .from(teamMembers)
-      .where(and(
-        eq(teamMembers.userId, userId),
-        inArray(teamMembers.teamId, teamIds)
-      ))
+      .where(and(eq(teamMembers.userId, userId), inArray(teamMembers.teamId, teamIds)))
       .limit(1);
-    
+
     return result.length > 0;
   }
 
-  async getUserOrganizationRole(userId: string, organizationId: string): Promise<string | undefined> {
+  async getUserOrganizationRole(
+    userId: string,
+    organizationId: string
+  ): Promise<string | undefined> {
     const result = await db
       .select()
       .from(members)
@@ -265,12 +268,15 @@ export class BookingService {
   }
 
   // Sync booking with Acuity appointment
-  async syncWithAcuityAppointment(bookingId: string, acuityAppointment: {
-    datetime: string;
-    appointmentTypeID: number;
-    duration: string;
-    price: string;
-  }) {
+  async syncWithAcuityAppointment(
+    bookingId: string,
+    acuityAppointment: {
+      datetime: string;
+      appointmentTypeID: number;
+      duration: string;
+      price: string;
+    }
+  ) {
     const [updated] = await db
       .update(bookings)
       .set({
@@ -311,7 +317,7 @@ export class BookingService {
     examineeName: string;
     examineePhone: string;
     examineeEmail?: string | null;
-    appointmentType: "in_person" | "telehealth";
+    appointmentType: "in-person" | "telehealth";
     notes?: string | null;
     referrerId: string;
   }) {
@@ -328,10 +334,7 @@ export class BookingService {
     const [specialist] = await db
       .select()
       .from(specialists)
-      .where(and(
-        eq(specialists.id, sanitizedData.specialistId),
-        eq(specialists.isActive, true)
-      ))
+      .where(and(eq(specialists.id, sanitizedData.specialistId), eq(specialists.isActive, true)))
       .limit(1);
 
     if (!specialist) {
@@ -339,10 +342,11 @@ export class BookingService {
     }
 
     // Validate appointment type is enabled for this specialist
-    const isValidAppointmentType = await appointmentTypeRepository.validateAppointmentTypeForBooking(
-      sanitizedData.specialistId,
-      sanitizedData.appointmentTypeId
-    );
+    const isValidAppointmentType =
+      await appointmentTypeRepository.validateAppointmentTypeForBooking(
+        sanitizedData.specialistId,
+        sanitizedData.appointmentTypeId
+      );
 
     if (!isValidAppointmentType) {
       throw new Error("Selected appointment type is not available for this specialist");
@@ -367,7 +371,7 @@ export class BookingService {
         .from(members)
         .where(eq(members.userId, sanitizedData.referrerId))
         .limit(1);
-      
+
       if (!member?.organizationId) {
         throw new Error("User organization not found");
       }
@@ -439,11 +443,13 @@ export class BookingService {
     const existingBookings = await tx
       .select()
       .from(bookings)
-      .where(and(
-        eq(bookings.specialistId, specialistId),
-        eq(bookings.examDate, dateTime),
-        eq(bookings.status, "active")
-      ))
+      .where(
+        and(
+          eq(bookings.specialistId, specialistId),
+          eq(bookings.examDate, dateTime),
+          eq(bookings.status, "active")
+        )
+      )
       .limit(1);
 
     return existingBookings.length === 0;
@@ -533,9 +539,7 @@ export class BookingService {
     // Validate transition
     const allowedTransitions = validTransitions[currentProgress] || [];
     if (!allowedTransitions.includes(newProgress)) {
-      const error = new Error(
-        `Invalid transition from ${currentProgress} to ${newProgress}`
-      );
+      const error = new Error(`Invalid transition from ${currentProgress} to ${newProgress}`);
       error.name = "InvalidTransitionError";
       throw error;
     }
@@ -545,8 +549,23 @@ export class BookingService {
       // Create progress entry
       await tx.insert(bookingProgress).values({
         bookingId,
-        fromStatus: currentProgress as "scheduled" | "rescheduled" | "cancelled" | "no-show" | "generating-report" | "report-generated" | "payment-received" | null,
-        toStatus: newProgress as "scheduled" | "rescheduled" | "cancelled" | "no-show" | "generating-report" | "report-generated" | "payment-received",
+        fromStatus: currentProgress as
+          | "scheduled"
+          | "rescheduled"
+          | "cancelled"
+          | "no-show"
+          | "generating-report"
+          | "report-generated"
+          | "payment-received"
+          | null,
+        toStatus: newProgress as
+          | "scheduled"
+          | "rescheduled"
+          | "cancelled"
+          | "no-show"
+          | "generating-report"
+          | "report-generated"
+          | "payment-received",
         changedBy: context.userId,
         reason: context.notes,
         metadata: context.impersonatedUserId
@@ -567,10 +586,7 @@ export class BookingService {
         updateData.status = "closed";
       }
 
-      await tx
-        .update(bookings)
-        .set(updateData)
-        .where(eq(bookings.id, bookingId));
+      await tx.update(bookings).set(updateData).where(eq(bookings.id, bookingId));
     });
 
     // Create audit log

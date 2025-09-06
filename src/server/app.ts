@@ -12,6 +12,7 @@ import userRoutes from "./routes/user.routes";
 import { bookingsRoutes } from "./routes/bookings.routes";
 import { specialistsRoutes } from "./routes/specialists.routes";
 import { documentsRoutes } from "./routes/documents.routes";
+
 import { ContentfulStatusCode } from "hono/utils/http-status";
 
 const app = new Hono()

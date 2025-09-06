@@ -37,18 +37,32 @@ interface BookingConfirmationProps {
     duration: number;
     description: string | null;
     category: string | null;
+    appointmentMode?: "in-person" | "telehealth";
     source: {
       name: "acuity" | "override";
       description: "acuity" | "override";
     };
   };
   dateTime: Date;
-  examineeData: {
-    examineeName: string;
+  intakeFormData: {
+    // Referrer Information
+    referrerFirstName: string;
+    referrerLastName: string;
+    referrerEmail: string;
+    referrerPhone: string;
+    // Examinee Information
+    examineeFirstName: string;
+    examineeLastName: string;
+    examineeDateOfBirth: string;
     examineePhone: string;
     examineeEmail?: string | null;
-    appointmentType: "in_person" | "telehealth";
-    notes?: string | null;
+    examineeAddress: string;
+    // Medical & Case Information
+    conditions: string;
+    caseType: string;
+    contactAuthorisation: boolean;
+    termsAccepted: boolean;
+    specialNotes?: string | null;
   };
   onConfirm: (bookingId: string) => void;
   bookingId: string | null;
@@ -58,7 +72,7 @@ export function BookingConfirmation({
   specialist,
   appointmentType,
   dateTime,
-  examineeData,
+  intakeFormData,
   onConfirm,
   bookingId,
 }: BookingConfirmationProps) {
@@ -71,12 +85,23 @@ export function BookingConfirmation({
         json: {
           specialistId: specialist.id,
           appointmentTypeId: appointmentType.id,
-          appointmentType: examineeData.appointmentType || "telehealth",
+          appointmentType: appointmentType.appointmentMode || "telehealth",
           appointmentDateTime: dateTime.toISOString(),
-          examineeName: examineeData.examineeName,
-          examineePhone: examineeData.examineePhone,
-          examineeEmail: examineeData.examineeEmail,
-          notes: examineeData.notes,
+          examineeName: `${intakeFormData.examineeFirstName} ${intakeFormData.examineeLastName}`,
+          examineePhone: intakeFormData.examineePhone,
+          examineeEmail: intakeFormData.examineeEmail,
+          notes:
+            `REFERRER: ${intakeFormData.referrerFirstName} ${intakeFormData.referrerLastName} | ${intakeFormData.referrerEmail} | ${intakeFormData.referrerPhone}\n` +
+            `EXAMINEE: ${intakeFormData.examineeFirstName} ${intakeFormData.examineeLastName}\n` +
+            `DOB: ${intakeFormData.examineeDateOfBirth}\n` +
+            `Phone: ${intakeFormData.examineePhone}\n` +
+            `Email: ${intakeFormData.examineeEmail || "Not provided"}\n` +
+            `Address: ${intakeFormData.examineeAddress}\n` +
+            `Conditions: ${intakeFormData.conditions}\n` +
+            `Case Type: ${intakeFormData.caseType}\n` +
+            `Contact Auth: ${intakeFormData.contactAuthorisation ? "Yes" : "No"}\n` +
+            `Terms Accepted: ${intakeFormData.termsAccepted ? "Yes" : "No"}\n` +
+            (intakeFormData.specialNotes ? `Special Notes: ${intakeFormData.specialNotes}` : ""),
         },
       });
 
@@ -215,7 +240,7 @@ export function BookingConfirmation({
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                {examineeData.appointmentType === "telehealth" ? (
+                {appointmentType.appointmentMode === "telehealth" ? (
                   <>
                     <Video className="h-3 w-3 text-blue-600" />
                     <Badge variant="secondary" className="text-blue-600">
@@ -234,6 +259,34 @@ export function BookingConfirmation({
 
           <Separator />
 
+          {/* Referrer Information */}
+          <div>
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Referrer Information
+            </h3>
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Name:</span>{" "}
+                <span className="font-medium">
+                  {intakeFormData.referrerFirstName} {intakeFormData.referrerLastName}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Mail className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Email:</span>{" "}
+                <span className="font-medium">{intakeFormData.referrerEmail}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Phone className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Phone:</span>{" "}
+                <span className="font-medium">{intakeFormData.referrerPhone}</span>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Examinee Information */}
           <div>
             <h3 className="font-semibold mb-3 flex items-center gap-2">
@@ -243,27 +296,67 @@ export function BookingConfirmation({
             <div className="space-y-2 text-sm">
               <div>
                 <span className="text-muted-foreground">Name:</span>{" "}
-                <span className="font-medium">{examineeData.examineeName}</span>
+                <span className="font-medium">
+                  {intakeFormData.examineeFirstName} {intakeFormData.examineeLastName}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Date of Birth:</span>{" "}
+                <span className="font-medium">{intakeFormData.examineeDateOfBirth}</span>
               </div>
               <div className="flex items-center gap-1">
                 <Phone className="h-3 w-3 text-muted-foreground" />
                 <span className="text-muted-foreground">Phone:</span>{" "}
-                <span className="font-medium">{examineeData.examineePhone}</span>
+                <span className="font-medium">{intakeFormData.examineePhone}</span>
               </div>
-              {examineeData.examineeEmail && (
+              {intakeFormData.examineeEmail && (
                 <div className="flex items-center gap-1">
                   <Mail className="h-3 w-3 text-muted-foreground" />
                   <span className="text-muted-foreground">Email:</span>{" "}
-                  <span className="font-medium">{examineeData.examineeEmail}</span>
+                  <span className="font-medium">{intakeFormData.examineeEmail}</span>
                 </div>
               )}
-              {examineeData.notes && (
+              <div>
+                <span className="text-muted-foreground">Address:</span>{" "}
+                <span className="font-medium whitespace-pre-line">
+                  {intakeFormData.examineeAddress}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Medical & Case Information */}
+          <div>
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Medical & Case Information
+            </h3>
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Medical Conditions:</span>{" "}
+                <span className="font-medium">{intakeFormData.conditions}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Case Type:</span>{" "}
+                <span className="font-medium">{intakeFormData.caseType}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Consents:</span>{" "}
+                <span className="font-medium text-green-600">
+                  {intakeFormData.contactAuthorisation && intakeFormData.termsAccepted
+                    ? "✓ All obtained"
+                    : "Incomplete"}
+                </span>
+              </div>
+              {intakeFormData.specialNotes && (
                 <div className="mt-3">
                   <div className="flex items-center gap-1 mb-1">
                     <FileText className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Additional Notes:</span>
+                    <span className="text-muted-foreground">Special Notes:</span>
                   </div>
-                  <p className="text-sm bg-muted p-2 rounded-md">{examineeData.notes}</p>
+                  <p className="text-sm bg-muted p-2 rounded-md">{intakeFormData.specialNotes}</p>
                 </div>
               )}
             </div>
