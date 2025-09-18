@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -52,7 +52,11 @@ export function BookingSettingsModal({
   const [hasLoaded, setHasLoaded] = useState(false);
 
   // Fetch organizations
-  const { data: organizationsData, isLoading, error } = useQuery({
+  const {
+    data: organizationsData,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["organizations-for-booking"],
     queryFn: async () => {
       const response = await adminClient.organizations.$get({
@@ -61,11 +65,11 @@ export function BookingSettingsModal({
           page: "1",
         },
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to fetch organizations");
       }
-      
+
       const result = await response.json();
       return result.organizations as Organization[];
     },
@@ -84,7 +88,7 @@ export function BookingSettingsModal({
 
   const handleConfirm = () => {
     if (selectedTimezone && selectedOrganization && organizationsData) {
-      const selectedOrg = organizationsData.find(org => org.id === selectedOrganization);
+      const selectedOrg = organizationsData.find((org) => org.id === selectedOrganization);
       if (selectedOrg) {
         onConfirm(selectedTimezone, selectedOrganization, selectedOrg.slug);
       }
@@ -94,14 +98,14 @@ export function BookingSettingsModal({
   const canConfirm = selectedTimezone && selectedOrganization;
 
   return (
-    <Dialog open={isOpen} modal>
-      <DialogContent className="sm:max-w-[425px]" onInteractOutside={(e) => e.preventDefault()}>
-        <DialogHeader>
-          <DialogTitle>Confirm Booking Settings</DialogTitle>
-          <DialogDescription>
+    <AlertDialog open={isOpen}>
+      <AlertDialogContent className="sm:max-w-[425px]">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm Booking Settings</AlertDialogTitle>
+          <AlertDialogDescription>
             Please confirm your timezone and organization for this booking session.
-          </DialogDescription>
-        </DialogHeader>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
 
         <div className="grid gap-4 py-4">
           {/* Timezone Selection */}
@@ -110,10 +114,7 @@ export function BookingSettingsModal({
               <Globe className="h-4 w-4" />
               Timezone
             </Label>
-            <Select
-              value={selectedTimezone}
-              onValueChange={setSelectedTimezone}
-            >
+            <Select value={selectedTimezone} onValueChange={setSelectedTimezone}>
               <SelectTrigger id="timezone">
                 <SelectValue placeholder="Select timezone" />
               </SelectTrigger>
@@ -146,10 +147,7 @@ export function BookingSettingsModal({
                 </AlertDescription>
               </Alert>
             ) : (
-              <Select
-                value={selectedOrganization}
-                onValueChange={setSelectedOrganization}
-              >
+              <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
                 <SelectTrigger id="organization">
                   <SelectValue placeholder="Select organization" />
                 </SelectTrigger>
@@ -168,15 +166,12 @@ export function BookingSettingsModal({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button 
-            onClick={handleConfirm} 
-            disabled={!canConfirm || isLoading}
-          >
+        <AlertDialogFooter>
+          <Button onClick={handleConfirm} disabled={!canConfirm || isLoading}>
             Confirm Settings
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
