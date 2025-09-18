@@ -164,7 +164,7 @@ export default function BookingsPage() {
               bookings={data?.bookings || []}
               totalCount={data?.pagination.total || 0}
               currentPage={filters.page || 1}
-              pageSize={filters.limit || 20}
+              pageSize={filters.limit || 10}
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
             />

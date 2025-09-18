@@ -52,6 +52,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { BookingWithSpecialist } from "@/types/booking";
+import { cn } from "@/lib/utils";
 
 // Memoized cell components for performance
 const SpecialistCell = memo(
@@ -181,9 +182,18 @@ export const BookingListTable = memo(function BookingListTable({
       },
       cell: ({ row }) => {
         const booking = row.original;
+        const color = booking.type === "telehealth" ? "blue" : "violet";
+
         return (
           <div className="space-y-1">
-            <div className="font-medium capitalize">{booking.type || "Not specified"}</div>
+            <div
+              className={cn(
+                "text-xs px-2 py-.5 font-medium border capitalize w-fit rounded",
+                `bg-${color}-100 border-${color}-200 text-${color}-700`
+              )}
+            >
+              {booking.type}
+            </div>
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Calendar className="h-3 w-3" />
               <span>
@@ -213,17 +223,20 @@ export const BookingListTable = memo(function BookingListTable({
         if (!booking.examinee) {
           return <span className="text-muted-foreground">No case info</span>;
         }
+
+        const color = booking.status === "active" ? "green" : "red";
         return (
           <div className="space-y-1">
-            {booking.examinee.caseType && (
-              <div className="font-medium">{booking.examinee.caseType}</div>
-            )}
-            {booking.examinee.condition && (
-              <div className="text-sm text-muted-foreground">{booking.examinee.condition}</div>
-            )}
-            {!booking.examinee.caseType && !booking.examinee.condition && (
-              <span className="text-muted-foreground">Not provided</span>
-            )}
+            <div
+              className={cn(
+                "text-xs px-2 py-.5 font-medium border capitalize w-fit rounded",
+                `bg-${color}-100 border-${color}-200 text-${color}-700`
+              )}
+            >
+              {booking.status}
+            </div>
+            <div className="text-sm text-muted-foreground">{booking.examinee.caseType}</div>
+            <div className="text-sm text-muted-foreground">{booking.examinee.condition}</div>
           </div>
         );
       },
