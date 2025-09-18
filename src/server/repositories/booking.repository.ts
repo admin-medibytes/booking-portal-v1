@@ -1,6 +1,13 @@
 import { db } from "@/server/db";
-import { bookings, specialists, users, referrers, examinees, organizations } from "@/server/db/schema";
-import { eq, and, gte, lte, desc, sql, SQL } from "drizzle-orm";
+import {
+  bookings,
+  specialists,
+  users,
+  referrers,
+  examinees,
+  organizations,
+} from "@/server/db/schema";
+import { eq, and, gte, lte, desc, sql, SQL, or, ilike, inArray } from "drizzle-orm";
 import type { BookingFilters } from "@/types/booking";
 
 export class BookingRepository {
@@ -17,8 +24,25 @@ export class BookingRepository {
     if (filters?.endDate) {
       conditions.push(lte(bookings.dateTime, filters.endDate));
     }
-    if (filters?.specialistId) {
+
+    // Handle both single specialistId and multiple specialistIds
+    if (filters?.specialistIds && filters.specialistIds.length > 0) {
+      conditions.push(inArray(bookings.specialistId, filters.specialistIds));
+    } else if (filters?.specialistId) {
       conditions.push(eq(bookings.specialistId, filters.specialistId));
+    }
+
+    // Handle search across examinee fields
+    if (filters?.search) {
+      const searchTerm = `%${filters.search}%`;
+      conditions.push(
+        or(
+          ilike(examinees.firstName, searchTerm),
+          ilike(examinees.lastName, searchTerm),
+          ilike(examinees.email, searchTerm),
+          ilike(examinees.phoneNumber, searchTerm)
+        )!
+      );
     }
 
     return conditions;
@@ -52,10 +76,19 @@ export class BookingRepository {
 
     const results = await query;
 
-    const [{ count }] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(bookings)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    // Build count query - need to include examinees join if searching
+    const countQuery = filters?.search
+      ? db
+          .select({ count: sql<number>`count(*)` })
+          .from(bookings)
+          .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
+      : db
+          .select({ count: sql<number>`count(*)` })
+          .from(bookings)
+          .where(conditions.length > 0 ? and(...conditions) : undefined);
+    
+    const [{ count }] = await countQuery;
 
     return {
       data: results,
@@ -74,16 +107,16 @@ export class BookingRepository {
         specialist: {
           with: {
             user: true,
-          }
+          },
         },
         referrer: {
           with: {
             organization: true,
-          }
+          },
         },
         examinee: true,
         organization: true,
-      }
+      },
     });
 
     return result;

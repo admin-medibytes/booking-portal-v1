@@ -12,6 +12,8 @@ const bookingFiltersSchema = type({
   "startDate?": "string.date",
   "endDate?": "string.date",
   "specialistId?": "string.uuid",
+  "specialistIds?": "string",
+  "search?": "string",
   "page?": "string.integer",
   "limit?": "string.integer<=100",
 });
@@ -51,6 +53,8 @@ const bookingsRoutes = new Hono()
       startDate: queryParams.startDate ? new Date(queryParams.startDate) : undefined,
       endDate: queryParams.endDate ? new Date(queryParams.endDate) : undefined,
       specialistId: queryParams.specialistId,
+      specialistIds: queryParams.specialistIds ? queryParams.specialistIds.split(",") : undefined,
+      search: queryParams.search,
       page: Number(queryParams.page) ?? 1,
       limit: Number(queryParams.limit) ?? 20,
     };

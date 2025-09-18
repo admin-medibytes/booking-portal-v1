@@ -44,10 +44,10 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
 
   // Initialize filter state from URL
   const [filters, setFilters] = useState<FilterState>(() => {
-    const urlStatus = searchParams.get("status");
+    const urlStatus = searchParams.get("status") ?? "active";
     // Convert "all" to null, validate other values
     const status =
-      urlStatus === "all" || !urlStatus
+      urlStatus === "all"
         ? null
         : ["active", "closed"].includes(urlStatus)
           ? (urlStatus as "active" | "closed")

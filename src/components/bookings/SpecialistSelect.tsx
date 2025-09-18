@@ -2,25 +2,15 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  MapPin,
-  Video,
-  User,
-  MapPinned,
-  Check,
-  Eye,
-  Search,
-  Star,
-  Mail,
-  Phone,
-} from "lucide-react";
+import { MapPin, User, Check, Eye, Search, Mail, Phone } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -32,10 +22,9 @@ import {
 import { specialistsClient } from "@/lib/hono-client";
 import { getLocationDisplay } from "@/lib/utils/location";
 import { handleApiResponse } from "@/lib/hono-utils";
-import { cn } from "@/lib/utils";
 import type { Specialist } from "@/types/specialist";
-import Link from "next/link";
 import { getInitials } from "@/lib/utils/initials";
+import Link from "next/link";
 
 interface SpecialistSelectProps {
   onSelect: (specialist: Specialist | null) => void;

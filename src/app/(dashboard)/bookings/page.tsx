@@ -115,7 +115,7 @@ export default function BookingsPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
-          <p className="mt-2 text-gray-600">Manage patient appointments and referrals</p>
+          <p className="mt-2 text-gray-600">Manage examinee appointments and referrals</p>
         </div>
         <Button className="inline-flex items-center" onClick={() => router.push("/bookings/new")}>
           <Plus className="w-4 h-4 mr-2" />

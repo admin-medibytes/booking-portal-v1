@@ -112,7 +112,7 @@ export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProp
     const grouped: Record<string, BookingWithSpecialist[]> = {};
 
     bookings.forEach((booking) => {
-      const appointmentDate = booking.examDate;
+      const appointmentDate = booking.dateTime;
       if (appointmentDate) {
         const dateKey = format(new Date(appointmentDate), "yyyy-MM-dd");
         if (!grouped[dateKey]) {
@@ -125,8 +125,8 @@ export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProp
     // Sort bookings within each day by time
     Object.keys(grouped).forEach((dateKey) => {
       grouped[dateKey].sort((a, b) => {
-        const timeA = a.examDate ? new Date(a.examDate).getTime() : 0;
-        const timeB = b.examDate ? new Date(b.examDate).getTime() : 0;
+        const timeA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
+        const timeB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
         return timeA - timeB;
       });
     });
@@ -140,8 +140,8 @@ export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProp
     const monthEnd = endOfMonth(currentDate);
 
     return bookings.filter((booking) => {
-      if (!booking.examDate) return false;
-      const bookingDate = new Date(booking.examDate);
+      if (!booking.dateTime) return false;
+      const bookingDate = new Date(booking.dateTime);
       return bookingDate >= monthStart && bookingDate <= monthEnd;
     }).length;
   }, [bookings, currentDate]);
@@ -157,14 +157,6 @@ export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProp
       {/* Calendar Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold sm:text-2xl">{headerTitle}</h2>
-            {viewType === "month" && (
-              <Badge variant="secondary" className="text-sm border border-gray-200">
-                {totalMonthBookings} {totalMonthBookings === 1 ? "booking" : "bookings"}
-              </Badge>
-            )}
-          </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={navigatePrevious}>
               <ChevronLeft className="w-4 h-4" />
@@ -177,6 +169,14 @@ export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProp
               <ChevronRight className="w-4 h-4" />
               <span className="sr-only">Next</span>
             </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold sm:text-2x">{headerTitle}</h2>
+            {viewType === "month" && (
+              <Badge variant="secondary" className="text-sm border border-gray-200">
+                {totalMonthBookings} {totalMonthBookings === 1 ? "booking" : "bookings"}
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -414,8 +414,8 @@ function WeekView({ currentDate, bookingsByDate, onBookingClick }: WeekViewProps
               const dateKey = format(day, "yyyy-MM-dd");
               const dayBookings = bookingsByDate[dateKey] || [];
               const hourBookings = dayBookings.filter((booking) => {
-                if (!booking.examDate) return false;
-                const bookingDate = new Date(booking.examDate);
+                if (!booking.dateTime) return false;
+                const bookingDate = new Date(booking.dateTime);
                 return bookingDate.getHours() === hour;
               });
 
@@ -468,8 +468,8 @@ function DayView({ currentDate, bookingsByDate, onBookingClick }: DayViewProps) 
       <div className="max-h-[600px] overflow-y-auto">
         {businessHours.map((hour) => {
           const hourBookings = dayBookings.filter((booking) => {
-            if (!booking.examDate) return false;
-            const bookingDate = new Date(booking.examDate);
+            if (!booking.dateTime) return false;
+            const bookingDate = new Date(booking.dateTime);
             return bookingDate.getHours() === hour;
           });
 
@@ -513,12 +513,12 @@ function AgendaView({ currentDate, bookings, onBookingClick }: AgendaViewProps) 
 
     return bookings
       .filter((booking) => {
-        const bookingDate = booking.examDate ? new Date(booking.examDate) : null;
+        const bookingDate = booking.dateTime ? new Date(booking.dateTime) : null;
         return bookingDate && bookingDate >= startDate && bookingDate <= endDate;
       })
       .sort((a, b) => {
-        const dateA = a.examDate ? new Date(a.examDate).getTime() : 0;
-        const dateB = b.examDate ? new Date(b.examDate).getTime() : 0;
+        const dateA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
+        const dateB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
         return dateA - dateB;
       });
   }, [currentDate, bookings]);
@@ -528,8 +528,8 @@ function AgendaView({ currentDate, bookings, onBookingClick }: AgendaViewProps) 
     const grouped: Record<string, BookingWithSpecialist[]> = {};
 
     agendaBookings.forEach((booking) => {
-      if (!booking.examDate) return;
-      const dateKey = format(new Date(booking.examDate), "yyyy-MM-dd");
+      if (!booking.dateTime) return;
+      const dateKey = format(new Date(booking.dateTime), "yyyy-MM-dd");
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
       }
@@ -597,7 +597,7 @@ interface BookingItemProps {
 }
 
 function BookingItem({ booking, view, onClick }: BookingItemProps) {
-  const appointmentDate = booking.examDate ? new Date(booking.examDate) : null;
+  const appointmentDate = booking.dateTime ? new Date(booking.dateTime) : null;
   const timeString = appointmentDate ? format(appointmentDate, "h:mm a") : "";
 
   // For now, we'll use a default status since currentProgress isn't available
@@ -613,7 +613,7 @@ function BookingItem({ booking, view, onClick }: BookingItemProps) {
         onClick={(e) => onClick(booking, e)}
       >
         <div className="font-medium truncate">
-          {timeString} - {booking.patientFirstName} {booking.patientLastName}
+          {timeString} - {booking.examinee.firstName} {booking.examinee.lastName}
         </div>
       </div>
     );
@@ -629,7 +629,7 @@ function BookingItem({ booking, view, onClick }: BookingItemProps) {
         onClick={(e) => onClick(booking, e)}
       >
         <div className="font-medium truncate">
-          {booking.patientFirstName} {booking.patientLastName}
+          {booking.examinee?.firstName} {booking.examinee?.lastName}
         </div>
         <div className="text-xs opacity-75">{booking.specialist?.name || "Unassigned"}</div>
       </div>
@@ -647,11 +647,11 @@ function BookingItem({ booking, view, onClick }: BookingItemProps) {
             <div className="flex items-center gap-2 mb-1">
               <span className="font-medium">{timeString}</span>
               <Badge variant="outline" className="text-xs">
-                {booking.examLocation || "In-Person"}
+                {booking.location}
               </Badge>
             </div>
             <div className="font-medium">
-              {booking.patientFirstName} {booking.patientLastName}
+              {booking.examinee.firstName} {booking.examinee.lastName}
             </div>
             <div className="text-sm opacity-75">
               with {booking.specialist?.name || "Unassigned"} (

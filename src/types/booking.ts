@@ -1,5 +1,13 @@
 import { InferSelectModel } from "drizzle-orm";
-import { bookings, bookingProgress, specialists, referrers, examinees, organizations, type SpecialistLocation } from "@/server/db/schema";
+import {
+  bookings,
+  bookingProgress,
+  specialists,
+  referrers,
+  examinees,
+  organizations,
+  type SpecialistLocation,
+} from "@/server/db/schema";
 
 export type Booking = InferSelectModel<typeof bookings>;
 export type BookingProgress = InferSelectModel<typeof bookingProgress>;
@@ -15,9 +23,9 @@ export interface BookingWithSpecialist extends Booking {
     jobTitle: string;
     location?: SpecialistLocation | null;
   };
-  referrer?: Referrer | null;
-  examinee?: Examinee | null;
-  referrerOrganization?: Organization | null;
+  referrer: Referrer;
+  examinee: Examinee;
+  referrerOrganization: Organization;
 }
 
 export interface BookingWithProgress extends BookingWithSpecialist {

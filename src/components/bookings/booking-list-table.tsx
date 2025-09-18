@@ -115,7 +115,10 @@ export const BookingListTable = memo(function BookingListTable({
         const booking = row.original;
         return (
           <div className="space-y-1">
-            <div className="font-medium">
+            <div
+              className="font-medium hover:font-bold hover:cursor-pointer"
+              onClick={() => router.push(`/bookings/${booking.id}`)}
+            >
               {booking.examinee
                 ? `${booking.examinee.firstName} ${booking.examinee.lastName}`
                 : "Not provided"}

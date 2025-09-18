@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { BookingDetailClient } from "./booking-detail-client";
 import { bookingService } from "@/server/services/booking.service";
-import type { BookingWithDetails } from "@/hooks/use-booking";
 
 interface BookingDetailPageProps {
   params: Promise<{
@@ -21,39 +20,29 @@ export default async function BookingDetailPage({ params }: BookingDetailPagePro
     notFound();
   }
 
-  // Fetch booking data server-side
-  let booking: BookingWithDetails | null = null;
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/bookings/${id}`, {
-      headers: {
-        cookie: (await headers()).get("cookie") || "",
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch booking');
-    }
-    
-    const data = await response.json() as { success: boolean; booking: BookingWithDetails };
-    booking = data.booking;
-  } catch {
-    notFound();
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) {
+    return notFound();
   }
 
-  if (!booking) {
-    notFound();
-  }
+  const booking = await bookingService.getBookingById(id, {
+    id: session.user.id,
+    role: session.user.role as "user" | "admin" | null,
+  });
 
   // Check permissions
   const userOrgRole = session.session?.activeOrganizationId
-    ? await bookingService.getUserOrganizationRole(session.user.id, session.session.activeOrganizationId)
+    ? await bookingService.getUserOrganizationRole(
+        session.user.id,
+        session.session.activeOrganizationId
+      )
     : undefined;
-  
-  const isSpecialistForBooking = userOrgRole === "specialist" && 
-    booking.specialist?.id && 
+
+  const isSpecialistForBooking =
+    userOrgRole === "specialist" &&
+    booking.specialist?.id &&
     (await bookingService.isUserSpecialist(session.user.id, booking.specialist.id));
-  
+
   const canUpdateProgress = session.user.role === "admin" || isSpecialistForBooking || false;
 
   return (

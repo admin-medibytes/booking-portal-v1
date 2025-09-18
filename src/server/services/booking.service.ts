@@ -216,9 +216,7 @@ export class BookingService {
     return specialist.length > 0;
   }
 
-  private formatBookingResponse(
-    bookingData: any
-  ): BookingWithSpecialist & { referrer?: any; examinee?: any; referrerOrganization?: any } {
+  private formatBookingResponse(bookingData: any) {
     // Handle both the old select format and the new query format
     if (bookingData.booking) {
       // Old format from select joins

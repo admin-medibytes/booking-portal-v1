@@ -1,11 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   User,
   Phone,
@@ -19,20 +19,28 @@ import {
   Briefcase,
   FileText,
   AlertCircle,
-  Trash2,
   Globe,
   ChevronDown,
   Check,
+  Mail,
 } from "lucide-react";
-import { format, addMinutes } from "date-fns";
-import { formatInTimeZone } from "date-fns-tz";
-import type { BookingWithSpecialist } from "@/types/booking";
-import { useState } from "react";
-import { timeZones } from "@/lib/utils/timezones";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useState } from "react";
+import { addMinutes } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { timeZones } from "@/lib/utils/timezones";
+import { BookingWithDetails } from "@/hooks/use-booking";
 
 interface BookingDetailCardProps {
-  booking: BookingWithSpecialist;
+  booking: BookingWithDetails;
 }
 
 // Filter for Australian timezones only
@@ -51,15 +59,34 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
   };
 
   const [selectedTimezone, setSelectedTimezone] = useState(getUserTimezone());
+  const [showContactModal, setShowContactModal] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
-        return "bg-success text-success-foreground";
+        return "bg-green-100 border-green-200 text-green-700";
       case "closed":
-        return "bg-muted text-muted-foreground";
+        return "bg-red-100 border-red-200 text-red-500";
       case "archived":
-        return "bg-destructive text-destructive-foreground";
+        return "bg-gray-100 border-gray-300 text-gray-700";
+      default:
+        return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getProgressColor = (progress: string) => {
+    switch (progress) {
+      case "scheduled":
+      case "rescheduled":
+        return "bg-sky-100 border-sky-200 text-sky-700";
+      case "cancelled":
+      case "no-show":
+        return "bg-red-100 border-red-200 text-red-700";
+      case "generating-report":
+      case "report-generated":
+        return "bg-amber-100 border-amber-200 text-amber-700";
+      case "payment-received":
+        return "bg-green-100 border-green-200 text-green-700";
       default:
         return "bg-muted text-muted-foreground";
     }
@@ -140,9 +167,9 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
             {/* Specialist Info */}
             <div className="flex items-start gap-4 p-4 bg-muted/50 rounded-lg">
               <Avatar className="h-16 w-16">
-                <AvatarImage src="/placeholder.svg" alt={booking.specialist?.name} />
+                <AvatarImage src="/placeholder.svg" alt={booking.specialist.name} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-lg">
-                  {booking.specialist?.name
+                  {booking.specialist.name
                     ?.split(" ")
                     .map((n) => n[0])
                     .join("") || "NA"}
@@ -298,14 +325,14 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
             </div>
 
             {/* Case Information */}
-            {(booking.examinee?.condition ||
-              booking.examinee?.caseType ||
-              booking.examinee?.address) && (
+            {(booking.examinee.condition ||
+              booking.examinee.caseType ||
+              booking.examinee.address) && (
               <>
                 <Separator />
                 <div>
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-warning" />
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
                     Case Information
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -425,7 +452,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
             <div className="flex justify-between items-start">
               <span className="text-muted-foreground">Specialist</span>
               <span className="font-medium text-right">
-                {booking.specialist?.name || "Not assigned"}
+                {booking.specialist.name || "Not assigned"}
               </span>
             </div>
             <div className="flex justify-between">
@@ -457,14 +484,19 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Progress</span>
-              <span className="font-medium capitalize">
-                {(booking as any).currentProgress || "Scheduled"}
-              </span>
+              <Badge className={cn("capitalize", getProgressColor(booking.currentProgress))}>
+                {booking.currentProgress}
+              </Badge>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Contact Authorized</span>
-              <span className="font-medium">
-                {booking.examinee?.authorizedContact ? "Yes" : "No"}
+              <span
+                className={cn(
+                  "font-medium",
+                  booking.examinee.authorizedContact ? "text-emerald-500" : "text-rose-500"
+                )}
+              >
+                {booking.examinee.authorizedContact ? "Yes" : "No"}
               </span>
             </div>
 
@@ -567,12 +599,55 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
             <p className="text-sm text-muted-foreground mb-4">
               Contact our support team for assistance with your booking.
             </p>
-            <Button className="w-full bg-transparent" variant="outline">
+            <Button
+              className="w-full bg-transparent"
+              variant="outline"
+              onClick={() => setShowContactModal(true)}
+            >
               <Phone className="h-4 w-4 mr-2" />
               Contact Support
             </Button>
           </CardContent>
         </Card>
+
+        <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Need Help?</DialogTitle>
+              <DialogDescription>
+                If you need assistance with your booking, we are here to help.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="flex items-center space-x-3 p-4 bg-slate-50 rounded-lg">
+                <Phone className="h-5 w-5 text-slate-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-900">Phone</p>
+                  <a href="tel:1800603920" className="text-sm text-primary hover:underline">
+                    1800 603 920
+                  </a>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 p-4 bg-slate-50 rounded-lg">
+                <Mail className="h-5 w-5 text-slate-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-900">Email</p>
+                  <a
+                    href="mailto:appointments@medibytes.com"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    admin@medibytes.com.au
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button onClick={() => setShowContactModal(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

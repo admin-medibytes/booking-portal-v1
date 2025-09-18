@@ -5,7 +5,7 @@ import type { BookingWithSpecialist, BookingProgress } from "@/types/booking";
 
 export interface BookingWithDetails extends BookingWithSpecialist {
   progress: (BookingProgress & {
-    changedBy?: {
+    changedBy: {
       id: string;
       name: string;
       email: string;
@@ -30,9 +30,11 @@ export function useBookingWithDetails(id: string) {
     queryKey: bookingDetailKeys.detail(id),
     queryFn: async () => {
       const response = bookingsClient[":id"].$get({
-        param: { id }
+        param: { id },
       });
-      const data = await handleApiResponse<{ success: boolean; booking: BookingWithDetails }>(response);
+      const data = await handleApiResponse<{ success: boolean; booking: BookingWithDetails }>(
+        response
+      );
       return data.booking;
     },
     enabled: !!id,

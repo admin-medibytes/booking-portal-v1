@@ -16,7 +16,6 @@ export const client = hc<AppType>(`${baseUrl}`, {
 });
 
 // Export individual route clients for easier access
-export const authClient = client.api.auth; // TODO: remove this and stick to using auth-client from better auth
 export const adminClient = client.api.admin;
 export const userClient = client.api.user;
 export const bookingsClient = client.api.bookings;
