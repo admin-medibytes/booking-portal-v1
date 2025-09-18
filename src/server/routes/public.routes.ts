@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { type } from "arktype";
 import { arktypeValidator } from "@/server/middleware/validate.middleware";
 import { userService } from "@/server/services/user.service";
+import { appFormsService } from "@/server/services/appForms.service";
 import { logger } from "@/server/utils/logger";
 
 const acceptInvitationSchema = type({

@@ -30,11 +30,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { specialistsClient } from "@/lib/hono-client";
-import {
-  formatLocationShort,
-  getLocationDisplay,
-  getAppointmentTypeDisplay,
-} from "@/lib/utils/location";
+import { getLocationDisplay } from "@/lib/utils/location";
 import { handleApiResponse } from "@/lib/hono-utils";
 import { cn } from "@/lib/utils";
 import type { Specialist } from "@/types/specialist";

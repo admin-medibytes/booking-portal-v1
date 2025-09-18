@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from "uuid";
 import {
   pgTable,
   text,
@@ -11,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { users } from "./auth";
+import { acuityAppointmentTypes } from "./acuity";
 
 export interface SpecialistLocation {
   streetAddress?: string;
@@ -26,11 +28,11 @@ export const specialists = pgTable(
   {
     id: text("id")
       .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
+      .$defaultFn(() => uuidv4()),
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    acuityCalendarId: text("acuity_calendar_id").notNull().unique(),
+    acuityCalendarId: integer("acuity_calendar_id").notNull().unique(),
     name: text("name").notNull(),
     slug: text("slug").unique(),
     image: text("image"),
@@ -64,48 +66,17 @@ export const specialistsRelations = relations(specialists, ({ one, many }) => ({
   appointmentTypes: many(specialistAppointmentTypes),
 }));
 
-export const appointmentTypes = pgTable(
-  "appointment_types",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    acuityAppointmentTypeId: integer("acuity_appointment_type_id").notNull().unique(),
-    acuityName: text("acuity_name").notNull(),
-    acuityDescription: text("acuity_description"),
-    durationMinutes: integer("duration_minutes").notNull(),
-    category: text("category"),
-    active: boolean("active").default(true).notNull(),
-    lastSyncedAt: timestamp("last_synced_at"),
-    raw: jsonb("raw"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    acuityAppointmentTypeIdIdx: index("appointment_types_acuity_id_idx").on(
-      table.acuityAppointmentTypeId
-    ),
-    activeIdx: index("appointment_types_active_idx").on(table.active),
-    categoryIdx: index("appointment_types_category_idx").on(table.category),
-  })
-);
-
-export const appointmentTypesRelations = relations(appointmentTypes, ({ many }) => ({
-  specialists: many(specialistAppointmentTypes),
-}));
-
 export const specialistAppointmentTypes = pgTable(
   "specialist_appointment_types",
   {
     specialistId: text("specialist_id")
       .notNull()
       .references(() => specialists.id, { onDelete: "cascade" }),
-    appointmentTypeId: text("appointment_type_id")
+    appointmentTypeId: integer("appointment_type_id")
       .notNull()
-      .references(() => appointmentTypes.id, { onDelete: "cascade" }),
+      .references(() => acuityAppointmentTypes.id, { onDelete: "cascade" }),
     enabled: boolean("enabled").default(true).notNull(),
-    appointmentMode: text("appointment_mode", { enum: ["in-person", "telehealth"] })
-      .notNull(),
+    appointmentMode: text("appointment_mode", { enum: ["in-person", "telehealth"] }).notNull(),
     customDisplayName: text("custom_display_name"),
     customDescription: text("custom_description"),
     customPrice: integer("custom_price"),
@@ -133,9 +104,9 @@ export const specialistAppointmentTypesRelations = relations(
       fields: [specialistAppointmentTypes.specialistId],
       references: [specialists.id],
     }),
-    appointmentType: one(appointmentTypes, {
+    appointmentType: one(acuityAppointmentTypes, {
       fields: [specialistAppointmentTypes.appointmentTypeId],
-      references: [appointmentTypes.id],
+      references: [acuityAppointmentTypes.id],
     }),
   })
 );

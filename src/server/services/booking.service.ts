@@ -8,13 +8,22 @@ import {
   bookings,
   users,
   bookingProgress,
+  referrers,
+  examinees,
+  specialistAppointmentTypes,
+  appForms,
+  appFormFields,
+  acuityAppointmentTypeForms,
+  organizations,
 } from "@/server/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import type { User } from "@/types/user";
 import type { BookingWithSpecialist, BookingFilters } from "@/types/booking";
+import type { ExamineeFieldType } from "@/server/db/schema/appForms";
 import { acuityService } from "@/server/services/acuity.service";
 import { auditService } from "@/server/services/audit.service";
 import DOMPurify from "isomorphic-dompurify";
+import { formatLocationFull } from "@/lib/utils/location";
 
 // BookingFilters is imported from types/booking.ts
 
@@ -27,7 +36,8 @@ export class BookingService {
       throw error;
     }
 
-    const hasAccess = await this.userHasAccessToBooking(user, bookingData.booking);
+    // Handle both old and new format
+    const hasAccess = await this.userHasAccessToBooking(user, bookingData);
     if (!hasAccess) {
       const error = new Error("Access denied");
       error.name = "AccessDeniedError";
@@ -206,24 +216,44 @@ export class BookingService {
     return specialist.length > 0;
   }
 
-  private formatBookingResponse(bookingData: {
-    booking: typeof bookings.$inferSelect;
-    specialist: typeof specialists.$inferSelect | null;
-    specialistUser?: typeof users.$inferSelect | null;
-  }): BookingWithSpecialist {
-    const { booking, specialist, specialistUser } = bookingData;
-    return {
-      ...booking,
-      specialist:
-        specialist && specialistUser
+  private formatBookingResponse(
+    bookingData: any
+  ): BookingWithSpecialist & { referrer?: any; examinee?: any; referrerOrganization?: any } {
+    // Handle both the old select format and the new query format
+    if (bookingData.booking) {
+      // Old format from select joins
+      const { booking, specialist, specialistUser, referrer, examinee, referrerOrganization } =
+        bookingData;
+      return {
+        ...booking,
+        specialist:
+          specialist && specialistUser
+            ? {
+                id: specialist.id,
+                name: specialistUser.name,
+                jobTitle: specialistUser.jobTitle,
+                location: specialist.location,
+              }
+            : { id: "", name: "", jobTitle: "", location: null },
+        referrer: referrer || null,
+        examinee: examinee || null,
+        referrerOrganization: referrerOrganization || null,
+      };
+    } else {
+      // New format from query builder
+      return {
+        ...bookingData,
+        specialist: bookingData.specialist
           ? {
-              id: specialist.id,
-              name: specialistUser.name,
-              jobTitle: specialistUser.jobTitle,
-              location: specialist.location,
+              id: bookingData.specialist.id,
+              name: bookingData.specialist.user?.name || "",
+              jobTitle: bookingData.specialist.user?.jobTitle || "",
+              location: bookingData.specialist.location,
             }
           : { id: "", name: "", jobTitle: "", location: null },
-    };
+        referrerOrganization: bookingData.referrer?.organization || null,
+      };
+    }
   }
 
   // Find booking by Acuity appointment ID
@@ -258,7 +288,7 @@ export class BookingService {
     const [updated] = await db
       .update(bookings)
       .set({
-        examDate,
+        dateTime: examDate,
         updatedAt: new Date(),
       })
       .where(eq(bookings.id, bookingId))
@@ -277,160 +307,226 @@ export class BookingService {
       price: string;
     }
   ) {
-    const [updated] = await db
-      .update(bookings)
-      .set({
-        examDate: new Date(acuityAppointment.datetime),
-        updatedAt: new Date(),
-        metadata: {
-          ...(await this.getBookingMetadata(bookingId)),
-          lastAcuitySync: new Date().toISOString(),
-          acuityData: {
-            appointmentTypeId: acuityAppointment.appointmentTypeID,
-            duration: acuityAppointment.duration,
-            price: acuityAppointment.price,
-          },
-        },
-      })
-      .where(eq(bookings.id, bookingId))
-      .returning();
+    throw new Error("booking.service.syncWithAcuityAppointment: Not implemented");
+    // const [updated] = await db
+    //   .update(bookings)
+    //   .set({
+    //     dateTime: new Date(acuityAppointment.datetime),
+    //     updatedAt: new Date(),
+    //   })
+    //   .where(eq(bookings.id, bookingId))
+    //   .returning();
 
-    return updated;
+    // return updated;
   }
 
-  // Helper to get existing metadata
-  private async getBookingMetadata(bookingId: string): Promise<Record<string, unknown>> {
-    const [booking] = await db
-      .select({ metadata: bookings.metadata })
-      .from(bookings)
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
+  // Extract examinee data from form fields based on field mappings
+  private async extractExamineeDataFromFields(
+    appointmentTypeId: number,
+    fields: { id: number; value: string }[]
+  ): Promise<
+    Partial<{
+      firstName: string;
+      lastName: string;
+      dateOfBirth: string;
+      email: string;
+      phoneNumber: string;
+      address: string;
+      authorizedContact: string;
+      condition: string;
+      caseType: string;
+      [key: string]: string;
+    }>
+  > {
+    // Get the form configuration with field mappings
+    const formMappings = await db
+      .select({
+        acuityFieldId: appFormFields.acuityFieldId,
+        examineeFieldMapping: appFormFields.examineeFieldMapping,
+      })
+      .from(appFormFields)
+      .innerJoin(appForms, eq(appFormFields.appFormId, appForms.id))
+      .innerJoin(
+        acuityAppointmentTypeForms,
+        eq(appForms.acuityFormId, acuityAppointmentTypeForms.formId)
+      )
+      .where(
+        and(
+          eq(acuityAppointmentTypeForms.appointmentTypeId, appointmentTypeId),
+          eq(appForms.isActive, true)
+        )
+      );
 
-    return (booking?.metadata as Record<string, unknown>) || {};
+    // Create a map of field ID to examinee field mapping
+    const fieldMappingMap = new Map<number, ExamineeFieldType>();
+    formMappings.forEach((mapping) => {
+      if (mapping.examineeFieldMapping) {
+        fieldMappingMap.set(mapping.acuityFieldId, mapping.examineeFieldMapping);
+      }
+    });
+
+    // Extract examinee data from submitted fields
+    const examineeData: Record<string, string> = {};
+    for (const field of fields) {
+      const mapping = fieldMappingMap.get(field.id);
+      if (mapping && field.value) {
+        examineeData[mapping] = field.value;
+      }
+    }
+
+    return examineeData;
   }
 
   // Create a new booking
   async createBooking(data: {
+    appointmentTypeId: number;
+    datetime: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    timezone: string;
+    organizationId: string;
+    teamId: string;
+    createdById: string;
     specialistId: string;
-    appointmentTypeId: string;
-    appointmentDateTime: Date;
-    examineeName: string;
-    examineePhone: string;
-    examineeEmail?: string | null;
-    appointmentType: "in-person" | "telehealth";
-    notes?: string | null;
-    referrerId: string;
+    fields: {
+      id: number;
+      value: string;
+    }[];
   }) {
-    // Sanitize all string inputs
-    const sanitizedData = {
-      ...data,
-      examineeName: DOMPurify.sanitize(data.examineeName),
-      examineePhone: DOMPurify.sanitize(data.examineePhone),
-      examineeEmail: data.examineeEmail ? DOMPurify.sanitize(data.examineeEmail) : null,
-      notes: data.notes ? DOMPurify.sanitize(data.notes) : null,
-    };
-
     // Validate specialist exists
-    const [specialist] = await db
-      .select()
-      .from(specialists)
-      .where(and(eq(specialists.id, sanitizedData.specialistId), eq(specialists.isActive, true)))
-      .limit(1);
+    const specialist = await db.query.specialists.findFirst({
+      where: and(eq(specialists.id, data.specialistId), eq(specialists.isActive, true)),
+    });
 
     if (!specialist) {
       throw new Error("Specialist not found or inactive");
     }
 
-    // Validate appointment type is enabled for this specialist
-    const isValidAppointmentType =
-      await appointmentTypeRepository.validateAppointmentTypeForBooking(
-        sanitizedData.specialistId,
-        sanitizedData.appointmentTypeId
-      );
-
-    if (!isValidAppointmentType) {
-      throw new Error("Selected appointment type is not available for this specialist");
-    }
-
-    // Begin transaction
-    const booking = await db.transaction(async (tx) => {
-      // Re-check availability with database lock
-      const isAvailable = await this.checkTimeSlotAvailability(
-        sanitizedData.specialistId,
-        sanitizedData.appointmentDateTime,
-        tx
-      );
-
-      if (!isAvailable) {
-        throw new Error("Time slot not available");
-      }
-
-      // Get user's organization ID through members table
-      const [member] = await tx
-        .select()
-        .from(members)
-        .where(eq(members.userId, sanitizedData.referrerId))
-        .limit(1);
-
-      if (!member?.organizationId) {
-        throw new Error("User organization not found");
-      }
-
-      // Create booking in database
-      const [newBooking] = await tx
-        .insert(bookings)
-        .values({
-          organizationId: member.organizationId,
-          specialistId: sanitizedData.specialistId,
-          referrerId: sanitizedData.referrerId,
-          examDate: sanitizedData.appointmentDateTime,
-          patientFirstName: sanitizedData.examineeName.split(" ")[0] || "",
-          patientLastName: sanitizedData.examineeName.split(" ").slice(1).join(" ") || "",
-          patientDateOfBirth: new Date("1970-01-01"), // Placeholder - should be collected in form
-          patientPhone: sanitizedData.examineePhone,
-          patientEmail: sanitizedData.examineeEmail,
-          examinationType: "Independent Medical Examination",
-          examLocation: sanitizedData.appointmentType,
-          status: "active",
-          metadata: {
-            notes: sanitizedData.notes,
-            createdVia: "portal",
-            appointmentType: sanitizedData.appointmentType,
-          },
-        })
-        .returning();
-
-      // Create Acuity appointment
-      try {
-        const acuityAppointment = await acuityService.createAppointment({
-          datetime: sanitizedData.appointmentDateTime.toISOString(),
-          appointmentTypeID: 1, // TODO: Get from specialist configuration
-          calendarID: parseInt(specialist.acuityCalendarId, 10),
-          firstName: sanitizedData.examineeName.split(" ")[0] || "",
-          lastName: sanitizedData.examineeName.split(" ").slice(1).join(" ") || "",
-          phone: sanitizedData.examineePhone,
-          email: sanitizedData.examineeEmail || "",
-          notes: sanitizedData.notes || "",
-        });
-
-        // Update booking with Acuity ID
-        const [updatedBooking] = await tx
-          .update(bookings)
-          .set({
-            acuityAppointmentId: acuityAppointment.id,
-            updatedAt: new Date(),
-          })
-          .where(eq(bookings.id, newBooking.id))
-          .returning();
-
-        return updatedBooking;
-      } catch (error) {
-        console.error("Failed to create Acuity appointment:", error);
-        throw new Error("Failed to sync with scheduling system");
-      }
+    const specialistAppointmentType = await db.query.specialistAppointmentTypes.findFirst({
+      where: and(
+        eq(specialistAppointmentTypes.specialistId, specialist.id),
+        eq(specialistAppointmentTypes.appointmentTypeId, data.appointmentTypeId)
+      ),
+      with: { appointmentType: true },
     });
 
-    return booking;
+    if (!specialistAppointmentType) {
+      throw new Error("Appointment type not found");
+    }
+
+    // Extract examinee data from form fields
+    const extractedExamineeData1 = await this.extractExamineeDataFromFields(
+      data.appointmentTypeId,
+      data.fields
+    );
+
+    // Create acuity appointment
+    let acuityAppointment;
+    try {
+      acuityAppointment = await acuityService.createAppointment({
+        datetime: data.datetime,
+        appointmentTypeID: specialistAppointmentType.appointmentTypeId,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        timezone: data.timezone,
+        fields: data.fields,
+      });
+    } catch (error) {
+      console.error("Failed to create Acuity appointment:", error);
+      throw new Error("Failed to sync with scheduling system");
+    }
+
+    // Extract examinee data from form fields
+    const extractedExamineeData = await this.extractExamineeDataFromFields(
+      data.appointmentTypeId,
+      data.fields
+    );
+
+    try {
+      const booking = await db.transaction(async (tx) => {
+        const referrerUser = await tx.query.users.findFirst({
+          where: eq(users.email, data.email),
+          columns: { id: true, jobTitle: true },
+        });
+
+        // Create referrer record
+        const [referrerRecord] = await tx
+          .insert(referrers)
+          .values({
+            organizationId: data.organizationId,
+            userId: referrerUser?.id,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            phone: data.phone,
+            jobTitle: referrerUser?.jobTitle,
+          })
+          .returning();
+
+        // Create examinee record with extracted data from form fields
+        const [examineeRecord] = await tx
+          .insert(examinees)
+          .values({
+            referrerId: referrerRecord.id,
+            firstName: extractedExamineeData.firstName || "",
+            lastName: extractedExamineeData.lastName || "",
+            dateOfBirth: extractedExamineeData.dateOfBirth || "",
+            address: extractedExamineeData.address || "",
+            email: extractedExamineeData.email || "",
+            phoneNumber: extractedExamineeData.phoneNumber || "",
+            authorizedContact:
+              extractedExamineeData.authorizedContact === "true" ||
+              extractedExamineeData.authorizedContact === "yes" ||
+              extractedExamineeData.authorizedContact === "1" ||
+              false, // Default to true if not specified
+            condition: extractedExamineeData.condition || "",
+            caseType: extractedExamineeData.caseType || "",
+          })
+          .returning();
+
+        // Create booking in database with Acuity ID
+        const [newBooking] = await tx
+          .insert(bookings)
+          .values({
+            organizationId: data.organizationId,
+            teamId: data.teamId,
+            createdById: data.createdById,
+            referrerId: referrerRecord.id,
+            specialistId: specialist.id,
+            examineeId: examineeRecord.id,
+            status: "active",
+            type: specialistAppointmentType.appointmentMode,
+            duration: specialistAppointmentType.appointmentType.duration,
+            location:
+              specialistAppointmentType.appointmentMode === "telehealth"
+                ? "Generating link"
+                : specialist.location === null
+                  ? "[Admin to advise]"
+                  : (formatLocationFull(specialist.location) ?? "[Admin to advise]"),
+            dateTime: new Date(data.datetime),
+            acuityAppointmentId: acuityAppointment.id, // Use the Acuity ID directly
+            acuityAppointmentTypeId: specialistAppointmentType.appointmentTypeId,
+            acuityCalendarId: specialist.acuityCalendarId,
+            scheduledAt: new Date(),
+          })
+          .returning();
+
+        return newBooking;
+      });
+
+      return booking;
+    } catch (error) {
+      // Database transaction failed, need to cancel the Acuity appointment
+      console.error(
+        "Failed to create database records, Acuity appointment id is:",
+        acuityAppointment.id
+      );
+      throw error; // Re-throw the original database error
+    }
   }
 
   // Check if a time slot is available
@@ -446,7 +542,7 @@ export class BookingService {
       .where(
         and(
           eq(bookings.specialistId, specialistId),
-          eq(bookings.examDate, dateTime),
+          eq(bookings.dateTime, dateTime),
           eq(bookings.status, "active")
         )
       )
@@ -463,8 +559,6 @@ export class BookingService {
         bookingId: bookingProgress.bookingId,
         fromStatus: bookingProgress.fromStatus,
         toStatus: bookingProgress.toStatus,
-        reason: bookingProgress.reason,
-        metadata: bookingProgress.metadata,
         createdAt: bookingProgress.createdAt,
         changedBy: {
           id: users.id,
@@ -473,7 +567,7 @@ export class BookingService {
         },
       })
       .from(bookingProgress)
-      .leftJoin(users, eq(bookingProgress.changedBy, users.id))
+      .leftJoin(users, eq(bookingProgress.changedById, users.id))
       .where(eq(bookingProgress.bookingId, bookingId))
       .orderBy(desc(bookingProgress.createdAt));
 
@@ -514,7 +608,7 @@ export class BookingService {
     // Check access
     const hasAccess = await this.userHasAccessToBooking(
       { id: context.userId, role: context.userRole },
-      bookingData.booking
+      bookingData
     );
     if (!hasAccess) {
       const error = new Error("Access denied");
@@ -525,7 +619,7 @@ export class BookingService {
     // Additional check for specialists - can only update their own bookings
     if (context.organizationRole === "specialist") {
       const specialistData = await this.getSpecialistByUserId(context.userId);
-      if (!specialistData || specialistData.id !== bookingData.booking.specialistId) {
+      if (!specialistData || specialistData.id !== bookingData.specialistId) {
         const error = new Error("Specialists can only update their own bookings");
         error.name = "AccessDeniedError";
         throw error;
@@ -566,11 +660,7 @@ export class BookingService {
           | "generating-report"
           | "report-generated"
           | "payment-received",
-        changedBy: context.userId,
-        reason: context.notes,
-        metadata: context.impersonatedUserId
-          ? { impersonatedUserId: context.impersonatedUserId }
-          : {},
+        changedById: context.userId,
       });
 
       // Update booking timestamps based on progress

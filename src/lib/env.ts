@@ -23,7 +23,6 @@ export const env = createEnv({
     BETTER_AUTH_URL: type("string.url"),
     AUTH_TRUSTED_ORIGINS: type("string"),
     SESSION_SECRET: type("string"),
-    SESSION_TIMEOUT: type("string.numeric").narrow((val) => Number(val) >= 0),
 
     // AWS
     AWS_REGION: type("string"),
@@ -80,6 +79,7 @@ export const env = createEnv({
   },
   client: {
     NEXT_PUBLIC_API_URL: type("string.url"),
+    NEXT_PUBLIC_APP_URL: type("string.url"),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
@@ -88,6 +88,7 @@ export const env = createEnv({
     APP_NAME: process.env.APP_NAME,
     APP_URL: process.env.APP_URL,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     DB_SSL: process.env.DB_SSL,
     DB_POOL_SIZE: process.env.DB_POOL_SIZE,
@@ -97,7 +98,6 @@ export const env = createEnv({
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     AUTH_TRUSTED_ORIGINS: process.env.AUTH_TRUSTED_ORIGINS,
     SESSION_SECRET: process.env.SESSION_SECRET,
-    SESSION_TIMEOUT: process.env.SESSION_TIMEOUT,
     AWS_REGION: process.env.AWS_REGION,
     AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,

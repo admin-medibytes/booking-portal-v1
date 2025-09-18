@@ -9,9 +9,9 @@ import authRoutes from "./routes/auth.routes";
 import adminRoutes from "./routes/admin.routes";
 import publicRoutes from "./routes/public.routes";
 import userRoutes from "./routes/user.routes";
-import { bookingsRoutes } from "./routes/bookings.routes";
 import { specialistsRoutes } from "./routes/specialists.routes";
-import { documentsRoutes } from "./routes/documents.routes";
+import formsRoutes from "./routes/forms.routes";
+import { bookingsRoutes } from "./routes/bookings.routes";
 
 import { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -19,7 +19,29 @@ const app = new Hono()
   .basePath("/api")
 
   .use("*", logger())
-  .use("*", cors())
+  .use(
+    "*",
+    cors({
+      origin: (origin) => {
+        // Parse allowed origins from environment variable
+        const allowedOrigins = env.AUTH_TRUSTED_ORIGINS.split(",").map((o) => o.trim());
+
+        // Allow requests with no origin (e.g., server-to-server, Postman)
+        if (!origin) return null;
+
+        // Check if the origin is in the allowed list
+        if (allowedOrigins.includes(origin)) {
+          return origin;
+        }
+
+        // Reject other origins
+        return null;
+      },
+      credentials: true,
+      allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+      allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    })
+  )
 
   // Mount public routes (no auth required)
   .route("/public", publicRoutes)
@@ -33,14 +55,14 @@ const app = new Hono()
   // Mount user routes (authenticated)
   .route("/user", userRoutes)
 
-  // Mount bookings routes (authenticated)
-  .route("/bookings", bookingsRoutes)
-
   // Mount specialists routes (authenticated)
   .route("/specialists", specialistsRoutes)
 
-  // Mount documents routes (authenticated)
-  .route("/documents", documentsRoutes)
+  // Mount forms routes (authenticated)
+  .route("/forms", formsRoutes)
+
+  // Mount bookings routes (authenticated)
+  .route("/bookings", bookingsRoutes)
 
   .get("/health", async (c) => {
     const dbHealth = await healthCheck();

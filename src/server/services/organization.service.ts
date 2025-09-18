@@ -172,6 +172,19 @@ export class OrganizationService {
     }
   }
 
+  async getOrganizationBySlug(slug: string, headers: HeadersInit) {
+    const response = await auth.api.getFullOrganization({
+      headers,
+      query: { organizationSlug: slug },
+    });
+
+    if (!response) {
+      throw new HTTPException(404, { message: "Organization not found" });
+    }
+
+    return response;
+  }
+
   async getOrganizationWithStats(organizationId: string, headers: HeadersInit) {
     try {
       const response = await auth.api.getFullOrganization({

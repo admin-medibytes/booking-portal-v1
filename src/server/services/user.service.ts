@@ -1,12 +1,21 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
-import { users, organizations, members, invitations, teams, specialists } from "@/server/db/schema";
+import {
+  users,
+  organizations,
+  members,
+  invitations,
+  teams,
+  specialists,
+  accounts,
+} from "@/server/db/schema";
 import { eq, and, or, like, count, sql, inArray } from "drizzle-orm";
 import { logger } from "@/server/utils/logger";
 import { AppError, ErrorCode, ConflictError, NotFoundError } from "@/server/utils/errors";
 import { emailService } from "@/server/services/email.service";
 import { env } from "@/lib/env";
 import { auditService } from "@/server/services/audit.service";
+import { hashPassword } from "@/lib/crypto";
 import type {
   CreateUserInput,
   UserListParams,
@@ -796,38 +805,103 @@ export class UserService {
         .where(eq(users.email, input.email))
         .limit(1);
 
-      if (existingUser.length > 0) {
-        throw new ConflictError("User with this email already exists");
-      }
+      let userId: string;
 
-      // Create the user account with Better Auth
-      const result = await auth.api.createUser({
-        headers: new Headers(),
-        body: {
-          email: input.email,
-          password: input.password,
-          name: `${input.firstName} ${input.lastName}`,
-          data: {
+      if (existingUser.length > 0) {
+        // User exists - this happens when admin created the user with sendEmailInvitation=true
+        // We need to update their password and profile info
+        userId = existingUser[0].id;
+
+        // Hash the new password
+        const hashedPassword = await hashPassword(input.password);
+
+        // Update user's profile information in the users table
+        await db
+          .update(users)
+          .set({
+            name: `${input.firstName} ${input.lastName}`,
             firstName: input.firstName,
             lastName: input.lastName,
             jobTitle: input.jobTitle,
+            emailVerified: true,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+
+        // Update password in the accounts table
+        await db
+          .update(accounts)
+          .set({
+            password: hashedPassword,
+            updatedAt: new Date(),
+          })
+          .where(eq(accounts.userId, userId));
+
+        // Check if user is already a member of the organization
+        const existingMember = await db
+          .select()
+          .from(members)
+          .where(
+            and(eq(members.userId, userId), eq(members.organizationId, invite.organizationId!))
+          )
+          .limit(1);
+
+        // Only add membership if not already a member
+        if (existingMember.length === 0 && invite.organizationId) {
+          await db.insert(members).values({
+            id: crypto.randomUUID(),
+            userId: userId,
+            organizationId: invite.organizationId,
+            role: invite.role as "owner" | "manager" | "team_lead" | "referrer" | "specialist",
+            createdAt: new Date(),
+          });
+        }
+
+        logger.info("Existing user accepted invitation and updated password", {
+          invitationId: input.invitationId,
+          userId: userId,
+          email: input.email,
+          organizationRole: invite.role,
+        });
+      } else {
+        // User doesn't exist - create new user
+        const result = await auth.api.createUser({
+          headers: new Headers(),
+          body: {
+            email: input.email,
+            password: input.password,
+            name: `${input.firstName} ${input.lastName}`,
+            data: {
+              firstName: input.firstName,
+              lastName: input.lastName,
+              jobTitle: input.jobTitle,
+            },
+            role: "user", // Base role is always "user"
           },
-          role: "user", // Base role is always "user"
-        },
-      });
+        });
 
-      if (!result?.user) {
-        throw new AppError(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to create user account", 500);
-      }
+        if (!result?.user) {
+          throw new AppError(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to create user account", 500);
+        }
 
-      // Add user to organization as member with the specified role
-      if (invite.organizationId) {
-        await db.insert(members).values({
-          id: crypto.randomUUID(),
-          userId: result.user.id,
-          organizationId: invite.organizationId,
-          role: invite.role as "owner" | "manager" | "team_lead" | "referrer" | "specialist",
-          createdAt: new Date(),
+        userId = result.user.id;
+
+        // Add user to organization as member with the specified role
+        if (invite.organizationId) {
+          await db.insert(members).values({
+            id: crypto.randomUUID(),
+            userId: userId,
+            organizationId: invite.organizationId,
+            role: invite.role as "owner" | "manager" | "team_lead" | "referrer" | "specialist",
+            createdAt: new Date(),
+          });
+        }
+
+        logger.info("New user created via invitation", {
+          invitationId: input.invitationId,
+          userId: userId,
+          email: input.email,
+          organizationRole: invite.role,
         });
       }
 
@@ -837,14 +911,14 @@ export class UserService {
         .set({ status: "accepted" })
         .where(eq(invitations.id, input.invitationId));
 
-      logger.info("Invitation accepted and user created", {
+      logger.info("Invitation accepted", {
         invitationId: input.invitationId,
-        userId: result.user.id,
+        userId: userId,
         email: input.email,
         organizationRole: invite.role,
       });
 
-      return { userId: result.user.id };
+      return { userId: userId };
     } catch (error) {
       if (error instanceof AppError) {
         throw error;

@@ -14,7 +14,18 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { format } from "date-fns";
-import { ArrowUpDown, Eye } from "lucide-react";
+import {
+  ArrowUpDown,
+  Eye,
+  MoreHorizontal,
+  Calendar,
+  Clock,
+  Mail,
+  Phone,
+  Building2,
+  Clock4,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -32,6 +43,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { BookingWithSpecialist } from "@/types/booking";
 
 // Memoized cell components for performance
@@ -89,41 +108,35 @@ export const BookingListTable = memo(function BookingListTable({
 
   const columns: ColumnDef<BookingWithSpecialist>[] = [
     {
-      accessorKey: "examDate",
-      header: ({ column }) => {
+      id: "examinee",
+      header: "Examinee",
+      cell: ({ row }) => {
+        const booking = row.original;
         return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Date
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
+          <div className="space-y-1">
+            <div className="font-medium">
+              {booking.examinee
+                ? `${booking.examinee.firstName} ${booking.examinee.lastName}`
+                : "Not provided"}
+            </div>
+            {booking.examinee?.email && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Mail className="h-3 w-3" />
+                <span>{booking.examinee.email}</span>
+              </div>
+            )}
+            {booking.examinee?.phoneNumber && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Phone className="h-3 w-3" />
+                <span>{booking.examinee.phoneNumber}</span>
+              </div>
+            )}
+          </div>
         );
       },
-      cell: ({ row }) => {
-        const date = row.getValue("examDate") as string | null;
-        if (!date) return <span className="text-muted-foreground">Not scheduled</span>;
-        return format(new Date(date), "MMM dd, yyyy");
-      },
     },
     {
-      id: "time",
-      accessorKey: "examDate",
-      header: "Time",
-      cell: ({ row }) => {
-        const date = row.getValue("examDate") as string | null;
-        if (!date) return <span className="text-muted-foreground">-</span>;
-        return format(new Date(date), "h:mm a");
-      },
-    },
-    {
-      id: "examinee",
-      accessorFn: (row) => `${row.patientFirstName} ${row.patientLastName}`,
-      header: "Examinee",
-    },
-    {
-      accessorKey: "specialist",
+      id: "specialist",
       header: ({ column }) => {
         return (
           <Button
@@ -136,8 +149,16 @@ export const BookingListTable = memo(function BookingListTable({
         );
       },
       cell: ({ row }) => {
-        const specialist = row.getValue("specialist") as BookingWithSpecialist["specialist"];
-        return <SpecialistCell specialist={specialist} />;
+        const specialist = row.original.specialist;
+        if (!specialist) {
+          return <span className="text-muted-foreground">Not assigned</span>;
+        }
+        return (
+          <div>
+            <div className="font-medium">{specialist.name}</div>
+            <div className="text-sm text-muted-foreground">{specialist.jobTitle || "N/A"}</div>
+          </div>
+        );
       },
       sortingFn: (rowA, rowB) => {
         const a = rowA.original.specialist?.name || "";
@@ -146,35 +167,138 @@ export const BookingListTable = memo(function BookingListTable({
       },
     },
     {
-      accessorKey: "status",
+      id: "appointment",
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Status
+            Appointment
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         );
       },
       cell: ({ row }) => {
-        const status = row.getValue("status") as string;
-        return <StatusBadge status={status} />;
+        const booking = row.original;
+        return (
+          <div className="space-y-1">
+            <div className="font-medium capitalize">{booking.type || "Not specified"}</div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              <span>
+                {booking.dateTime
+                  ? format(new Date(booking.dateTime), "MMM dd, yyyy")
+                  : "Not scheduled"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              <span>{booking.dateTime ? format(new Date(booking.dateTime), "h:mm a") : "--"}</span>
+            </div>
+          </div>
+        );
+      },
+      sortingFn: (rowA, rowB) => {
+        const a = rowA.original.dateTime ? new Date(rowA.original.dateTime).getTime() : 0;
+        const b = rowB.original.dateTime ? new Date(rowB.original.dateTime).getTime() : 0;
+        return a - b;
+      },
+    },
+    {
+      id: "case",
+      header: "Case",
+      cell: ({ row }) => {
+        const booking = row.original;
+        if (!booking.examinee) {
+          return <span className="text-muted-foreground">No case info</span>;
+        }
+        return (
+          <div className="space-y-1">
+            {booking.examinee.caseType && (
+              <div className="font-medium">{booking.examinee.caseType}</div>
+            )}
+            {booking.examinee.condition && (
+              <div className="text-sm text-muted-foreground">{booking.examinee.condition}</div>
+            )}
+            {!booking.examinee.caseType && !booking.examinee.condition && (
+              <span className="text-muted-foreground">Not provided</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "referrer",
+      header: "Referrer",
+      cell: ({ row }) => {
+        const booking = row.original;
+        if (!booking.referrer) {
+          return <span className="text-muted-foreground">No referrer info</span>;
+        }
+        return (
+          <div className="space-y-1">
+            <div className="font-medium">
+              {booking.referrer.firstName} {booking.referrer.lastName}
+            </div>
+            {booking.referrerOrganization?.name && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Building2 className="h-3 w-3" />
+                <span>{booking.referrerOrganization.name}</span>
+              </div>
+            )}
+            {booking.referrer.email && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Mail className="h-3 w-3" />
+                <span>{booking.referrer.email}</span>
+              </div>
+            )}
+          </div>
+        );
       },
     },
     {
       id: "actions",
+      header: "Actions",
       cell: ({ row }) => {
+        const booking = row.original;
         return (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push(`/bookings/${row.original.id}`)}
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            View Details
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push(`/bookings/${booking.id}`)}>
+                <Eye className="mr-2 h-4 w-4" />
+                See Details
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  // TODO: Implement reschedule logic
+                  console.log("Reschedule", booking.id);
+                }}
+              >
+                <Clock4 className="mr-2 h-4 w-4" />
+                Reschedule
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => {
+                  // TODO: Implement cancel logic
+                  console.log("Cancel", booking.id);
+                }}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Cancel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         );
       },
     },

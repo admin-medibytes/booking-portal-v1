@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { toast } from "sonner";
 import { TwoFactorModal } from "./two-factor-modal";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 
 type LoginFormData = {
   email: string;
@@ -24,12 +25,15 @@ export function LoginForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [showTwoFactorModal, setShowTwoFactorModal] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  const togglePasswordVisibility = () => setIsPasswordVisible((prev) => !prev);
 
   const form = useForm({
     defaultValues: {
       email: "",
       password: "",
-      rememberMe: false,
+      rememberMe: true,
     } as LoginFormData,
     onSubmit: async ({ value }) => {
       try {
@@ -170,20 +174,36 @@ export function LoginForm() {
             {(field) => (
               <div>
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  className="mt-1"
-                  aria-invalid={field.state.meta.errors.length > 0}
-                  aria-describedby={
-                    field.state.meta.errors.length > 0 ? "password-error" : undefined
-                  }
-                />
+                <div className="relative mt-1">
+                  <Input
+                    id="password"
+                    type={isPasswordVisible ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                    className="pe-9"
+                    aria-invalid={field.state.meta.errors.length > 0}
+                    aria-describedby={
+                      field.state.meta.errors.length > 0 ? "password-error" : undefined
+                    }
+                  />
+                  <button
+                    className="text-muted-foreground/80 hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 absolute inset-y-0 end-0 flex h-full w-9 items-center justify-center rounded-e-md transition-[color,box-shadow] outline-none focus:z-10 focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+                    type="button"
+                    onClick={togglePasswordVisibility}
+                    aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+                    aria-pressed={isPasswordVisible}
+                    aria-controls="password"
+                  >
+                    {isPasswordVisible ? (
+                      <EyeOffIcon size={16} aria-hidden="true" />
+                    ) : (
+                      <EyeIcon size={16} aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
                 {field.state.meta.errors.length > 0 && (
                   <p id="password-error" className="mt-1 text-sm text-red-600">
                     {field.state.meta.errors[0]}

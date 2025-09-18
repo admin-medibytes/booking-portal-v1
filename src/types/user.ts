@@ -1,5 +1,12 @@
 import { type InferSelectModel } from "drizzle-orm";
-import { users, members, organizations, teams, specialists, type SpecialistLocation } from "@/server/db/schema";
+import {
+  users,
+  members,
+  organizations,
+  teams,
+  specialists,
+  type SpecialistLocation,
+} from "@/server/db/schema";
 
 export type User = InferSelectModel<typeof users>;
 export type Member = InferSelectModel<typeof members>;
@@ -17,7 +24,7 @@ export interface CreateUserInput {
   teamId: string;
   role: "referrer" | "specialist" | "admin";
   sendEmailInvitation: boolean;
-  acuityCalendarId?: string;
+  acuityCalendarId?: number;
   slug?: string;
   createdBy: string;
 }
@@ -35,7 +42,7 @@ export interface UserWithMemberships extends User {
   memberships: UserMembership[];
   specialist?: {
     id: string;
-    acuityCalendarId: string;
+    acuityCalendarId: number;
     position: number;
     location?: SpecialistLocation | null;
   };

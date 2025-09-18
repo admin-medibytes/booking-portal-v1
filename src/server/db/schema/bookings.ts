@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from "uuid";
 import {
   pgTable,
   text,
@@ -28,7 +29,7 @@ export const bookingProgressStatusEnum = pgEnum("booking_progress_status", [
 export const referrers = pgTable("referrers", {
   id: text("id")
     .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
+    .$defaultFn(() => uuidv4()),
   organizationId: text("organization_id")
     .notNull()
     .references(() => organizations.id),
@@ -45,7 +46,7 @@ export const referrers = pgTable("referrers", {
 export const examinees = pgTable("examinees", {
   id: text("id")
     .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
+    .$defaultFn(() => uuidv4()),
   referrerId: text("referrer_id")
     .notNull()
     .references(() => referrers.id),
@@ -67,7 +68,7 @@ export const bookings = pgTable(
   {
     id: text("id")
       .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
+      .$defaultFn(() => uuidv4()),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
@@ -120,7 +121,7 @@ export const bookingProgress = pgTable(
   {
     id: text("id")
       .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
+      .$defaultFn(() => uuidv4()),
     bookingId: text("booking_id")
       .notNull()
       .references(() => bookings.id, { onDelete: "cascade" }),
@@ -174,9 +175,13 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
     fields: [bookings.createdById],
     references: [users.id],
   }),
-  referrer: one(users, {
+  referrer: one(referrers, {
     fields: [bookings.referrerId],
-    references: [users.id],
+    references: [referrers.id],
+  }),
+  examinee: one(examinees, {
+    fields: [bookings.examineeId],
+    references: [examinees.id],
   }),
   specialist: one(specialists, {
     fields: [bookings.specialistId],

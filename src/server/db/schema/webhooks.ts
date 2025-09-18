@@ -1,7 +1,8 @@
+import { v4 as uuidv4 } from "uuid";
 import { pgTable, text, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
 
 export const webhookEvents = pgTable('webhook_events', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text('id').primaryKey().$defaultFn(() => uuidv4()),
   source: text('source').notNull().default('acuity'),
   eventType: text('event_type').notNull(),
   resourceId: text('resource_id').notNull(), // Acuity appointment ID

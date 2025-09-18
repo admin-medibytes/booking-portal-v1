@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Calendar, FileText, Settings, Users, Shield, Home, CalendarCheck } from "lucide-react";
+import { Calendar, FileText, Settings, Users, Shield, Home, CalendarCheck, Plug } from "lucide-react";
 
 import {
   Sidebar,
@@ -67,6 +67,11 @@ export function AppSidebar({ user }: AppUserProps) {
       href: "/admin/audit",
       label: "Audit Logs",
       icon: Shield,
+    },
+    {
+      href: "/admin/integrations",
+      label: "Integrations",
+      icon: Plug,
     },
   ];
 

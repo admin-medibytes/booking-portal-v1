@@ -1,6 +1,6 @@
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/server/db";
-import { appointmentTypes, specialistAppointmentTypes } from "@/server/db/schema";
+import { acuityAppointmentTypes as appointmentTypes, specialistAppointmentTypes } from "@/server/db/schema";
 
 export class AppointmentTypeRepository {
   async getAll(activeOnly = true) {
@@ -10,14 +10,20 @@ export class AppointmentTypeRepository {
       .select()
       .from(appointmentTypes)
       .where(conditions)
-      .orderBy(appointmentTypes.category, appointmentTypes.acuityName);
+      .orderBy(appointmentTypes.category, appointmentTypes.name);
   }
 
-  async getById(id: string) {
+  async getById(id: string | number) {
+    const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+    
+    if (isNaN(numericId)) {
+      return undefined;
+    }
+    
     const [result] = await db
       .select()
       .from(appointmentTypes)
-      .where(eq(appointmentTypes.id, id))
+      .where(eq(appointmentTypes.id, numericId))
       .limit(1);
 
     return result;
@@ -27,7 +33,7 @@ export class AppointmentTypeRepository {
     const [result] = await db
       .select()
       .from(appointmentTypes)
-      .where(eq(appointmentTypes.acuityAppointmentTypeId, acuityId))
+      .where(eq(appointmentTypes.id, acuityId))
       .limit(1);
 
     return result;
@@ -38,10 +44,10 @@ export class AppointmentTypeRepository {
     const baseQuery = db
       .select({
         id: appointmentTypes.id,
-        acuityAppointmentTypeId: appointmentTypes.acuityAppointmentTypeId,
-        acuityName: appointmentTypes.acuityName,
-        acuityDescription: appointmentTypes.acuityDescription,
-        durationMinutes: appointmentTypes.durationMinutes,
+        acuityAppointmentTypeId: appointmentTypes.id,
+        acuityName: appointmentTypes.name,
+        acuityDescription: appointmentTypes.description,
+        durationMinutes: appointmentTypes.duration,
         category: appointmentTypes.category,
         active: appointmentTypes.active,
         enabled: specialistAppointmentTypes.enabled,
@@ -50,8 +56,8 @@ export class AppointmentTypeRepository {
         customDescription: specialistAppointmentTypes.customDescription,
         customPrice: specialistAppointmentTypes.customPrice,
         notes: specialistAppointmentTypes.notes,
-        effectiveName: sql<string>`COALESCE(${specialistAppointmentTypes.customDisplayName}, ${appointmentTypes.acuityName})`,
-        effectiveDescription: sql<string>`COALESCE(${specialistAppointmentTypes.customDescription}, ${appointmentTypes.acuityDescription})`,
+        effectiveName: sql<string>`COALESCE(${specialistAppointmentTypes.customDisplayName}, ${appointmentTypes.name})`,
+        effectiveDescription: sql<string>`COALESCE(${specialistAppointmentTypes.customDescription}, ${appointmentTypes.description})`,
         sourceName: sql<string>`CASE WHEN ${specialistAppointmentTypes.customDisplayName} IS NULL THEN 'acuity' ELSE 'override' END`,
         sourceDescription: sql<string>`CASE WHEN ${specialistAppointmentTypes.customDescription} IS NULL THEN 'acuity' ELSE 'override' END`,
       })
@@ -67,14 +73,14 @@ export class AppointmentTypeRepository {
           enabledOnly ? eq(specialistAppointmentTypes.enabled, true) : undefined
         )
       )
-      .orderBy(appointmentTypes.category, appointmentTypes.acuityName);
+      .orderBy(appointmentTypes.category, appointmentTypes.name);
 
     return await baseQuery;
   }
 
   async upsertSpecialistMapping(
     specialistId: string,
-    appointmentTypeId: string,
+    appointmentTypeId: string | number,
     data: {
       enabled?: boolean;
       appointmentMode?: "in-person" | "telehealth";
@@ -84,13 +90,19 @@ export class AppointmentTypeRepository {
       notes?: string | null;
     }
   ) {
+    const numericId = typeof appointmentTypeId === 'string' ? parseInt(appointmentTypeId, 10) : appointmentTypeId;
+    
+    if (isNaN(numericId)) {
+      throw new Error('Invalid appointment type ID');
+    }
+    
     const existing = await db
       .select()
       .from(specialistAppointmentTypes)
       .where(
         and(
           eq(specialistAppointmentTypes.specialistId, specialistId),
-          eq(specialistAppointmentTypes.appointmentTypeId, appointmentTypeId)
+          eq(specialistAppointmentTypes.appointmentTypeId, numericId)
         )
       )
       .limit(1);
@@ -105,7 +117,7 @@ export class AppointmentTypeRepository {
         .where(
           and(
             eq(specialistAppointmentTypes.specialistId, specialistId),
-            eq(specialistAppointmentTypes.appointmentTypeId, appointmentTypeId)
+            eq(specialistAppointmentTypes.appointmentTypeId, numericId)
           )
         )
         .returning();
@@ -115,7 +127,7 @@ export class AppointmentTypeRepository {
         .insert(specialistAppointmentTypes)
         .values({
           specialistId,
-          appointmentTypeId,
+          appointmentTypeId: numericId,
           appointmentMode: data.appointmentMode || "in-person",
           ...data,
         })
@@ -126,8 +138,14 @@ export class AppointmentTypeRepository {
 
   async validateAppointmentTypeForBooking(
     specialistId: string,
-    appointmentTypeId: string
+    appointmentTypeId: string | number
   ): Promise<boolean> {
+    const numericId = typeof appointmentTypeId === 'string' ? parseInt(appointmentTypeId, 10) : appointmentTypeId;
+    
+    if (isNaN(numericId)) {
+      return false;
+    }
+
     const result = await db
       .select({
         valid: sql<number>`1`,
@@ -140,7 +158,7 @@ export class AppointmentTypeRepository {
       .where(
         and(
           eq(specialistAppointmentTypes.specialistId, specialistId),
-          eq(specialistAppointmentTypes.appointmentTypeId, appointmentTypeId),
+          eq(specialistAppointmentTypes.appointmentTypeId, numericId),
           eq(specialistAppointmentTypes.enabled, true),
           eq(appointmentTypes.active, true)
         )
@@ -150,14 +168,20 @@ export class AppointmentTypeRepository {
     return result.length > 0;
   }
 
-  async getAppointmentTypeWithSpecialistMapping(specialistId: string, appointmentTypeId: string) {
+  async getAppointmentTypeWithSpecialistMapping(specialistId: string, appointmentTypeId: string | number) {
+    const numericId = typeof appointmentTypeId === 'string' ? parseInt(appointmentTypeId, 10) : appointmentTypeId;
+    
+    if (isNaN(numericId)) {
+      return undefined;
+    }
+    
     const [result] = await db
       .select({
         id: appointmentTypes.id,
-        acuityAppointmentTypeId: appointmentTypes.acuityAppointmentTypeId,
-        acuityName: appointmentTypes.acuityName,
-        acuityDescription: appointmentTypes.acuityDescription,
-        durationMinutes: appointmentTypes.durationMinutes,
+        acuityAppointmentTypeId: appointmentTypes.id,
+        acuityName: appointmentTypes.name,
+        acuityDescription: appointmentTypes.description,
+        durationMinutes: appointmentTypes.duration,
         category: appointmentTypes.category,
         active: appointmentTypes.active,
         enabled: specialistAppointmentTypes.enabled,
@@ -166,8 +190,8 @@ export class AppointmentTypeRepository {
         customDescription: specialistAppointmentTypes.customDescription,
         customPrice: specialistAppointmentTypes.customPrice,
         notes: specialistAppointmentTypes.notes,
-        effectiveName: sql<string>`COALESCE(${specialistAppointmentTypes.customDisplayName}, ${appointmentTypes.acuityName})`,
-        effectiveDescription: sql<string>`COALESCE(${specialistAppointmentTypes.customDescription}, ${appointmentTypes.acuityDescription})`,
+        effectiveName: sql<string>`COALESCE(${specialistAppointmentTypes.customDisplayName}, ${appointmentTypes.name})`,
+        effectiveDescription: sql<string>`COALESCE(${specialistAppointmentTypes.customDescription}, ${appointmentTypes.description})`,
       })
       .from(specialistAppointmentTypes)
       .innerJoin(
@@ -177,7 +201,7 @@ export class AppointmentTypeRepository {
       .where(
         and(
           eq(specialistAppointmentTypes.specialistId, specialistId),
-          eq(specialistAppointmentTypes.appointmentTypeId, appointmentTypeId),
+          eq(specialistAppointmentTypes.appointmentTypeId, numericId),
           eq(appointmentTypes.active, true)
         )
       )

@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from "uuid";
 import { pgTable, text, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "./auth";
@@ -7,7 +8,7 @@ export const auditLogs = pgTable(
   {
     id: text("id")
       .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
+      .$defaultFn(() => uuidv4()),
     userId: text("user_id")
       .references(() => users.id)
       .notNull(),

@@ -18,14 +18,14 @@ export interface AcuityWebhookEvent {
 // Request/Response types for our API endpoints
 export interface SpecialistAvailabilityRequest {
   startDate: string; // YYYY-MM-DD
-  endDate: string;   // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
   appointmentTypeId?: number;
   timezone?: string;
 }
 
 export interface SpecialistAvailabilityResponse {
   specialistId: string;
-  calendarId: string;
+  calendarId: number;
   timeSlots: Array<{
     date: string;
     time: string;

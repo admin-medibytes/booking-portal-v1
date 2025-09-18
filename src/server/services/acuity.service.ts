@@ -52,6 +52,23 @@ export const AcuityAppointmentType = type({
   calendarIDs: "number[]",
 });
 
+export const AcuityFormField = type({
+  id: "number",
+  name: "string",
+  options: "string[] | null",
+  required: "boolean",
+  type: "'textbox' | 'textarea' | 'dropdown' | 'checkbox' | 'checkboxlist' | 'yesno' | 'file' | 'address'",
+});
+
+export const AcuityForm = type({
+  id: "number",
+  appointmentTypeIDs: "number[]",
+  description: "string",
+  hidden: "boolean",
+  name: "string",
+  fields: "unknown[]", // Will be validated as AcuityFormField[] separately
+});
+
 export const AcuityAppointment = type({
   id: "number",
   firstName: "string",
@@ -79,6 +96,8 @@ export type AcuityTimeSlotType = typeof AcuityTimeSlot.infer;
 export type AcuityAvailabilityTimeType = typeof AcuityAvailabilityTime.infer;
 export type AcuityAppointmentTypeType = typeof AcuityAppointmentType.infer;
 export type AcuityAppointmentType = typeof AcuityAppointment.infer;
+export type AcuityFormFieldType = typeof AcuityFormField.infer;
+export type AcuityFormType = typeof AcuityForm.infer;
 
 // Rate limiting state
 interface RateLimitState {
@@ -392,17 +411,40 @@ export class AcuityService {
 
   // Appointment operations
   async createAppointment(data: {
-    appointmentTypeID: number;
-    calendarID: number;
     datetime: string;
+    appointmentTypeID: number;
     firstName: string;
     lastName: string;
     email: string;
     phone?: string;
-    notes?: string;
+    timezone?: string;
     fields?: Array<{ id: number; value: string }>;
+    calendarID?: number; // Optional, for compatibility
+    notes?: string; // Optional, can be included in fields if needed
   }): Promise<AcuityAppointmentType> {
-    const appointment = await this.request<unknown>("POST", "/appointments", data);
+    // Build the request payload matching Acuity's expected format
+    const requestPayload: any = {
+      appointmentTypeID: data.appointmentTypeID,
+      datetime: data.datetime,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+    };
+
+    // Add optional fields only if they're provided
+    if (data.phone) requestPayload.phone = data.phone;
+    if (data.timezone) requestPayload.timezone = data.timezone;
+    if (data.fields && data.fields.length > 0) requestPayload.fields = data.fields;
+    
+    // If notes are provided, add them to the payload
+    // Note: Acuity typically handles notes through form fields, but some endpoints accept it directly
+    if (data.notes) requestPayload.notes = data.notes;
+    
+    // CalendarID is typically not needed in the request as Acuity determines it from appointmentTypeID
+    // But include it if explicitly provided for backward compatibility
+    if (data.calendarID) requestPayload.calendarID = data.calendarID;
+
+    const appointment = await this.request<unknown>("POST", "/appointments", requestPayload);
     const parsed = AcuityAppointment(appointment);
 
     if (parsed instanceof type.errors) {
@@ -417,7 +459,9 @@ export class AcuityService {
     }
 
     // Invalidate availability cache for this calendar
-    await invalidateAvailabilityCache(data.calendarID.toString());
+    if (parsed.calendarID) {
+      await invalidateAvailabilityCache(parsed.calendarID.toString());
+    }
 
     return parsed;
   }
@@ -485,6 +529,54 @@ export class AcuityService {
     }
 
     return parsed;
+  }
+
+  // Form operations
+  async getForms(): Promise<AcuityFormType[]> {
+    const forms = await this.request<unknown[]>("GET", "/forms");
+    const results: AcuityFormType[] = [];
+
+    for (const form of forms) {
+      const parsed = AcuityForm(form);
+      if (parsed instanceof type.errors) {
+        logger.error(
+          {
+            errors: parsed.map((e) => ({ path: e.path, message: e.message })),
+            data: form,
+          },
+          "Invalid form data from Acuity"
+        );
+        throw new AcuityAPIError("Invalid form data received from Acuity");
+      }
+      
+      // Validate fields separately
+      if (parsed.fields && Array.isArray(parsed.fields)) {
+        const validatedFields: AcuityFormFieldType[] = [];
+        for (const field of parsed.fields) {
+          const fieldParsed = AcuityFormField(field);
+          if (fieldParsed instanceof type.errors) {
+            logger.warn(
+              {
+                errors: fieldParsed.map((e) => ({ path: e.path, message: e.message })),
+                data: field,
+                formId: parsed.id,
+              },
+              "Invalid form field data from Acuity"
+            );
+            // Skip invalid fields but continue processing
+            continue;
+          }
+          validatedFields.push(fieldParsed);
+        }
+        parsed.fields = validatedFields;
+      }
+      
+      results.push(parsed);
+    }
+
+    logger.debug({ count: results.length }, "Fetched forms from Acuity");
+    
+    return results;
   }
 
   // Webhook signature validation with timing attack prevention

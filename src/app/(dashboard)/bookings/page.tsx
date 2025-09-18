@@ -20,7 +20,7 @@ export default function BookingsPage() {
 
   // Initialize view from URL or localStorage
   const [view, setView] = useState<ViewType>(() => {
-    const urlView = searchParams.get("view") as ViewType;
+    const urlView = (searchParams.get("view") as ViewType | undefined) || "list";
     if (urlView && ["calendar", "list"].includes(urlView)) {
       return urlView;
     }

@@ -5,6 +5,7 @@ import { authMiddleware, requireAuth } from "@/server/middleware/auth.middleware
 import { bookingCreateRateLimit } from "@/server/middleware/rate-limit.middleware";
 import { arktypeValidator } from "@/server/middleware/validate.middleware";
 import type { BookingFilters } from "@/types/booking";
+import { organizationService } from "../services/organization.service";
 
 const bookingFiltersSchema = type({
   "status?": "'active' | 'closed' | 'archived'",
@@ -98,14 +99,19 @@ const bookingsRoutes = new Hono()
     arktypeValidator(
       "json",
       type({
-        specialistId: "string.uuid",
-        appointmentTypeId: "string.uuid",
-        appointmentDateTime: "string.date",
-        examineeName: "string>0",
-        examineePhone: "string>0",
-        "examineeEmail?": "string.email|null",
-        appointmentType: "'in-person'|'telehealth'",
-        "notes?": "string|null",
+        appointmentTypeId: "number",
+        datetime: "string",
+        firstName: "string",
+        lastName: "string",
+        email: "string",
+        phone: "string",
+        timezone: "string",
+        organizationSlug: "string",
+        specialistId: "string",
+        fields: type({
+          id: "number",
+          value: "string",
+        }).array(),
       })
     ),
     bookingCreateRateLimit,
@@ -117,13 +123,24 @@ const bookingsRoutes = new Hono()
       }
 
       // Validate request body
-      const input = c.req.valid("json");
+      const { organizationSlug, ...input } = c.req.valid("json");
+
+      // Get organization ID from slug
+      const organization = await organizationService.getOrganizationBySlug(
+        organizationSlug,
+        c.req.raw.headers
+      );
+
+      if (!organization) {
+        return c.json({ error: "Organization not found" }, 404);
+      }
 
       // Create booking
       const booking = await bookingService.createBooking({
         ...input,
-        appointmentDateTime: new Date(input.appointmentDateTime),
-        referrerId: user.id,
+        organizationId: organization.id,
+        teamId: organization.teams[0].id,
+        createdById: user.id,
       });
 
       return c.json(

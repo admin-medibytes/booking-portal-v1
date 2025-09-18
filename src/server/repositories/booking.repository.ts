@@ -1,5 +1,5 @@
 import { db } from "@/server/db";
-import { bookings, specialists, users } from "@/server/db/schema";
+import { bookings, specialists, users, referrers, examinees, organizations } from "@/server/db/schema";
 import { eq, and, gte, lte, desc, sql, SQL } from "drizzle-orm";
 import type { BookingFilters } from "@/types/booking";
 
@@ -7,20 +7,20 @@ export class BookingRepository {
   // Helper method to build common filter conditions
   private buildFilterConditions(filters?: BookingFilters, baseConditions: SQL[] = []): SQL[] {
     const conditions = [...baseConditions];
-    
+
     if (filters?.status) {
       conditions.push(eq(bookings.status, filters.status as "active" | "closed" | "archived"));
     }
     if (filters?.startDate) {
-      conditions.push(gte(bookings.examDate, filters.startDate));
+      conditions.push(gte(bookings.dateTime, filters.startDate));
     }
     if (filters?.endDate) {
-      conditions.push(lte(bookings.examDate, filters.endDate));
+      conditions.push(lte(bookings.dateTime, filters.endDate));
     }
     if (filters?.specialistId) {
       conditions.push(eq(bookings.specialistId, filters.specialistId));
     }
-    
+
     return conditions;
   }
 
@@ -35,10 +35,16 @@ export class BookingRepository {
         booking: bookings,
         specialist: specialists,
         specialistUser: users,
+        referrer: referrers,
+        examinee: examinees,
+        referrerOrganization: organizations,
       })
       .from(bookings)
       .leftJoin(specialists, eq(bookings.specialistId, specialists.id))
       .leftJoin(users, eq(specialists.userId, users.id))
+      .leftJoin(referrers, eq(bookings.referrerId, referrers.id))
+      .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
+      .leftJoin(organizations, eq(referrers.organizationId, organizations.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(bookings.createdAt))
       .limit(limit)
@@ -62,19 +68,25 @@ export class BookingRepository {
     };
   }
   async findByIdWithSpecialist(id: string) {
-    const result = await db
-      .select({
-        booking: bookings,
-        specialist: specialists,
-        specialistUser: users,
-      })
-      .from(bookings)
-      .leftJoin(specialists, eq(bookings.specialistId, specialists.id))
-      .leftJoin(users, eq(specialists.userId, users.id))
-      .where(eq(bookings.id, id))
-      .limit(1);
+    const result = await db.query.bookings.findFirst({
+      where: eq(bookings.id, id),
+      with: {
+        specialist: {
+          with: {
+            user: true,
+          }
+        },
+        referrer: {
+          with: {
+            organization: true,
+          }
+        },
+        examinee: true,
+        organization: true,
+      }
+    });
 
-    return result[0];
+    return result;
   }
 
   async findAllForAdmin(filters?: BookingFilters) {

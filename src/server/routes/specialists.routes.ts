@@ -20,7 +20,7 @@ function getSpecialistFields(
   specialist: {
     id: string;
     userId: string;
-    acuityCalendarId: string;
+    acuityCalendarId: number;
     name: string;
     slug: string | null;
     image?: string | null;
@@ -556,75 +556,6 @@ const specialistsRoutes = new Hono()
     }
   })
 
-  // GET /api/specialists/:id/appointment-types - Get specialist appointment types
-  .get("/:id/appointment-types", async (c) => {
-    try {
-      const authContext = c.get("auth");
-      const specialistId = c.req.param("id");
-      const refresh = c.req.query("refresh") === "true";
-
-      if (!authContext?.user) {
-        return c.json(
-          {
-            success: false,
-            error: "Authentication required",
-          },
-          401
-        );
-      }
-
-      // Get specialist details
-      const specialistData = await specialistRepository.findById(specialistId);
-      if (!specialistData) {
-        return c.json(
-          {
-            success: false,
-            error: "Specialist not found",
-          },
-          404
-        );
-      }
-
-      // Refresh from Acuity if requested
-      if (refresh) {
-        const acuityTypes = await acuityService.getAppointmentTypes();
-        await appointmentTypeRepository.upsertFromAcuity(acuityTypes);
-      }
-
-      // Get specialist-specific appointment types with overrides
-      const appointmentTypes = await appointmentTypeRepository.getSpecialistAppointmentTypes(
-        specialistId,
-        true // enabledOnly
-      );
-
-      // Return appointment types with effective and source information
-      return c.json({
-        success: true,
-        data: appointmentTypes.map((type) => ({
-          id: type.id,
-          acuityAppointmentTypeId: type.acuityAppointmentTypeId,
-          name: type.effectiveName,
-          description: type.effectiveDescription,
-          duration: type.durationMinutes,
-          category: type.category,
-          appointmentMode: type.appointmentMode,
-          source: {
-            name: type.sourceName,
-            description: type.sourceDescription,
-          },
-        })),
-      });
-    } catch (error) {
-      logger.error("Failed to fetch appointment types", error as Error);
-      return c.json(
-        {
-          success: false,
-          error: "Failed to fetch appointment types",
-        },
-        500
-      );
-    }
-  })
   .get(
     "/:id/availability",
     arktypeValidator(
@@ -712,7 +643,7 @@ const specialistsRoutes = new Hono()
             try {
               const times = await acuityService.getAvailabilityTimes({
                 appointmentTypeId: parseInt(appointmentTypeId, 10),
-                calendarId: parseInt(specialistData.specialist.acuityCalendarId, 10),
+                calendarId: specialistData.specialist.acuityCalendarId,
                 date: dateStr,
                 timezone,
               });
@@ -738,7 +669,7 @@ const specialistsRoutes = new Hono()
               try {
                 const times = await acuityService.getAvailabilityTimes({
                   appointmentTypeId: appointmentType.id,
-                  calendarId: parseInt(specialistData.specialist.acuityCalendarId, 10),
+                  calendarId: specialistData.specialist.acuityCalendarId,
                   date: dateStr,
                   timezone,
                 });
@@ -867,7 +798,7 @@ const specialistsRoutes = new Hono()
         const availableDates = await acuityService.getAvailabilityDates({
           month,
           appointmentTypeId: parseInt(appointmentTypeId, 10),
-          calendarId: parseInt(specialistData.specialist.acuityCalendarId, 10),
+          calendarId: specialistData.specialist.acuityCalendarId,
         });
 
         // Audit log the availability access
@@ -892,6 +823,406 @@ const specialistsRoutes = new Hono()
           {
             success: false,
             error: error instanceof Error ? error.message : "Failed to retrieve available dates",
+          },
+          500
+        );
+      }
+    }
+  )
+
+  // GET /api/specialists/:id/appointment-types - Get specialist appointment types (public)
+  .get("/:id/appointment-types", async (c) => {
+    try {
+      const authContext = c.get("auth");
+      const user = authContext?.user;
+      if (!user) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+
+      const specialistId = c.req.param("id");
+
+      // Import db and schema
+      const { db } = await import("@/server/db");
+      const { specialistAppointmentTypes, specialists } = await import(
+        "@/server/db/schema/specialists"
+      );
+      const { acuityAppointmentTypes } = await import("@/server/db/schema/acuity");
+      const { eq, and } = await import("drizzle-orm");
+
+      // Verify specialist exists and is active
+      const [specialist] = await db
+        .select({ id: specialists.id, isActive: specialists.isActive })
+        .from(specialists)
+        .where(eq(specialists.id, specialistId));
+
+      if (!specialist) {
+        return c.json(
+          {
+            success: false,
+            error: "Specialist not found",
+          },
+          404
+        );
+      }
+
+      if (!specialist.isActive) {
+        return c.json(
+          {
+            success: false,
+            error: "Specialist is not active",
+          },
+          400
+        );
+      }
+
+      // Fetch enabled appointment types for the specialist
+      const appointmentTypes = await db
+        .select({
+          specialistId: specialistAppointmentTypes.specialistId,
+          appointmentTypeId: specialistAppointmentTypes.appointmentTypeId,
+          enabled: specialistAppointmentTypes.enabled,
+          appointmentMode: specialistAppointmentTypes.appointmentMode,
+          customDisplayName: specialistAppointmentTypes.customDisplayName,
+          customDescription: specialistAppointmentTypes.customDescription,
+          customPrice: specialistAppointmentTypes.customPrice,
+          appointmentType: {
+            id: acuityAppointmentTypes.id,
+            name: acuityAppointmentTypes.name,
+            description: acuityAppointmentTypes.description,
+            duration: acuityAppointmentTypes.duration,
+            price: acuityAppointmentTypes.price,
+            category: acuityAppointmentTypes.category,
+            active: acuityAppointmentTypes.active,
+          },
+        })
+        .from(specialistAppointmentTypes)
+        .leftJoin(
+          acuityAppointmentTypes,
+          eq(specialistAppointmentTypes.appointmentTypeId, acuityAppointmentTypes.id)
+        )
+        .where(
+          and(
+            eq(specialistAppointmentTypes.specialistId, specialistId),
+            eq(specialistAppointmentTypes.enabled, true)
+          )
+        );
+
+      // Transform data to match the expected format for the booking flow
+      const transformedTypes = appointmentTypes
+        .filter((item) => item.appointmentType?.active) // Only include active appointment types
+        .map((item) => ({
+          id: `${item.specialistId}_${item.appointmentTypeId}`,
+          acuityAppointmentTypeId: item.appointmentTypeId,
+          name: item.customDisplayName || item.appointmentType?.name || "Unknown",
+          description: item.customDescription || item.appointmentType?.description || null,
+          duration: item.appointmentType?.duration || 30,
+          category: item.appointmentType?.category || null,
+          appointmentMode: item.appointmentMode,
+          source: {
+            name: item.customDisplayName ? ("override" as const) : ("acuity" as const),
+            description: item.customDescription ? ("override" as const) : ("acuity" as const),
+          },
+        }));
+
+      // Audit log the access
+      logger.audit("view_specialist_appointment_types", user.id, "specialist", specialistId, {
+        userRole: user.role,
+        typesFound: transformedTypes.length,
+      });
+
+      return c.json({
+        success: true,
+        data: transformedTypes,
+      });
+    } catch (error) {
+      logger.error("Failed to get specialist appointment types", error as Error);
+      return c.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to retrieve appointment types",
+        },
+        500
+      );
+    }
+  })
+
+  // GET /api/specialists/:id/appointment-types/:typeId/form - Get form for appointment type
+  .get("/:id/appointment-types/:typeId/form", async (c) => {
+    try {
+      const authContext = c.get("auth");
+      const user = authContext?.user;
+      if (!user) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+
+      const specialistId = c.req.param("id");
+      const appointmentTypeId = parseInt(c.req.param("typeId"), 10);
+
+      if (isNaN(appointmentTypeId)) {
+        return c.json(
+          {
+            success: false,
+            error: "Invalid appointment type ID",
+          },
+          400
+        );
+      }
+
+      // Import db and schema
+      const { db } = await import("@/server/db");
+      const { specialistAppointmentTypes } = await import("@/server/db/schema/specialists");
+      const { acuityAppointmentTypeForms, acuityForms } = await import("@/server/db/schema/acuity");
+      const { appForms, appFormFields } = await import("@/server/db/schema/appForms");
+      const { eq, and } = await import("drizzle-orm");
+
+      // Verify the appointment type belongs to the specialist
+      const [specialistAppointmentType] = await db
+        .select()
+        .from(specialistAppointmentTypes)
+        .where(
+          and(
+            eq(specialistAppointmentTypes.specialistId, specialistId),
+            eq(specialistAppointmentTypes.appointmentTypeId, appointmentTypeId),
+            eq(specialistAppointmentTypes.enabled, true)
+          )
+        );
+
+      if (!specialistAppointmentType) {
+        return c.json(
+          {
+            success: false,
+            error: "Appointment type not found or not enabled for this specialist",
+          },
+          404
+        );
+      }
+
+      // Find forms linked to this appointment type
+      const linkedForms = await db
+        .select({
+          formId: acuityAppointmentTypeForms.formId,
+        })
+        .from(acuityAppointmentTypeForms)
+        .where(eq(acuityAppointmentTypeForms.appointmentTypeId, appointmentTypeId));
+
+      if (linkedForms.length === 0) {
+        return c.json({
+          success: true,
+          data: null,
+          message: "No form configured for this appointment type",
+        });
+      }
+
+      // Get the first linked form (could be enhanced to handle multiple forms)
+      const acuityFormId = linkedForms[0].formId;
+
+      // Check if there's an app form configuration for this Acuity form
+      const appFormWithFields = await db
+        .select({
+          form: appForms,
+          fields: appFormFields,
+        })
+        .from(appForms)
+        .leftJoin(appFormFields, eq(appForms.id, appFormFields.appFormId))
+        .where(and(eq(appForms.acuityFormId, acuityFormId), eq(appForms.isActive, true)));
+
+      if (appFormWithFields.length === 0) {
+        return c.json({
+          success: true,
+          data: null,
+          message: "No custom form configuration available",
+        });
+      }
+
+      // Get the Acuity form details with fields
+      const { acuityFormsFields } = await import("@/server/db/schema/acuity");
+
+      const acuityFieldsData = await db
+        .select()
+        .from(acuityFormsFields)
+        .where(eq(acuityFormsFields.formId, acuityFormId));
+
+      // Create a map of Acuity fields for easy lookup
+      const acuityFieldsMap = new Map(acuityFieldsData.map((field) => [field.id, field]));
+
+      // Group fields by form and include Acuity field details
+      const formData = appFormWithFields[0].form;
+      const fields = appFormWithFields
+        .filter((row) => row.fields !== null)
+        .map((row) => {
+          const acuityField = acuityFieldsMap.get(row.fields!.acuityFieldId);
+          return {
+            ...row.fields!,
+            acuityField: acuityField
+              ? {
+                  id: acuityField.id,
+                  name: acuityField.name,
+                  type: acuityField.type,
+                  options: acuityField.options as string[] | undefined,
+                  required: acuityField.required,
+                }
+              : undefined,
+          };
+        })
+        .sort((a, b) => a.displayOrder - b.displayOrder);
+
+      // Get the Acuity form details
+      const [acuityForm] = await db
+        .select()
+        .from(acuityForms)
+        .where(eq(acuityForms.id, acuityFormId));
+
+      const result = {
+        ...formData,
+        fields,
+        acuityForm: acuityForm
+          ? {
+              id: acuityForm.id,
+              name: acuityForm.name,
+              description: acuityForm.description,
+            }
+          : null,
+      };
+
+      // Audit log
+      logger.audit(
+        "view_appointment_type_form",
+        user.id,
+        "appointment_type_form",
+        `${specialistId}_${appointmentTypeId}`,
+        {
+          specialistId,
+          appointmentTypeId,
+          formId: formData?.id,
+        }
+      );
+
+      return c.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error("Failed to get appointment type form", error as Error);
+      return c.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to retrieve form",
+        },
+        500
+      );
+    }
+  })
+
+  // PUT /api/specialists/:id/appointment-types/:typeId - Update specialist appointment type configuration
+  .put(
+    "/:id/appointment-types/:typeId",
+    requireRole("admin"),
+    arktypeValidator(
+      "json",
+      type({
+        "enabled?": "boolean",
+        "appointmentMode?": "'in-person'|'telehealth'",
+        "customDisplayName?": "string | null",
+        "customDescription?": "string | null",
+        "customPrice?": "number | null",
+        "notes?": "string | null",
+      })
+    ),
+    async (c) => {
+      try {
+        const authContext = c.get("auth");
+        const adminUser = authContext?.user;
+        if (!adminUser) {
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+
+        const specialistId = c.req.param("id");
+        const appointmentTypeId = parseInt(c.req.param("typeId"), 10);
+        const updates = c.req.valid("json");
+
+        if (isNaN(appointmentTypeId)) {
+          return c.json(
+            {
+              success: false,
+              error: "Invalid appointment type ID",
+            },
+            400
+          );
+        }
+
+        // Import db and schema at the top of the file if not already imported
+        const { db } = await import("@/server/db");
+        const { specialistAppointmentTypes } = await import("@/server/db/schema/specialists");
+        const { eq, and } = await import("drizzle-orm");
+
+        // Check if the specialist appointment type exists
+        const [existing] = await db
+          .select()
+          .from(specialistAppointmentTypes)
+          .where(
+            and(
+              eq(specialistAppointmentTypes.specialistId, specialistId),
+              eq(specialistAppointmentTypes.appointmentTypeId, appointmentTypeId)
+            )
+          );
+
+        if (!existing) {
+          return c.json(
+            {
+              success: false,
+              error: "Specialist appointment type not found",
+            },
+            404
+          );
+        }
+
+        // Update the specialist appointment type
+        const [updated] = await db
+          .update(specialistAppointmentTypes)
+          .set({
+            ...updates,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(specialistAppointmentTypes.specialistId, specialistId),
+              eq(specialistAppointmentTypes.appointmentTypeId, appointmentTypeId)
+            )
+          )
+          .returning();
+
+        // Audit log the update
+        logger.audit(
+          "update_specialist_appointment_type",
+          adminUser.id,
+          "specialist_appointment_type",
+          `${specialistId}_${appointmentTypeId}`,
+          {
+            specialistId,
+            appointmentTypeId,
+            updates: Object.keys(updates),
+            oldValues: existing,
+            newValues: updates,
+          }
+        );
+
+        logger.info("Specialist appointment type updated", {
+          specialistId,
+          appointmentTypeId,
+          updates: Object.keys(updates),
+        });
+
+        return c.json({
+          success: true,
+          data: updated,
+          message: "Appointment type configuration updated successfully",
+        });
+      } catch (error) {
+        logger.error("Failed to update specialist appointment type", error as Error);
+        return c.json(
+          {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update appointment type",
           },
           500
         );
@@ -958,7 +1289,7 @@ const specialistsRoutes = new Hono()
         // Fetch time slots for the specific date
         const times = await acuityService.getAvailabilityTimes({
           appointmentTypeId: parseInt(appointmentTypeId, 10),
-          calendarId: parseInt(specialistData.specialist.acuityCalendarId, 10),
+          calendarId: specialistData.specialist.acuityCalendarId,
           date,
           timezone,
         });

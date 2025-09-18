@@ -9,6 +9,8 @@ import * as bookingsSchema from "./schema/bookings";
 import * as documentsSchema from "./schema/documents";
 import * as auditSchema from "./schema/audit";
 import * as webhooksSchema from "./schema/webhooks";
+import * as acuitySchema from "./schema/acuity";
+import * as appFormsSchema from "./schema/appForms";
 
 const poolSize = parseInt(env.DB_POOL_SIZE || "10", 10);
 
@@ -42,6 +44,8 @@ export const schema = {
   ...documentsSchema,
   ...auditSchema,
   ...webhooksSchema,
+  ...acuitySchema,
+  ...appFormsSchema,
 };
 
 export const db = drizzle(client, { schema });

@@ -22,7 +22,7 @@ export default async function NotFound() {
           </div>
           <h1 className="text-4xl font-bold tracking-tight">404</h1>
           <h2 className="text-2xl font-semibold">Page Not Found</h2>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-balance">
             Sorry, the page you are looking for doesn&apos;t exist or has been moved.
           </p>
         </div>

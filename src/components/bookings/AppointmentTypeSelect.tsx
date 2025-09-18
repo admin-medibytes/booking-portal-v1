@@ -21,11 +21,7 @@ interface AppointmentType {
   description: string | null;
   duration: number;
   category: string | null;
-  appointmentMode?: "in-person" | "telehealth";
-  source: {
-    name: "acuity" | "override";
-    description: "acuity" | "override";
-  };
+  appointmentMode: "in-person" | "telehealth";
 }
 
 interface AppointmentTypeSelectProps {
@@ -196,14 +192,17 @@ export function AppointmentTypeSelect({
                         {appointmentType.duration} min
                       </span>
                     </div>
-                    {appointmentType.category && (
-                      <Badge className="bg-primary/10 text-primary border-primary/20">
-                        {appointmentType.category}
+                    {appointmentType.appointmentMode === "in-person" && (
+                      <Badge className="text-xs px-3 py-1 font-medium border bg-violet-50 text-violet-700 border-violet-200">
+                        {appointmentType.appointmentMode}
                       </Badge>
                     )}
-                    {appointmentType.source.name === "override" && (
-                      <Badge className="bg-purple-100 text-purple-700 border-purple-200">
-                        Customized
+                    {appointmentType.appointmentMode === "telehealth" && (
+                      <Badge
+                        className="text-xs px-3 py-1 font-medium border bg-blue-50 text-blue-700 border-blue-200"
+                        variant="secondary"
+                      >
+                        {appointmentType.appointmentMode}
                       </Badge>
                     )}
                   </div>

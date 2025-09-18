@@ -9,9 +9,10 @@ dotenv.config({ path: path.join(process.cwd(), ".env") });
 // Simple environment validation and access
 export const scriptEnv = {
   NODE_ENV: process.env.NODE_ENV || "development",
-  DATABASE_URL: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/booking_portal",
+  DATABASE_URL:
+    process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/booking_portal",
   BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || "dev-secret-change-in-production",
-  BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
 } as const;
 
 // Validate required env vars

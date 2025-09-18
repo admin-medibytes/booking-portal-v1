@@ -20,10 +20,12 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
 
-  trustedOrigins: env.AUTH_TRUSTED_ORIGINS?.split(",").map((origin) => origin.trim()) || [],
+  trustedOrigins: env.AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()) || [],
 
   session: {
-    expiresIn: Number(env.SESSION_TIMEOUT),
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+    updateAge: 60 * 60 * 12, // 12 hours
+
     cookieCache: {
       enabled: true,
       maxAge: 180, // 3 minutes
@@ -68,8 +70,8 @@ export const auth = betterAuth({
 
   rateLimit: {
     enabled: true,
-    window: Number(env.RATE_LIMIT_WINDOW_MS) || 60000, // 1 minute
-    max: Number(env.RATE_LIMIT_MAX_REQUESTS) || 10,
+    window: 60000, // 1 minute
+    max: 10,
   },
 
   plugins: [

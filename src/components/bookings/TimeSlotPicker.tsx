@@ -38,7 +38,8 @@ interface AvailabilityResponse {
 interface TimeSlotPickerProps {
   specialistId: string;
   appointmentTypeId: number;
-  onSelect: (dateTime: Date, timezone: string) => void;
+  onSelect: (dateTime: Date, datetimeString: string, timezone: string) => void;
+  onTimezoneChange?: (timezone: string) => void;
   selectedDateTime: Date | null;
   selectedTimezone?: string;
   specialist?: {
@@ -76,28 +77,29 @@ export function TimeSlotPicker({
   specialistId,
   appointmentTypeId,
   onSelect,
+  onTimezoneChange,
   selectedDateTime,
   selectedTimezone,
   specialist,
   appointmentType,
 }: TimeSlotPickerProps) {
   const todayDate = today("Australia/Sydney");
-  
+
   // Initialize with selected date if returning to this step
-  const initialDate = selectedDateTime 
+  const initialDate = selectedDateTime
     ? new CalendarDate(
         selectedDateTime.getFullYear(),
         selectedDateTime.getMonth() + 1, // JS months are 0-indexed
         selectedDateTime.getDate()
       )
     : todayDate;
-  
+
   const [selectedDate, setSelectedDate] = useState<CalendarDate>(initialDate);
   const [timeZone, setTimeZone] = useState(selectedTimezone || "Australia/Sydney");
   const [timeFormat, setTimeFormat] = useState<"12" | "24">("12");
-  const [visibleMonth, setVisibleMonth] = useState({ 
-    month: initialDate.month, 
-    year: initialDate.year 
+  const [visibleMonth, setVisibleMonth] = useState({
+    month: initialDate.month,
+    year: initialDate.year,
   });
   const hasUserSelectedDate = useRef(!!selectedDateTime);
 
@@ -179,10 +181,10 @@ export function TimeSlotPicker({
     if (!hasUserSelectedDate.current && availableDates.length > 0) {
       // Find the first available date in the current visible month
       const currentMonthDates = availableDates.filter((dateStr) => {
-        const [year, month] = dateStr.split('-').map(Number);
+        const [year, month] = dateStr.split("-").map(Number);
         return year === visibleMonth.year && month === visibleMonth.month;
       });
-      
+
       if (currentMonthDates.length > 0) {
         // Sort dates and pick the first one
         const firstDate = currentMonthDates.sort()[0];
@@ -204,7 +206,8 @@ export function TimeSlotPicker({
   const handleTimeSelect = (slot: any) => {
     const dateTime = parseISO(slot.datetime);
     console.log("TimeSlotPicker - Selecting time with timezone:", timeZone);
-    onSelect(dateTime, timeZone);
+    console.log("TimeSlotPicker - Original datetime string:", slot.datetime);
+    onSelect(dateTime, slot.datetime, timeZone);
   };
 
   const formatTime = (date: Date) => {
@@ -279,14 +282,15 @@ export function TimeSlotPicker({
                 </>
               )}
             </div>
-            <Select value={timeZone} onValueChange={(newTimezone) => {
-              setTimeZone(newTimezone);
-              // If a time was already selected, update with new timezone
-              if (selectedDateTime) {
-                console.log("TimeSlotPicker - Timezone changed to:", newTimezone);
-                onSelect(selectedDateTime, newTimezone);
-              }
-            }}>
+            <Select
+              value={timeZone}
+              onValueChange={(newTimezone) => {
+                setTimeZone(newTimezone);
+                // Notify parent component of timezone change
+                onTimezoneChange?.(newTimezone);
+                // Note: The user will need to reselect a time slot after changing timezone
+              }}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select time zone">{timeZone}</SelectValue>
               </SelectTrigger>
