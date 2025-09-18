@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { BookingWithSpecialist } from "@/types/booking";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 // Memoized cell components for performance
 const SpecialistCell = memo(
@@ -114,27 +115,20 @@ export const BookingListTable = memo(function BookingListTable({
       cell: ({ row }) => {
         const booking = row.original;
         return (
-          <div className="space-y-1">
-            <div
-              className="font-medium hover:font-bold hover:cursor-pointer"
-              onClick={() => router.push(`/bookings/${booking.id}`)}
-            >
-              {booking.examinee
-                ? `${booking.examinee.firstName} ${booking.examinee.lastName}`
-                : "Not provided"}
-            </div>
-            {booking.examinee?.email && (
+          <div className="space-y-1 flex items-center">
+            <Link href={`/bookings/${booking.id}`} className="group space-y-1 w-fit">
+              <div className="font-medium group-hover:font-bold">
+                {booking.examinee.firstName} {booking.examinee.lastName}
+              </div>
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Mail className="h-3 w-3" />
                 <span>{booking.examinee.email}</span>
               </div>
-            )}
-            {booking.examinee?.phoneNumber && (
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Phone className="h-3 w-3" />
                 <span className="font-mono">{booking.examinee.phoneNumber}</span>
               </div>
-            )}
+            </Link>
           </div>
         );
       },
@@ -185,14 +179,17 @@ export const BookingListTable = memo(function BookingListTable({
       },
       cell: ({ row }) => {
         const booking = row.original;
-        const color = booking.type === "telehealth" ? "blue" : "violet";
+        const color =
+          booking.type === "telehealth"
+            ? "bg-blue-100 border-blue-200 text-blue-700"
+            : "bg-violet-100 border-violet-200 text-violet-700";
 
         return (
           <div className="space-y-1">
             <div
               className={cn(
                 "text-xs px-2 py-.5 font-medium border capitalize w-fit rounded",
-                `bg-${color}-100 border-${color}-200 text-${color}-700`
+                color
               )}
             >
               {booking.type}
