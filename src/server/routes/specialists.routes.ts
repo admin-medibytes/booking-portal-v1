@@ -7,7 +7,6 @@ import {
   LocationInput,
   type UpdatePositionsInputType,
 } from "@/server/repositories/specialist.repository";
-import { appointmentTypeRepository } from "@/server/repositories/appointment-type.repository";
 import { acuityService } from "@/server/services/acuity.service";
 import { logger } from "@/server/utils/logger";
 import { generateSlug } from "@/lib/utils/slug";
@@ -232,7 +231,7 @@ const specialistsRoutes = new Hono()
       "json",
       type({
         userId: "string",
-        acuityCalendarId: "string",
+        acuityCalendarId: "number",
       })
     ),
     async (c) => {

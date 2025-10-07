@@ -181,42 +181,46 @@ export function GlobalSearch({ onResultClick }: GlobalSearchProps) {
   }, [query]);
 
   // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + K to focus search
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        inputRef.current?.focus();
-        setIsOpen(true);
-      }
-
-      // Escape to close
-      if (e.key === "Escape") {
-        setIsOpen(false);
-        inputRef.current?.blur();
-        setSelectedIndex(-1);
-      }
-
-      // Arrow navigation
-      if (isOpen && results.length > 0) {
-        if (e.key === "ArrowDown") {
+  useEffect(
+    () => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        // Cmd/Ctrl + K to focus search
+        if ((e.metaKey || e.ctrlKey) && e.key === "k") {
           e.preventDefault();
-          setSelectedIndex((prev) => (prev < results.length - 1 ? prev + 1 : prev));
+          inputRef.current?.focus();
+          setIsOpen(true);
         }
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
-        }
-        if (e.key === "Enter" && selectedIndex >= 0) {
-          e.preventDefault();
-          handleResultClick(results[selectedIndex]);
-        }
-      }
-    };
 
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, results, selectedIndex]);
+        // Escape to close
+        if (e.key === "Escape") {
+          setIsOpen(false);
+          inputRef.current?.blur();
+          setSelectedIndex(-1);
+        }
+
+        // Arrow navigation
+        if (isOpen && results.length > 0) {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setSelectedIndex((prev) => (prev < results.length - 1 ? prev + 1 : prev));
+          }
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+          }
+          if (e.key === "Enter" && selectedIndex >= 0) {
+            e.preventDefault();
+            handleResultClick(results[selectedIndex]);
+          }
+        }
+      };
+
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isOpen, results, selectedIndex]
+  );
 
   // Handle click outside
   useEffect(() => {

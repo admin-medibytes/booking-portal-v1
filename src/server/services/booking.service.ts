@@ -1,5 +1,4 @@
 import { bookingRepository } from "@/server/repositories/booking.repository";
-import { appointmentTypeRepository } from "@/server/repositories/appointment-type.repository";
 import { db } from "@/server/db";
 import {
   specialists,
@@ -10,26 +9,26 @@ import {
   bookingProgress,
   referrers,
   examinees,
+  organizations,
   specialistAppointmentTypes,
   appForms,
   appFormFields,
   acuityAppointmentTypeForms,
-  organizations,
 } from "@/server/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import type { User } from "@/types/user";
-import type { BookingWithSpecialist, BookingFilters } from "@/types/booking";
+import type { BookingFilters, BookingWithSpecialist } from "@/types/booking";
+import type { BookingWithDetails } from "@/hooks/use-booking";
 import type { ExamineeFieldType } from "@/server/db/schema/appForms";
 import { acuityService } from "@/server/services/acuity.service";
 import { auditService } from "@/server/services/audit.service";
-import DOMPurify from "isomorphic-dompurify";
 import { formatLocationFull } from "@/lib/utils/location";
 
 // BookingFilters is imported from types/booking.ts
 
 export class BookingService {
   async getBookingById(bookingId: string, user: Pick<User, "id" | "role">) {
-    const bookingData = await bookingRepository.findByIdWithSpecialist(bookingId);
+    const bookingData = await bookingRepository.findByIdWithDetails(bookingId);
     if (!bookingData) {
       const error = new Error("Booking not found");
       error.name = "BookingNotFoundError";
@@ -51,7 +50,7 @@ export class BookingService {
     const currentProgress = progressHistory[0]?.toStatus || "scheduled";
 
     return {
-      ...this.formatBookingResponse(bookingData),
+      ...bookingData,
       progress: progressHistory,
       currentProgress,
       documents: [], // Placeholder for future document implementation
@@ -86,7 +85,7 @@ export class BookingService {
   private async getBookingsForAdmin(filters?: BookingFilters) {
     const result = await bookingRepository.findAllForAdmin(filters);
     return {
-      bookings: result.data.map((item) => this.formatBookingResponse(item)),
+      bookings: result.data,
       pagination: result.pagination,
     };
   }
@@ -94,7 +93,7 @@ export class BookingService {
   private async getBookingsForReferrer(userId: string, filters?: BookingFilters) {
     const result = await bookingRepository.findForReferrer(userId, filters);
     return {
-      bookings: result.data.map((item) => this.formatBookingResponse(item)),
+      bookings: result.data,
       pagination: result.pagination,
     };
   }
@@ -102,7 +101,7 @@ export class BookingService {
   private async getBookingsForSpecialist(specialistId: string, filters?: BookingFilters) {
     const result = await bookingRepository.findForSpecialist(specialistId, filters);
     return {
-      bookings: result.data.map((item) => this.formatBookingResponse(item)),
+      bookings: result.data,
       pagination: result.pagination,
     };
   }
@@ -110,7 +109,7 @@ export class BookingService {
   private async getBookingsForOrganizationOwner(organizationId: string, filters?: BookingFilters) {
     const result = await bookingRepository.findForOrganization(organizationId, filters);
     return {
-      bookings: result.data.map((item) => this.formatBookingResponse(item)),
+      bookings: result.data,
       pagination: result.pagination,
     };
   }
@@ -216,44 +215,6 @@ export class BookingService {
     return specialist.length > 0;
   }
 
-  private formatBookingResponse(bookingData: any) {
-    // Handle both the old select format and the new query format
-    if (bookingData.booking) {
-      // Old format from select joins
-      const { booking, specialist, specialistUser, referrer, examinee, referrerOrganization } =
-        bookingData;
-      return {
-        ...booking,
-        specialist:
-          specialist && specialistUser
-            ? {
-                id: specialist.id,
-                name: specialistUser.name,
-                jobTitle: specialistUser.jobTitle,
-                location: specialist.location,
-              }
-            : { id: "", name: "", jobTitle: "", location: null },
-        referrer: referrer || null,
-        examinee: examinee || null,
-        referrerOrganization: referrerOrganization || null,
-      };
-    } else {
-      // New format from query builder
-      return {
-        ...bookingData,
-        specialist: bookingData.specialist
-          ? {
-              id: bookingData.specialist.id,
-              name: bookingData.specialist.user?.name || "",
-              jobTitle: bookingData.specialist.user?.jobTitle || "",
-              location: bookingData.specialist.location,
-            }
-          : { id: "", name: "", jobTitle: "", location: null },
-        referrerOrganization: bookingData.referrer?.organization || null,
-      };
-    }
-  }
-
   // Find booking by Acuity appointment ID
   async findByAcuityAppointmentId(acuityAppointmentId: string) {
     const result = await db
@@ -297,8 +258,8 @@ export class BookingService {
 
   // Sync booking with Acuity appointment
   async syncWithAcuityAppointment(
-    bookingId: string,
-    acuityAppointment: {
+    _bookingId: string,
+    _acuityAppointment: {
       datetime: string;
       appointmentTypeID: number;
       duration: string;
@@ -415,7 +376,7 @@ export class BookingService {
     }
 
     // Extract examinee data from form fields
-    const extractedExamineeData1 = await this.extractExamineeDataFromFields(
+    const _extractedExamineeData1 = await this.extractExamineeDataFromFields(
       data.appointmentTypeId,
       data.fields
     );
@@ -502,9 +463,7 @@ export class BookingService {
             location:
               specialistAppointmentType.appointmentMode === "telehealth"
                 ? "Generating link"
-                : specialist.location === null
-                  ? "[Admin to advise]"
-                  : (formatLocationFull(specialist.location) ?? "[Admin to advise]"),
+                : formatLocationFull(specialist.location),
             dateTime: new Date(data.datetime),
             acuityAppointmentId: acuityAppointment.id, // Use the Acuity ID directly
             acuityAppointmentTypeId: specialistAppointmentType.appointmentTypeId,
@@ -558,6 +517,7 @@ export class BookingService {
         fromStatus: bookingProgress.fromStatus,
         toStatus: bookingProgress.toStatus,
         createdAt: bookingProgress.createdAt,
+        changedById: bookingProgress.changedById,
         changedBy: {
           id: users.id,
           name: users.name,
@@ -596,7 +556,7 @@ export class BookingService {
     };
 
     // Get current booking
-    const bookingData = await bookingRepository.findByIdWithSpecialist(bookingId);
+    const bookingData = await bookingRepository.findByIdWithDetails(bookingId);
     if (!bookingData) {
       const error = new Error("Booking not found");
       error.name = "BookingNotFoundError";

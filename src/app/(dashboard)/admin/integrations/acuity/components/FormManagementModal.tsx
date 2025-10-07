@@ -104,7 +104,7 @@ export function FormManagementModal({
         onUpdate(); // Refresh the appointment types list
         onClose();
       } else {
-        throw new Error((result as any).error || "Failed to update");
+        throw new Error("Failed to update");
       }
     } catch (error) {
       console.error("Failed to save:", error);
@@ -153,17 +153,21 @@ export function FormManagementModal({
     Array.from(selectedFormIds).some((id) => !originalFormIds.has(id));
 
   // Load data when modal opens
-  useEffect(() => {
-    if (open && appointmentType) {
-      fetchData();
-    } else if (!open) {
-      // Reset state when modal closes
-      setAvailableForms([]);
-      setSelectedFormIds(new Set());
-      setOriginalFormIds(new Set());
-      setSearchQuery("");
-    }
-  }, [open, appointmentType]);
+  useEffect(
+    () => {
+      if (open && appointmentType) {
+        fetchData();
+      } else if (!open) {
+        // Reset state when modal closes
+        setAvailableForms([]);
+        setSelectedFormIds(new Set());
+        setOriginalFormIds(new Set());
+        setSearchQuery("");
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [open, appointmentType]
+  );
 
   if (!appointmentType) return null;
 

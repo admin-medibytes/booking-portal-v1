@@ -1,14 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import {
-  pgTable,
-  text,
-  timestamp,
-  integer,
-  jsonb,
-  pgEnum,
-  index,
-  boolean,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, pgEnum, index, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users, organizations, teams } from "./auth";
 import { specialists } from "./specialists";

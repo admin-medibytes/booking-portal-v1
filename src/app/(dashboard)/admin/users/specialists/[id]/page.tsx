@@ -19,36 +19,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
   Loader2,
   Edit2,
   X,
-  Check,
   User,
-  Mail,
-  Phone,
   MapPin,
-  Building,
   Video,
   MapPinned,
   AlertCircle,
   ArrowLeft,
   ChevronRight,
   Calendar,
-  Clock,
-  Globe,
-  Hash,
   Shield,
-  Link2,
   Settings,
   Activity,
-  Briefcase,
   UserCircle,
-  Database,
   CalendarDays,
-  ListChecks,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { Country, State, City } from "country-state-city";
@@ -59,6 +47,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { AppointmentTypesModal } from "../components/AppointmentTypesModal";
 import { EditableAppointmentTypeCard } from "../components/EditableAppointmentTypeCard";
+import { UpdateSpecialistInputType } from "@/server/repositories/specialist.repository";
 
 interface Specialist {
   id: string;
@@ -132,7 +121,7 @@ export default function SpecialistDetailPage() {
         );
       }
 
-      const specialist = data.data.find((s: Specialist) => s.id === specialistId);
+      const specialist = data.data.find((s) => s.id === specialistId);
       if (!specialist) {
         throw new Error("Specialist not found");
       }
@@ -165,39 +154,44 @@ export default function SpecialistDetailPage() {
   const specialist = specialistData?.specialist as Specialist | undefined;
 
   // Memoize initial values to prevent recalculation
-  const initialValues = useMemo(() => {
-    if (!specialist) return null;
+  const initialValues = useMemo(
+    () => {
+      if (!specialist) return null;
 
-    let countryCode = "AU";
-    if (specialist.location?.country) {
-      const country = Country.getAllCountries().find(
-        (c) => c.name === specialist.location?.country
-      );
-      countryCode = country?.isoCode || "AU";
-    }
+      let countryCode = "AU";
+      if (specialist.location?.country) {
+        const country = Country.getAllCountries().find(
+          (c) => c.name === specialist.location?.country
+        );
+        countryCode = country?.isoCode || "AU";
+      }
 
-    const states = State.getStatesOfCountry(countryCode);
-    let cities: any[] = [];
-    if (specialist.location?.state && specialist.location?.country) {
-      cities = City.getCitiesOfState(countryCode, specialist.location.state);
-    }
+      const states = State.getStatesOfCountry(countryCode);
+      let cities: ReturnType<typeof City.getCitiesOfState> = [];
+      if (specialist.location?.state && specialist.location?.country) {
+        cities = City.getCitiesOfState(countryCode, specialist.location.state);
+      }
 
-    return {
-      profileForm: {
-        name: specialist.name,
-        slug: specialist.slug,
-        isActive: !!specialist.isActive,
-        jobTitle: specialist.user.jobTitle,
-      },
-      practiceForm: {
-        location: specialist.location || null,
-      },
-      countryCode,
-      states,
-      cities,
-      showLocationFields: !!specialist.location,
-    };
-  }, [specialist?.id]);
+      return {
+        profileForm: {
+          name: specialist.name,
+          slug: specialist.slug,
+          isActive: !!specialist.isActive,
+          jobTitle: specialist.user.jobTitle,
+        },
+        practiceForm: {
+          location: specialist.location || null,
+        },
+        countryCode,
+        states,
+        cities,
+        showLocationFields: !!specialist.location,
+      };
+    },
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [specialist?.id]
+  );
 
   // Initialize form states
   const [profileForm, setProfileForm] = useState(
@@ -345,7 +339,7 @@ export default function SpecialistDetailPage() {
 
   // Mutations
   const updateSpecialistMutation = useMutation({
-    mutationFn: async (values: any) => {
+    mutationFn: async (values: UpdateSpecialistInputType) => {
       const response = await specialistsClient[":id"].$put({
         param: { id: specialistId },
         json: values,
@@ -367,8 +361,16 @@ export default function SpecialistDetailPage() {
     },
   });
 
+  type UpdateUserInput = {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    jobTitle?: string;
+    isActive?: boolean;
+  };
+
   const updateUserMutation = useMutation({
-    mutationFn: async (values: any) => {
+    mutationFn: async (values: UpdateUserInput) => {
       const response = await adminClient.users[":id"].$put({
         param: { id: specialist!.userId },
         json: values,
@@ -396,7 +398,9 @@ export default function SpecialistDetailPage() {
     updateSpecialistMutation.mutate(
       {
         name: profileForm.name,
-        slug: profileForm.slug,
+        slug: profileForm.slug ?? null,
+        image: undefined,
+        location: null,
         isActive: profileForm.isActive,
       },
       {
@@ -438,7 +442,22 @@ export default function SpecialistDetailPage() {
 
     updateSpecialistMutation.mutate(
       {
-        location: showLocationFields ? practiceForm.location : null,
+        name: undefined,
+        slug: undefined,
+        image: undefined,
+        isActive: undefined,
+        location: showLocationFields
+          ? practiceForm.location
+            ? {
+                streetAddress: practiceForm.location.streetAddress,
+                suburb: practiceForm.location.suburb,
+                city: practiceForm.location.city,
+                state: practiceForm.location.state,
+                postalCode: practiceForm.location.postalCode,
+                country: practiceForm.location.country,
+              }
+            : null
+          : null,
       },
       {
         onSuccess: () => setIsEditingPractice(false),
@@ -459,9 +478,15 @@ export default function SpecialistDetailPage() {
         });
       }
 
-      await updateSpecialistMutation.mutateAsync({ image: imageUrl });
+      await updateSpecialistMutation.mutateAsync({
+        name: undefined,
+        slug: undefined,
+        location: null,
+        isActive: undefined,
+        image: imageUrl,
+      });
       toast.success(imageUrl ? "Image uploaded successfully" : "Image removed successfully");
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to update image");
     } finally {
       setIsUploadingImage(false);
@@ -1082,7 +1107,7 @@ export default function SpecialistDetailPage() {
                 </div>
               ) : appointmentTypesData && appointmentTypesData.length > 0 ? (
                 <div className="space-y-2">
-                  {appointmentTypesData.map((item: any) => (
+                  {appointmentTypesData.map((item) => (
                     <EditableAppointmentTypeCard
                       key={item.appointmentTypeId}
                       data={{
@@ -1094,7 +1119,21 @@ export default function SpecialistDetailPage() {
                         customDescription: item.customDescription,
                         customPrice: item.customPrice,
                         notes: item.notes,
-                        appointmentType: item.appointmentType,
+                        appointmentType: item.appointmentType
+                          ? {
+                              id: item.appointmentType.id,
+                              name: item.appointmentType.name,
+                              description: item.appointmentType.description,
+                              duration: item.appointmentType.duration,
+                              price:
+                                item.appointmentType.price !== null &&
+                                item.appointmentType.price !== undefined
+                                  ? Number(item.appointmentType.price)
+                                  : null,
+                              category: item.appointmentType.category,
+                              active: item.appointmentType.active,
+                            }
+                          : undefined,
                       }}
                       onUpdate={() => {
                         // Refetch appointment types after update

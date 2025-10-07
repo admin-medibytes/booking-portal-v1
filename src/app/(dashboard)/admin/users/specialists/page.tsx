@@ -22,7 +22,7 @@ import type { SpecialistLocation } from "@/types/specialist";
 interface Specialist {
   id: string;
   userId: string;
-  acuityCalendarId: string;
+  acuityCalendarId: number;
   name: string;
   slug: string | null;
   location: SpecialistLocation | null;
@@ -353,10 +353,11 @@ export default function AdminSpecialistsPage() {
         <SortableSpecialistGrid
           specialists={filteredSpecialists}
           onReorder={handleReorder}
-          onSpecialistClick={(specialist) => router.push(`/admin/users/specialists/${specialist.id}`)}
+          onSpecialistClick={(specialist) =>
+            router.push(`/admin/users/specialists/${specialist.id}`)
+          }
         />
       )}
-
     </div>
   );
 }

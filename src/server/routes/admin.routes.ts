@@ -16,7 +16,7 @@ import {
   acuityAppointmentTypeForms,
 } from "@/server/db/schema/acuity";
 import { specialists, specialistAppointmentTypes } from "@/server/db/schema/specialists";
-import { eq, inArray, and, sql, asc } from "drizzle-orm";
+import { eq, sql, asc } from "drizzle-orm";
 
 const updateUserSchema = type({
   "firstName?": "string>=2",
@@ -95,7 +95,7 @@ const app = new Hono()
         teamId: "string",
         role: "'referrer'|'specialist'|'admin'",
         sendEmailInvitation: "boolean",
-        "acuityCalendarId?": "string",
+        "acuityCalendarId?": "number",
         "slug?": "string",
       })
     ),
@@ -642,8 +642,6 @@ const app = new Hono()
   // Acuity Integration routes
   // Get appointment types from database
   .get("/integration/acuity/appointment-types", async (c) => {
-    const auth = c.get("auth");
-
     try {
       // First, get the appointment types from the database
       const appointmentTypesData = await db
@@ -836,7 +834,7 @@ const app = new Hono()
         // Insert new appointment types
         if (newTypes && newTypes.length > 0) {
           for (const type of newTypes) {
-            const acuityType = acuityTypes.find((at: any) => at.id === type.id);
+            const acuityType = acuityTypes.find((at) => at.id === type.id);
             if (!acuityType) continue;
 
             await tx.insert(acuityAppointmentTypes).values({
@@ -883,7 +881,7 @@ const app = new Hono()
         // Update existing appointment types
         if (updatedTypes && updatedTypes.length > 0) {
           for (const type of updatedTypes) {
-            const acuityType = acuityTypes.find((at: any) => at.id === type.id);
+            const acuityType = acuityTypes.find((at) => at.id === type.id);
             if (!acuityType) continue;
 
             await tx
@@ -1026,8 +1024,6 @@ const app = new Hono()
 
   // Forms endpoints for the integration page
   .get("/integration/acuity/forms", async (c) => {
-    const auth = c.get("auth");
-
     try {
       // Fetch forms from database
       const formsData = await db
@@ -1226,7 +1222,7 @@ const app = new Hono()
           // Insert new forms
           if (newForms && newForms.length > 0 && acuityFormsData && acuityFormsData.length > 0) {
             for (const form of newForms) {
-              const acuityForm = acuityFormsData.find((af: any) => af.id === form.id);
+              const acuityForm = acuityFormsData.find((af) => af.id === form.id);
               if (!acuityForm) continue;
 
               await tx.insert(acuityForms).values({
@@ -1265,7 +1261,7 @@ const app = new Hono()
             acuityFormsData.length > 0
           ) {
             for (const form of updatedForms) {
-              const acuityForm = acuityFormsData.find((af: any) => af.id === form.id);
+              const acuityForm = acuityFormsData.find((af) => af.id === form.id);
               if (!acuityForm) continue;
 
               await tx
@@ -1463,22 +1459,22 @@ const app = new Hono()
           },
           201
         );
-      } catch (error: any) {
+      } catch (error) {
         logger.error("Failed to create app form", error as Error, { acuityFormId });
 
-        if (error.name === "NotFoundError") {
+        if ((error as Error & { name?: string }).name === "NotFoundError") {
           return c.json({ success: false, error: "Acuity form not found" }, 404);
         }
 
-        if (error.name === "ValidationError") {
-          return c.json({ success: false, error: error.message }, 400);
+        if ((error as Error & { name?: string }).name === "ValidationError") {
+          return c.json({ success: false, error: (error as Error).message }, 400);
         }
 
         return c.json(
           {
             success: false,
             error: "Failed to create app form",
-            message: error.message || "Unknown error",
+            message: (error as Error).message || "Unknown error",
           },
           500
         );
@@ -1532,10 +1528,11 @@ const app = new Hono()
         success: true,
         data: form,
       });
-    } catch (error: any) {
-      logger.error("Failed to get app form", error as Error, { id });
+    } catch (error: unknown) {
+      const err = error as Error & { name?: string };
+      logger.error("Failed to get app form", err, { id });
 
-      if (error.name === "NotFoundError") {
+      if (err.name === "NotFoundError") {
         return c.json({ success: false, error: "App form not found" }, 404);
       }
 
@@ -1543,7 +1540,7 @@ const app = new Hono()
         {
           success: false,
           error: "Failed to get app form",
-          message: error.message || "Unknown error",
+          message: err.message || "Unknown error",
         },
         500
       );
@@ -1579,10 +1576,11 @@ const app = new Hono()
           success: true,
           data: form,
         });
-      } catch (error: any) {
-        logger.error("Failed to update app form", error as Error, { id });
+      } catch (error: unknown) {
+        const err = error as Error & { name?: string };
+        logger.error("Failed to update app form", err, { id });
 
-        if (error.name === "NotFoundError") {
+        if (err.name === "NotFoundError") {
           return c.json({ success: false, error: "App form not found" }, 404);
         }
 
@@ -1590,7 +1588,7 @@ const app = new Hono()
           {
             success: false,
             error: "Failed to update app form",
-            message: error.message || "Unknown error",
+            message: err.message || "Unknown error",
           },
           500
         );
@@ -1617,7 +1615,8 @@ const app = new Hono()
           "staticValue?": "string|null",
           "displayOrder?": "number>=1",
           "displayWidth?": "'full'|'half'|'third'",
-          "examineeFieldMapping?": "'firstName'|'lastName'|'dateOfBirth'|'email'|'phoneNumber'|'address'|'authorizedContact'|'condition'|'caseType'|null",
+          "examineeFieldMapping?":
+            "'firstName'|'lastName'|'dateOfBirth'|'email'|'phoneNumber'|'address'|'authorizedContact'|'condition'|'caseType'|null",
         }).array(),
       })
     ),
@@ -1639,22 +1638,23 @@ const app = new Hono()
           success: true,
           data: updatedFields,
         });
-      } catch (error: any) {
-        logger.error("Failed to update app form fields", error as Error, { id });
+      } catch (error: unknown) {
+        const err = error as Error & { name?: string };
+        logger.error("Failed to update app form fields", err, { id });
 
-        if (error.name === "NotFoundError") {
+        if (err.name === "NotFoundError") {
           return c.json({ success: false, error: "App form not found" }, 404);
         }
 
-        if (error.name === "ValidationError") {
-          return c.json({ success: false, error: error.message }, 400);
+        if (err.name === "ValidationError") {
+          return c.json({ success: false, error: err.message }, 400);
         }
 
         return c.json(
           {
             success: false,
             error: "Failed to update app form fields",
-            message: error.message || "Unknown error",
+            message: err.message || "Unknown error",
           },
           500
         );
@@ -1679,10 +1679,11 @@ const app = new Hono()
         success: true,
         message: "App form deleted successfully",
       });
-    } catch (error: any) {
-      logger.error("Failed to delete app form", error as Error, { id });
+    } catch (error: unknown) {
+      const err = error as Error & { name?: string };
+      logger.error("Failed to delete app form", err, { id });
 
-      if (error.name === "NotFoundError") {
+      if (err.name === "NotFoundError") {
         return c.json({ success: false, error: "App form not found" }, 404);
       }
 
@@ -1690,7 +1691,7 @@ const app = new Hono()
         {
           success: false,
           error: "Failed to delete app form",
-          message: error.message || "Unknown error",
+          message: err.message || "Unknown error",
         },
         500
       );

@@ -2,14 +2,12 @@ import { db } from "@/server/db";
 import {
   appForms,
   appFormFields,
-  type AppForm,
   type AppFormField,
-  type NewAppForm,
   type NewAppFormField,
   type AppFormWithFields,
 } from "@/server/db/schema/appForms";
 import { acuityForms, acuityFormsFields } from "@/server/db/schema/acuity";
-import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { eq, and, asc, desc } from "drizzle-orm";
 import { NotFoundError, ValidationError } from "@/server/utils/errors";
 import { logger } from "@/server/utils/logger";
 

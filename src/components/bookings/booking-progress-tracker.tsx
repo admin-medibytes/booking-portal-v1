@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, User, AlertCircle } from "lucide-react";
+import { Clock, User } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import type { BookingProgress } from "@/types/booking";
 
@@ -71,7 +71,16 @@ export function BookingProgressTracker({
           {/* Current Progress */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
             <div className="flex-shrink-0">
-              <Badge variant={getProgressColor(currentProgress) as "default" | "secondary" | "destructive" | "outline"} className="text-sm">
+              <Badge
+                variant={
+                  getProgressColor(currentProgress) as
+                    | "default"
+                    | "secondary"
+                    | "destructive"
+                    | "outline"
+                }
+                className="text-sm"
+              >
                 {getProgressLabel(currentProgress)}
               </Badge>
             </div>
@@ -102,7 +111,13 @@ export function BookingProgressTracker({
                             {progress.fromStatus && (
                               <>
                                 <Badge
-                                  variant={getProgressColor(progress.fromStatus) as "default" | "secondary" | "destructive" | "outline"}
+                                  variant={
+                                    getProgressColor(progress.fromStatus) as
+                                      | "default"
+                                      | "secondary"
+                                      | "destructive"
+                                      | "outline"
+                                  }
                                   className="text-xs"
                                 >
                                   {getProgressLabel(progress.fromStatus)}
@@ -111,7 +126,13 @@ export function BookingProgressTracker({
                               </>
                             )}
                             <Badge
-                              variant={getProgressColor(progress.toStatus) as "default" | "secondary" | "destructive" | "outline"}
+                              variant={
+                                getProgressColor(progress.toStatus) as
+                                  | "default"
+                                  | "secondary"
+                                  | "destructive"
+                                  | "outline"
+                              }
                               className="text-xs"
                             >
                               {getProgressLabel(progress.toStatus)}
@@ -120,16 +141,10 @@ export function BookingProgressTracker({
                           <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                             <User className="w-3 h-3" />
                             <span>{progress.changedBy?.name || "System"}</span>
-                            {(progress.metadata as { impersonatedUserId?: string })?.impersonatedUserId && (
-                              <div className="flex items-center gap-1 text-amber-600">
-                                <AlertCircle className="w-3 h-3" />
-                                <span>via impersonation</span>
-                              </div>
-                            )}
                           </div>
-                          {progress.reason && (
+                          {/* {progress.reason && (
                             <p className="mt-2 text-sm text-gray-600">{progress.reason}</p>
-                          )}
+                          )} */}
                         </div>
                         <div className="text-xs text-gray-400">
                           <div title={format(new Date(progress.createdAt), "PPpp")}>

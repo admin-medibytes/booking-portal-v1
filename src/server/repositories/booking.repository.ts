@@ -54,27 +54,23 @@ export class BookingRepository {
     const limit = filters?.limit || 20;
     const offset = (page - 1) * limit;
 
-    const query = db
-      .select({
-        booking: bookings,
-        specialist: specialists,
-        specialistUser: users,
-        referrer: referrers,
-        examinee: examinees,
-        referrerOrganization: organizations,
-      })
-      .from(bookings)
-      .leftJoin(specialists, eq(bookings.specialistId, specialists.id))
-      .leftJoin(users, eq(specialists.userId, users.id))
-      .leftJoin(referrers, eq(bookings.referrerId, referrers.id))
-      .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
-      .leftJoin(organizations, eq(referrers.organizationId, organizations.id))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(bookings.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    const results = await query;
+    const results = await db.query.bookings.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      orderBy: desc(bookings.createdAt),
+      limit,
+      offset,
+      with: {
+        specialist: {
+          with: { user: true },
+        },
+        referrer: {
+          with: { organization: true },
+        },
+        examinee: true,
+        createdBy: true,
+        organization: true,
+      },
+    });
 
     // Build count query - need to include examinees join if searching
     const countQuery = filters?.search
@@ -87,7 +83,7 @@ export class BookingRepository {
           .select({ count: sql<number>`count(*)` })
           .from(bookings)
           .where(conditions.length > 0 ? and(...conditions) : undefined);
-    
+
     const [{ count }] = await countQuery;
 
     return {
@@ -95,26 +91,24 @@ export class BookingRepository {
       pagination: {
         page,
         limit,
-        total: Number(count),
+        total: count,
         totalPages: Math.ceil(Number(count) / limit),
       },
     };
   }
-  async findByIdWithSpecialist(id: string) {
+
+  async findByIdWithDetails(id: string) {
     const result = await db.query.bookings.findFirst({
       where: eq(bookings.id, id),
       with: {
         specialist: {
-          with: {
-            user: true,
-          },
+          with: { user: true },
         },
         referrer: {
-          with: {
-            organization: true,
-          },
+          with: { organization: true },
         },
         examinee: true,
+        createdBy: true,
         organization: true,
       },
     });

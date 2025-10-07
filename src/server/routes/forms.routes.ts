@@ -14,11 +14,11 @@ const app = new Hono()
       return c.json(form);
     } catch (error) {
       logger.error("Failed to get app form for rendering", error as Error, { id });
-      
-      if ((error as any).name === "NotFoundError") {
+
+      if ((error as Error).name === "NotFoundError") {
         return c.json({ error: "Form not found or not active" }, 404);
       }
-      
+
       return c.json({ error: "Failed to get form" }, 500);
     }
   });

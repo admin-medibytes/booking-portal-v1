@@ -26,8 +26,8 @@ export function formatLocationShort(location: SpecialistLocation | null): string
 /**
  * Format location for full display (e.g., "123 Main St, Brisbane, QLD 4000")
  */
-export function formatLocationFull(location: SpecialistLocation | null): string | null {
-  if (!location) return null;
+export function formatLocationFull(location: SpecialistLocation | null): string {
+  if (!location || location === null) return "[Admin to advise]";
 
   const parts = [];
   if (location.streetAddress) parts.push(location.streetAddress);
@@ -39,7 +39,7 @@ export function formatLocationFull(location: SpecialistLocation | null): string 
     parts.push(location.country);
   }
 
-  return parts.length > 0 ? parts.join(", ") : null;
+  return parts.length > 0 ? parts.join(", ") : "[Admin to advise]";
 }
 
 /**

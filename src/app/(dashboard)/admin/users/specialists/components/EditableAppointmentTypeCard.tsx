@@ -9,27 +9,21 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { 
-  Edit2, 
-  Save, 
-  X, 
-  Clock, 
-  DollarSign, 
-  Video, 
+import {
+  Edit2,
+  Save,
+  X,
+  Clock,
+  DollarSign,
+  Video,
   MapPin,
   StickyNote,
   Loader2,
-  Info
+  Info,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { specialistsClient } from "@/lib/hono-client";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AppointmentTypeData {
   specialistId: string;
@@ -40,15 +34,17 @@ interface AppointmentTypeData {
   customDescription?: string | null;
   customPrice?: number | null;
   notes?: string | null;
-  appointmentType?: {
-    id: number;
-    name: string;
-    description?: string | null;
-    duration: number;
-    price?: number | null;
-    category?: string | null;
-    active: boolean;
-  };
+  appointmentType?:
+    | {
+        id: number;
+        name: string;
+        description?: string | null;
+        duration: number;
+        price?: number | null;
+        category?: string | null;
+        active: boolean;
+      }
+    | undefined;
 }
 
 interface EditableAppointmentTypeCardProps {
@@ -56,10 +52,7 @@ interface EditableAppointmentTypeCardProps {
   onUpdate: () => void;
 }
 
-export function EditableAppointmentTypeCard({ 
-  data, 
-  onUpdate 
-}: EditableAppointmentTypeCardProps) {
+export function EditableAppointmentTypeCard({ data, onUpdate }: EditableAppointmentTypeCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -72,8 +65,8 @@ export function EditableAppointmentTypeCard({
   });
 
   const hasCustomizations = !!(
-    data.customDisplayName || 
-    data.customDescription || 
+    data.customDisplayName ||
+    data.customDescription ||
     data.customPrice !== null ||
     data.notes
   );
@@ -82,9 +75,9 @@ export function EditableAppointmentTypeCard({
     setIsSaving(true);
     try {
       const response = await specialistsClient[":id"]["appointment-types"][":typeId"].$put({
-        param: { 
-          id: data.specialistId, 
-          typeId: data.appointmentTypeId.toString() 
+        param: {
+          id: data.specialistId,
+          typeId: data.appointmentTypeId.toString(),
         },
         json: {
           enabled: formData.enabled,
@@ -127,9 +120,9 @@ export function EditableAppointmentTypeCard({
     setIsSaving(true);
     try {
       const response = await specialistsClient[":id"]["appointment-types"][":typeId"].$put({
-        param: { 
-          id: data.specialistId, 
-          typeId: data.appointmentTypeId.toString() 
+        param: {
+          id: data.specialistId,
+          typeId: data.appointmentTypeId.toString(),
         },
         json: { enabled },
       });
@@ -164,17 +157,12 @@ export function EditableAppointmentTypeCard({
                           Customized
                         </Badge>
                       </TooltipTrigger>
-                      <TooltipContent>
-                        This appointment type has custom settings
-                      </TooltipContent>
+                      <TooltipContent>This appointment type has custom settings</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 )}
               </h4>
-              <Badge
-                variant={data.enabled ? "default" : "secondary"}
-                className="text-xs"
-              >
+              <Badge variant={data.enabled ? "default" : "secondary"} className="text-xs">
                 {data.enabled ? "Enabled" : "Disabled"}
               </Badge>
               <Badge variant="outline" className="text-xs">
@@ -191,21 +179,21 @@ export function EditableAppointmentTypeCard({
                 )}
               </Badge>
             </div>
-            
+
             {(data.customDescription || data.appointmentType?.description) && (
               <p className="text-xs text-muted-foreground mt-1">
                 {data.customDescription || data.appointmentType?.description}
               </p>
             )}
-            
+
             <div className="flex items-center gap-3 mt-2">
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 {data.appointmentType?.duration || 0} min
               </span>
               <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <DollarSign className="w-3 h-3" />
-                ${(data.customPrice ?? data.appointmentType?.price ?? 0).toFixed(2)}
+                <DollarSign className="w-3 h-3" />$
+                {(data.customPrice ?? data.appointmentType?.price ?? 0).toFixed(2)}
                 {data.customPrice !== null && data.appointmentType?.price !== data.customPrice && (
                   <span className="text-muted-foreground/60 line-through ml-1">
                     ${(data.appointmentType?.price ?? 0).toFixed(2)}
@@ -218,7 +206,7 @@ export function EditableAppointmentTypeCard({
                 </Badge>
               )}
             </div>
-            
+
             {data.notes && (
               <div className="flex items-start gap-1 mt-2">
                 <StickyNote className="w-3 h-3 text-muted-foreground mt-0.5" />
@@ -226,7 +214,7 @@ export function EditableAppointmentTypeCard({
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Switch
               checked={data.enabled}
@@ -256,20 +244,11 @@ export function EditableAppointmentTypeCard({
             Edit {data.appointmentType?.name || "Appointment Type"}
           </h4>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCancel}
-              disabled={isSaving}
-            >
+            <Button variant="ghost" size="sm" onClick={handleCancel} disabled={isSaving}>
               <X className="h-4 w-4 mr-2" />
               Cancel
             </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={isSaving}
-            >
+            <Button size="sm" onClick={handleSave} disabled={isSaving}>
               {isSaving ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
@@ -287,13 +266,9 @@ export function EditableAppointmentTypeCard({
             <Switch
               id="enabled"
               checked={formData.enabled}
-              onCheckedChange={(checked) => 
-                setFormData({ ...formData, enabled: checked })
-              }
+              onCheckedChange={(checked) => setFormData({ ...formData, enabled: checked })}
             />
-            <span className="text-sm">
-              {formData.enabled ? "Enabled" : "Disabled"}
-            </span>
+            <span className="text-sm">{formData.enabled ? "Enabled" : "Disabled"}</span>
           </div>
         </div>
 
@@ -303,7 +278,7 @@ export function EditableAppointmentTypeCard({
           <div className="bg-muted/50 inline-flex h-9 rounded-md p-0.5 w-full">
             <RadioGroup
               value={formData.appointmentMode}
-              onValueChange={(value) => 
+              onValueChange={(value) =>
                 setFormData({ ...formData, appointmentMode: value as "in-person" | "telehealth" })
               }
               className="group after:bg-background has-focus-visible:after:border-ring has-focus-visible:after:ring-ring/50 relative inline-grid grid-cols-2 items-center gap-0 text-sm font-medium after:absolute after:inset-y-0 after:w-1/2 after:rounded-sm after:shadow-xs after:transition-[translate,box-shadow] after:duration-300 after:ease-[cubic-bezier(0.16,1,0.3,1)] has-focus-visible:after:ring-[3px] data-[state=telehealth]:after:translate-x-0 data-[state=in-person]:after:translate-x-full w-full"
@@ -341,9 +316,7 @@ export function EditableAppointmentTypeCard({
           <Input
             id="customDisplayName"
             value={formData.customDisplayName}
-            onChange={(e) => 
-              setFormData({ ...formData, customDisplayName: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, customDisplayName: e.target.value })}
             placeholder={data.appointmentType?.name || "Enter custom name"}
           />
         </div>
@@ -366,9 +339,7 @@ export function EditableAppointmentTypeCard({
           <Textarea
             id="customDescription"
             value={formData.customDescription}
-            onChange={(e) => 
-              setFormData({ ...formData, customDescription: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, customDescription: e.target.value })}
             placeholder={data.appointmentType?.description || "Enter custom description"}
             rows={2}
           />
@@ -384,7 +355,8 @@ export function EditableAppointmentTypeCard({
                   <Info className="w-3 h-3 text-muted-foreground" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  Override the default price. Leave empty to use default (${(data.appointmentType?.price ?? 0).toFixed(2)}).
+                  Override the default price. Leave empty to use default ($
+                  {(data.appointmentType?.price ?? 0).toFixed(2)}).
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -396,9 +368,7 @@ export function EditableAppointmentTypeCard({
               type="number"
               step="0.01"
               value={formData.customPrice}
-              onChange={(e) => 
-                setFormData({ ...formData, customPrice: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, customPrice: e.target.value })}
               placeholder={(data.appointmentType?.price ?? 0).toFixed(2)}
               className="pl-9"
             />
@@ -414,18 +384,14 @@ export function EditableAppointmentTypeCard({
                 <TooltipTrigger>
                   <Info className="w-3 h-3 text-muted-foreground" />
                 </TooltipTrigger>
-                <TooltipContent>
-                  These notes are only visible to administrators.
-                </TooltipContent>
+                <TooltipContent>These notes are only visible to administrators.</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </Label>
           <Textarea
             id="notes"
             value={formData.notes}
-            onChange={(e) => 
-              setFormData({ ...formData, notes: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             placeholder="Add any internal notes about this appointment type..."
             rows={2}
           />

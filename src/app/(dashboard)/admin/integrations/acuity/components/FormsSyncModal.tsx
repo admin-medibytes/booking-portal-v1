@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle2, PlusCircle, AlertCircle, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminClient } from "@/lib/hono-client";
@@ -69,10 +68,10 @@ export function FormsSyncModal({ open, onClose, onSync, onConfirmSync }: FormsSy
 
       const data = await response.json();
       if ("success" in data && data.success) {
-        setComparisonData(data as any);
+        setComparisonData(data);
         setState("preview");
       } else {
-        throw new Error((data as any).error || "Failed to fetch preview");
+        throw new Error("Failed to fetch preview");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");

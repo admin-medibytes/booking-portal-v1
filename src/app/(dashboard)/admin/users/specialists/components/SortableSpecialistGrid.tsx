@@ -21,7 +21,7 @@ import type { SpecialistLocation } from "@/types/specialist";
 interface Specialist {
   id: string;
   userId: string;
-  acuityCalendarId: string;
+  acuityCalendarId: number;
   name: string;
   slug: string | null;
   image?: string | null;
@@ -48,7 +48,11 @@ interface SortableSpecialistGridProps {
   onSpecialistClick?: (specialist: Specialist) => void;
 }
 
-export function SortableSpecialistGrid({ specialists, onReorder, onSpecialistClick }: SortableSpecialistGridProps) {
+export function SortableSpecialistGrid({
+  specialists,
+  onReorder,
+  onSpecialistClick,
+}: SortableSpecialistGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -66,7 +70,7 @@ export function SortableSpecialistGrid({ specialists, onReorder, onSpecialistCli
       if (oldIndex !== -1 && newIndex !== -1) {
         // Calculate new order
         const newOrder = arrayMove(specialists, oldIndex, newIndex);
-        
+
         // Create position updates
         const positionUpdates = newOrder.map((specialist, index) => ({
           id: specialist.id,
@@ -74,8 +78,8 @@ export function SortableSpecialistGrid({ specialists, onReorder, onSpecialistCli
         }));
 
         // Only send updates for specialists whose positions changed
-        const changedPositions = positionUpdates.filter((update, idx) => {
-          const original = specialists.find(s => s.id === update.id);
+        const changedPositions = positionUpdates.filter((update) => {
+          const original = specialists.find((s) => s.id === update.id);
           return original && original.position !== update.position;
         });
 
@@ -87,15 +91,8 @@ export function SortableSpecialistGrid({ specialists, onReorder, onSpecialistCli
   };
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={specialists.map((s) => s.id)}
-        strategy={rectSortingStrategy}
-      >
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={specialists.map((s) => s.id)} strategy={rectSortingStrategy}>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {specialists.map((specialist) => (
             <DraggableSpecialistCard

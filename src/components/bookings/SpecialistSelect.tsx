@@ -107,8 +107,6 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
     );
   }
 
-  const rating = specialists.map(() => +(Math.random() * 2 + 3).toFixed(1));
-
   return (
     <div className="space-y-6">
       {/* Search Bar */}
@@ -124,7 +122,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
 
       {/* Specialists List */}
       <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-        {filteredSpecialists.map((specialist, index) => {
+        {filteredSpecialists.map((specialist) => {
           const isSelected = selectedSpecialist?.id === specialist.id;
           // const rating = getRating(specialist);
 

@@ -12,13 +12,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { QRCodeSVG } from "qrcode.react";
 
-const passwordSchema = type({
-  newPassword: "string>=8",
-  confirmPassword: "string>=8",
-  "enable2FA?": "boolean",
-});
-
-type PasswordFormData = typeof passwordSchema.infer;
+type PasswordFormData = {
+  newPassword: string;
+  confirmPassword: string;
+  enable2FA?: boolean | undefined;
+};
 
 export function OnboardingForm() {
   const router = useRouter();

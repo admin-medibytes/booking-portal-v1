@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Calendar, FileText, Settings, Users, Shield, Home, CalendarCheck, Plug } from "lucide-react";
+import {
+  Calendar,
+  FileText,
+  Settings,
+  Users,
+  Shield,
+  Home,
+  CalendarCheck,
+  Plug,
+} from "lucide-react";
 
 import {
   Sidebar,
@@ -77,19 +86,23 @@ export function AppSidebar({ user }: AppUserProps) {
 
   const { setOpen } = useSidebar();
 
-  React.useEffect(() => {
-    const getCookie = (name: string) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop()?.split(";").shift();
-      return null;
-    };
+  React.useEffect(
+    () => {
+      const getCookie = (name: string) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop()?.split(";").shift();
+        return null;
+      };
 
-    const sidebarState = getCookie("sidebar_state");
-    if (!!sidebarState) {
-      setOpen(sidebarState === "false" ? false : true);
-    }
-  }, []);
+      const sidebarState = getCookie("sidebar_state");
+      if (!!sidebarState) {
+        setOpen(sidebarState === "false" ? false : true);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   return (
     <Sidebar>

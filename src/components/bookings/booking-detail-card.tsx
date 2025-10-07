@@ -130,20 +130,6 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
     setLoadingAction(null);
   };
 
-  const handleSendReminder = () => {
-    setLoadingAction("reminder");
-    // TODO: Implement send reminder logic
-    toast.info("Send reminder feature coming soon!");
-    setLoadingAction(null);
-  };
-
-  const handleDownloadReceipt = () => {
-    setLoadingAction("download");
-    // TODO: Implement download receipt logic
-    toast.info("Download receipt feature coming soon!");
-    setLoadingAction(null);
-  };
-
   const handleCancel = () => {
     setLoadingAction("cancel");
     // TODO: Implement cancel logic
@@ -167,7 +153,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
             {/* Specialist Info */}
             <div className="flex items-start gap-4 p-4 bg-muted/50 rounded-lg">
               <Avatar className="h-16 w-16">
-                <AvatarImage src="/placeholder.svg" alt={booking.specialist.name} />
+                <AvatarImage src={booking.specialist.image} alt={booking.specialist.name} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-lg">
                   {booking.specialist.name
                     ?.split(" ")

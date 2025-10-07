@@ -1,6 +1,11 @@
 import { db } from "@/server/db";
-import { specialists, users, specialistAppointmentTypes, type SpecialistLocation } from "@/server/db/schema";
-import { eq, sql, asc, and, or } from "drizzle-orm";
+import {
+  specialists,
+  users,
+  specialistAppointmentTypes,
+  type SpecialistLocation,
+} from "@/server/db/schema";
+import { eq, sql, asc, and } from "drizzle-orm";
 import { type } from "arktype";
 
 // Location validation schema
@@ -16,7 +21,7 @@ export const LocationInput = type({
 // Input validation schemas
 export const CreateSpecialistInput = type({
   userId: "string",
-  acuityCalendarId: "string",
+  acuityCalendarId: "number",
   name: "string",
   slug: "string",
   location: LocationInput.or("null | undefined"),
@@ -64,13 +69,11 @@ export class SpecialistRepository {
     const [specialist] = await db
       .insert(specialists)
       .values({
-        userId: validated.userId,
         acuityCalendarId: validated.acuityCalendarId,
+        userId: validated.userId,
         name: validated.name,
         slug: validated.slug,
-        location: (validated.location as SpecialistLocation | null) ?? null,
         position,
-        isActive: validated.isActive ?? true,
       })
       .returning();
 
@@ -134,7 +137,7 @@ export class SpecialistRepository {
   }
 
   // Find specialist by Acuity calendar ID
-  async findByAcuityCalendarId(acuityCalendarId: string) {
+  async findByAcuityCalendarId(acuityCalendarId: number) {
     const result = await db
       .select({
         specialist: specialists,
@@ -228,7 +231,7 @@ export class SpecialistRepository {
       .where(eq(specialists.isActive, true))
       .orderBy(asc(specialists.position));
 
-    return results.map(r => ({
+    return results.map((r) => ({
       specialist: {
         ...r.specialist,
         acceptsInPerson: r.hasInPersonAppointments,
@@ -268,7 +271,7 @@ export class SpecialistRepository {
       .innerJoin(users, eq(specialists.userId, users.id))
       .orderBy(asc(specialists.position));
 
-    return results.map(r => ({
+    return results.map((r) => ({
       specialist: {
         ...r.specialist,
         acceptsInPerson: r.hasInPersonAppointments,
@@ -289,7 +292,7 @@ export class SpecialistRepository {
   }
 
   // Check if an Acuity calendar is already linked
-  async isCalendarLinked(acuityCalendarId: string): Promise<boolean> {
+  async isCalendarLinked(acuityCalendarId: number): Promise<boolean> {
     const [result] = await db
       .select({ count: sql<number>`count(*)` })
       .from(specialists)
@@ -436,22 +439,24 @@ export class SpecialistRepository {
       .orderBy(asc(specialists.position));
 
     // Filter results based on appointment type
-    return results.filter(r => {
-      if (type === "in_person") {
-        return r.hasInPersonAppointments;
-      } else if (type === "telehealth") {
-        return r.hasTelehealthAppointments;
-      } else {
-        return r.hasInPersonAppointments && r.hasTelehealthAppointments;
-      }
-    }).map(r => ({
-      specialist: {
-        ...r.specialist,
-        acceptsInPerson: r.hasInPersonAppointments,
-        acceptsTelehealth: r.hasTelehealthAppointments,
-      },
-      user: r.user,
-    }));
+    return results
+      .filter((r) => {
+        if (type === "in_person") {
+          return r.hasInPersonAppointments;
+        } else if (type === "telehealth") {
+          return r.hasTelehealthAppointments;
+        } else {
+          return r.hasInPersonAppointments && r.hasTelehealthAppointments;
+        }
+      })
+      .map((r) => ({
+        specialist: {
+          ...r.specialist,
+          acceptsInPerson: r.hasInPersonAppointments,
+          acceptsTelehealth: r.hasTelehealthAppointments,
+        },
+        user: r.user,
+      }));
   }
 
   // Search specialists by location

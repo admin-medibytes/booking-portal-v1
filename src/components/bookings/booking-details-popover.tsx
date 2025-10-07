@@ -27,8 +27,7 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
     onClose();
   };
 
-
-  const appointmentDate = booking.examDate ? new Date(booking.examDate) : null;
+  const appointmentDate = booking.dateTime ? new Date(booking.dateTime) : null;
   // For now, we'll use a default status since currentProgress isn't available
   const statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
 
@@ -38,13 +37,15 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
         <DialogHeader>
           <DialogTitle>Booking Details</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           {/* Status Badge */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Status</span>
             <Badge className={statusColor}>
-              {booking.status ? booking.status.charAt(0).toUpperCase() + booking.status.slice(1) : 'Active'}
+              {booking.status
+                ? booking.status.charAt(0).toUpperCase() + booking.status.slice(1)
+                : "Active"}
             </Badge>
           </div>
 
@@ -54,7 +55,9 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
               <UserIcon className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Examinee</span>
             </div>
-            <p className="text-sm ml-6">{booking.patientFirstName} {booking.patientLastName}</p>
+            <p className="text-sm ml-6">
+              {booking.examinee.firstName} {booking.examinee.lastName}
+            </p>
           </div>
 
           {/* Appointment Date & Time */}
@@ -64,9 +67,7 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
                 <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Date & Time</span>
               </div>
-              <p className="text-sm ml-6">
-                {format(appointmentDate, "EEEE, MMMM d, yyyy")}
-              </p>
+              <p className="text-sm ml-6">{format(appointmentDate, "EEEE, MMMM d, yyyy")}</p>
               <div className="flex items-center gap-2 ml-6">
                 <ClockIcon className="h-3 w-3 text-muted-foreground" />
                 <span className="text-sm">{format(appointmentDate, "h:mm a")}</span>
@@ -81,8 +82,10 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
               <span className="text-sm font-medium">Specialist</span>
             </div>
             <div className="ml-6">
-              <p className="text-sm font-medium">{booking.specialist?.name || 'Unassigned'}</p>
-              <p className="text-sm text-muted-foreground">{booking.specialist?.jobTitle || 'N/A'}</p>
+              <p className="text-sm font-medium">{booking.specialist?.name || "Unassigned"}</p>
+              <p className="text-sm text-muted-foreground">
+                {booking.specialist?.jobTitle || "N/A"}
+              </p>
             </div>
           </div>
 
@@ -92,17 +95,17 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
               <BuildingIcon className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Exam Location</span>
             </div>
-            <p className="text-sm ml-6">{booking.examLocation || 'Not specified'}</p>
+            <p className="text-sm ml-6">{booking.location || "Not specified"}</p>
           </div>
 
           {/* Examination Type */}
-          {booking.examinationType && (
+          {booking.type && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <UserIcon className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Examination Type</span>
               </div>
-              <p className="text-sm ml-6">{booking.examinationType}</p>
+              <p className="text-sm ml-6">{booking.type}</p>
             </div>
           )}
         </div>
@@ -111,9 +114,7 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
-          <Button onClick={handleViewDetails}>
-            View Full Details
-          </Button>
+          <Button onClick={handleViewDetails}>View Full Details</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

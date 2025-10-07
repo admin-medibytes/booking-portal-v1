@@ -20,12 +20,13 @@ export interface BookingWithSpecialist extends Booking {
   specialist: {
     id: string;
     name: string;
+    image: string;
     jobTitle: string;
     location?: SpecialistLocation | null;
   };
-  referrer: Referrer;
+  referrer: Referrer | null;
   examinee: Examinee;
-  referrerOrganization: Organization;
+  referrerOrganization: Organization | null;
 }
 
 export interface BookingWithProgress extends BookingWithSpecialist {

@@ -6,7 +6,6 @@ import {
   cacheAvailability,
   getCachedAvailability,
   cacheAppointmentTypes,
-  getCachedAppointmentTypes,
   invalidateAvailabilityCache,
 } from "@/lib/redis";
 
@@ -304,10 +303,10 @@ export class AcuityService {
     return results;
   }
 
-  async getCalendarById(calendarId: string): Promise<AcuityCalendarType | null> {
+  async getCalendarById(calendarId: number): Promise<AcuityCalendarType | null> {
     try {
       const calendars = await this.getCalendars();
-      return calendars.find((cal) => cal.id.toString() === calendarId) || null;
+      return calendars.find((cal) => cal.id === calendarId) || null;
     } catch (error) {
       logger.error({ error, calendarId }, "Error fetching calendar by ID");
       throw error;
@@ -423,26 +422,19 @@ export class AcuityService {
     notes?: string; // Optional, can be included in fields if needed
   }): Promise<AcuityAppointmentType> {
     // Build the request payload matching Acuity's expected format
-    const requestPayload: any = {
+    const requestPayload = {
       appointmentTypeID: data.appointmentTypeID,
       datetime: data.datetime,
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email,
-    };
 
-    // Add optional fields only if they're provided
-    if (data.phone) requestPayload.phone = data.phone;
-    if (data.timezone) requestPayload.timezone = data.timezone;
-    if (data.fields && data.fields.length > 0) requestPayload.fields = data.fields;
-    
-    // If notes are provided, add them to the payload
-    // Note: Acuity typically handles notes through form fields, but some endpoints accept it directly
-    if (data.notes) requestPayload.notes = data.notes;
-    
-    // CalendarID is typically not needed in the request as Acuity determines it from appointmentTypeID
-    // But include it if explicitly provided for backward compatibility
-    if (data.calendarID) requestPayload.calendarID = data.calendarID;
+      ...(data.phone && { phone: data.phone }),
+      ...(data.timezone && { timezone: data.timezone }),
+      ...(data.fields && { fields: data.fields }),
+      ...(data.notes && { notes: data.notes }),
+      ...(data.calendarID && { calendarID: data.calendarID }),
+    };
 
     const appointment = await this.request<unknown>("POST", "/appointments", requestPayload);
     const parsed = AcuityAppointment(appointment);
@@ -548,7 +540,7 @@ export class AcuityService {
         );
         throw new AcuityAPIError("Invalid form data received from Acuity");
       }
-      
+
       // Validate fields separately
       if (parsed.fields && Array.isArray(parsed.fields)) {
         const validatedFields: AcuityFormFieldType[] = [];
@@ -570,12 +562,12 @@ export class AcuityService {
         }
         parsed.fields = validatedFields;
       }
-      
+
       results.push(parsed);
     }
 
     logger.debug({ count: results.length }, "Fetched forms from Acuity");
-    
+
     return results;
   }
 

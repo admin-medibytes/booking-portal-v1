@@ -68,9 +68,11 @@ interface AppForm {
 
 interface AppFormRendererProps {
   form: AppForm;
-  onSubmit: (data: Record<string, any>) => void | Promise<void>;
+  onSubmit: (
+    data: Record<string, string | number | boolean | string[] | null | undefined>
+  ) => void | Promise<void>;
   onValidationChange?: (isValid: boolean) => void;
-  defaultValues?: Record<string, any>;
+  defaultValues?: Record<string, string | number | boolean | string[] | null | undefined>;
   isSubmitting?: boolean;
   submitLabel?: string;
   className?: string;
@@ -83,7 +85,7 @@ export interface AppFormRendererRef {
 
 // Build arktype schema dynamically based on form fields
 function buildArktypeSchema(fields: AppFormField[]) {
-  const schemaObj: Record<string, any> = {};
+  const schemaObj: Record<string, unknown> = {};
 
   fields.forEach((field) => {
     const fieldName = `field_${field.acuityFieldId}`;
@@ -165,7 +167,9 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
     const formSchema = buildArktypeSchema(sortedFields);
 
     // Initialize form with default values - merge provided defaults with hidden field values
-    const defaultValues: Record<string, any> = { ...providedDefaultValues };
+    const defaultValues: Record<string, string | number | boolean | string[] | null | undefined> = {
+      ...providedDefaultValues,
+    };
     sortedFields.forEach((field) => {
       const fieldKey = `field_${field.acuityFieldId}`;
       // Set hidden field static values
@@ -222,7 +226,7 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
       });
 
       return () => unsubscribe();
-    }, [formInstance.store, onValidationChange, formSchema]);
+    }, [formInstance.store, formInstance.state.values, onValidationChange, formSchema]);
 
     // Group fields into rows based on displayWidth
     const fieldRows: AppFormField[][] = [];
@@ -346,7 +350,7 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
               return (
                 <>
                   <Textarea
-                    value={fieldApi.state.value || ""}
+                    value={(fieldApi.state.value as string) || ""}
                     onChange={(e) => fieldApi.handleChange(e.target.value)}
                     onBlur={fieldApi.handleBlur}
                     placeholder={placeholder}
@@ -361,7 +365,10 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
             if (fieldType === "dropdown" && field.acuityField?.options) {
               return (
                 <>
-                  <Select value={fieldApi.state.value || ""} onValueChange={fieldApi.handleChange}>
+                  <Select
+                    value={(fieldApi.state.value as string) || ""}
+                    onValueChange={(v) => fieldApi.handleChange(v)}
+                  >
                     <SelectTrigger className={cn("w-full", error && "border-destructive")}>
                       <SelectValue placeholder={placeholder || "Select an option"} />
                     </SelectTrigger>
@@ -384,8 +391,8 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id={fieldName}
-                      checked={fieldApi.state.value || false}
-                      onCheckedChange={fieldApi.handleChange}
+                      checked={Boolean(fieldApi.state.value) || false}
+                      onCheckedChange={(checked) => fieldApi.handleChange(!!checked)}
                     />
                     <Label htmlFor={fieldName} className="text-sm font-normal">
                       {label}
@@ -397,7 +404,7 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
             }
 
             if (fieldType === "checkboxlist" && field.acuityField?.options) {
-              const currentValue = fieldApi.state.value || [];
+              const currentValue = (fieldApi.state.value as string[]) || [];
               return (
                 <>
                   <div className="space-y-2">
@@ -410,9 +417,7 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
                             if (checked) {
                               fieldApi.handleChange([...currentValue, option]);
                             } else {
-                              fieldApi.handleChange(
-                                currentValue.filter((v: string) => v !== option)
-                              );
+                              fieldApi.handleChange(currentValue.filter((v) => v !== option));
                             }
                           }}
                         />
@@ -431,8 +436,8 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
               return (
                 <>
                   <RadioGroup
-                    value={fieldApi.state.value || ""}
-                    onValueChange={fieldApi.handleChange}
+                    value={(fieldApi.state.value as string) || ""}
+                    onValueChange={(v) => fieldApi.handleChange(v)}
                   >
                     <div className="flex gap-4">
                       <div className="flex items-center space-x-2">
@@ -510,8 +515,8 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
               return (
                 <>
                   <PhoneNumberInput
-                    value={fieldApi.state.value || ""}
-                    onChange={(value) => fieldApi.handleChange(value)}
+                    value={(fieldApi.state.value as string) || ""}
+                    onChange={(value: string) => fieldApi.handleChange(value)}
                     onBlur={fieldApi.handleBlur}
                     placeholder={placeholder || "0400 000 000"}
                     className={cn(error && "border-destructive")}
@@ -539,7 +544,7 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
               <>
                 <Input
                   type={inputType}
-                  value={fieldApi.state.value || ""}
+                  value={(fieldApi.state.value as string) || ""}
                   onChange={(e) => fieldApi.handleChange(e.target.value)}
                   onBlur={fieldApi.handleBlur}
                   placeholder={placeholder}

@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 interface Specialist {
   id: string;
   userId: string;
-  acuityCalendarId: string;
+  acuityCalendarId: number;
   name: string;
   slug: string | null;
   location: SpecialistLocation | null;

@@ -14,8 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle2, PlusCircle, AlertCircle, Link2, Link2Off } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { adminClient } from "@/lib/hono-client";
+import { cn } from "@/lib/utils";
 
 interface AppointmentType {
   id: number;
@@ -25,7 +25,7 @@ interface AppointmentType {
   formIds?: number[];
 }
 
-interface ComparisonResult {
+export interface ComparisonResult {
   acuityTypes: AppointmentType[];
   existingTypes: AppointmentType[];
   newTypes: AppointmentType[];
@@ -67,11 +67,12 @@ export function AppointmentTypesSyncModal({
       }
 
       const data = await response.json();
+
       if ("success" in data && data.success) {
-        setComparisonData(data as any);
+        setComparisonData(data);
         setState("preview");
       } else {
-        throw new Error((data as any).error || "Failed to fetch preview");
+        throw new Error("Failed to fetch preview");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -111,7 +112,6 @@ export function AppointmentTypesSyncModal({
 
   const getStatusIcon = (type: AppointmentType) => {
     const isNew = comparisonData?.newTypes.some((t) => t.id === type.id);
-    const hasAllForms = !comparisonData?.typesWithMissingForms.some((t) => t.id === type.id);
 
     if (isNew) return <PlusCircle className="w-4 h-4 text-green-500" />;
     return <CheckCircle2 className="w-4 h-4 text-blue-500" />;

@@ -9,7 +9,7 @@ export interface BookingWithDetails extends BookingWithSpecialist {
       id: string;
       name: string;
       email: string;
-    };
+    } | null;
   })[];
   documents: Array<{
     id: string;

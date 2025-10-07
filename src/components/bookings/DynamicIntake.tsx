@@ -43,6 +43,30 @@ import type { Specialist } from "@/types/specialist";
 import { getInitials } from "@/lib/utils/initials";
 import { Separator } from "../ui/separator";
 
+// Minimal shape of the form configuration used for rendering
+interface AppointmentFormConfiguration {
+  id: string;
+  name: string;
+  description?: string | null;
+  fields: Array<{
+    acuityFieldId: number;
+    customLabel?: string | null;
+    isHidden: boolean;
+    acuityField?: {
+      id: number;
+      name: string;
+      type: string;
+      required: boolean;
+      options?: string[] | null;
+    };
+  }>;
+  acuityForm?: {
+    id: number;
+    name: string;
+    description: string | null;
+  } | null;
+}
+
 interface AppointmentType {
   id: string;
   acuityAppointmentTypeId: number;
@@ -83,8 +107,20 @@ interface DynamicIntakeProps {
   timezone: string;
   onSubmit: (data: SubmitData) => void;
   onValidationChange?: (isValid: boolean) => void;
-  onFormConfigurationLoaded?: (config: any) => void;
-  defaultValues?: Record<string, any>;
+  onFormConfigurationLoaded?: (config: AppointmentFormConfiguration) => void;
+  defaultValues?: {
+    referrerInfo?: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string;
+    };
+    referrerFirstName?: string;
+    referrerLastName?: string;
+    referrerEmail?: string;
+    referrerPhone?: string;
+    fieldsInfo?: Array<{ id: number; value: string }>;
+  };
   renderMode?: "full" | "summary" | "forms";
   hideSubmitButton?: boolean;
 }
@@ -95,11 +131,11 @@ export interface DynamicIntakeRef {
 
 // Helper function to extract only dynamic form field values (excluding referrer fields)
 function extractDynamicFormValues(
-  allValues?: Record<string, any>
-): Record<string, any> | undefined {
+  allValues?: Record<string, string> | { fieldsInfo?: Array<{ id: number; value: string }> }
+): Record<string, string> | undefined {
   if (!allValues) return undefined;
 
-  const dynamicValues: Record<string, any> = {};
+  const dynamicValues: Record<string, string> = {};
 
   // Handle new format (fieldsInfo array)
   if (allValues.fieldsInfo && Array.isArray(allValues.fieldsInfo)) {
@@ -109,7 +145,7 @@ function extractDynamicFormValues(
     });
   } else {
     // Handle old format with field_ prefix
-    Object.entries(allValues).forEach(([key, value]) => {
+    Object.entries(allValues as Record<string, string>).forEach(([key, value]) => {
       if (key.startsWith("field_")) {
         dynamicValues[key] = value;
       }
@@ -125,7 +161,7 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
       specialist,
       appointmentType,
       dateTime,
-      datetimeString,
+      datetimeString: _datetimeString,
       timezone,
       onSubmit,
       onValidationChange,
@@ -179,7 +215,7 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
         }
 
         const result = await response.json();
-        return result.data;
+        return result.data as AppointmentFormConfiguration | null;
       },
       retry: 1,
     });
@@ -237,7 +273,13 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
       });
 
       return () => unsubscribe();
-    }, [referrerForm.store, isDynamicFormValid, formData, onValidationChange]);
+    }, [
+      referrerForm.store,
+      referrerForm.state.values,
+      isDynamicFormValid,
+      formData,
+      onValidationChange,
+    ]);
 
     // Expose submit method via ref
     useImperativeHandle(ref, () => ({
@@ -249,7 +291,7 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
       },
     }));
 
-    const handleDynamicFormSubmit = async (data: Record<string, any>) => {
+    const handleDynamicFormSubmit = async (data: Record<string, string | number | boolean | string[] | null | undefined>) => {
       // Validate referrer form first
       const referrerData = referrerForm.state.values;
       const isReferrerValid = referrerFormSchema(referrerData);
@@ -296,11 +338,6 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
       if (!pendingSubmitData) return;
 
       onSubmit({ ...pendingSubmitData, termsAccepted: true });
-    };
-
-    const handleModalClose = () => {
-      setShowTermsModal(false);
-      setModalTermsAccepted(false); // Reset checkbox when modal closes
     };
 
     // Terms and Conditions Modal
@@ -730,7 +767,38 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
               form={{
                 id: formData.id,
                 name: formData.name,
-                fields: formData.fields,
+                fields: formData.fields.map((f, index) => ({
+                  id: `${formData.id}-${f.acuityFieldId}-${index}`,
+                  appFormId: formData.id,
+                  acuityFieldId: f.acuityFieldId,
+                  acuityField: f.acuityField
+                    ? {
+                        id: f.acuityField.id,
+                        name: f.acuityField.name,
+                        type: f.acuityField.type as
+                          | "textbox"
+                          | "textarea"
+                          | "dropdown"
+                          | "checkbox"
+                          | "checkboxlist"
+                          | "yesno"
+                          | "file",
+                        options: f.acuityField.options ?? undefined,
+                        required: f.acuityField.required,
+                      }
+                    : undefined,
+                  customLabel: f.customLabel ?? null,
+                  placeholderText: undefined,
+                  helpText: undefined,
+                  tooltipText: undefined,
+                  customFieldType: null,
+                  isRequired: f.acuityField?.required ?? false,
+                  validationRules: {},
+                  isHidden: f.isHidden,
+                  staticValue: null,
+                  displayOrder: index + 1,
+                  displayWidth: "full",
+                })),
               }}
               defaultValues={extractDynamicFormValues(defaultValues)}
               onSubmit={handleDynamicFormSubmit}

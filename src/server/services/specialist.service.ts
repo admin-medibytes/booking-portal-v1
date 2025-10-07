@@ -16,7 +16,7 @@ export interface AdminSpecialistListOptions {
 export interface AdminSpecialistListItem {
   id: string;
   userId: string;
-  acuityCalendarId: string;
+  acuityCalendarId: number;
   name: string;
   slug: string | null;
   location: SpecialistLocation | null;

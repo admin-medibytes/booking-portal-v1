@@ -63,7 +63,6 @@ import {
   MoveUp,
   MoveDown,
   Regex,
-  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminClient } from "@/lib/hono-client";
@@ -127,6 +126,11 @@ interface AppFormField {
   };
 }
 
+// Shape returned by the API for fields may include a denormalized name
+type ApiAppFormField = Omit<AppFormField, "acuityField" | "acuityFieldName"> & {
+  acuityFieldName?: string;
+};
+
 const fieldTypeIcons: Record<CustomFieldType, React.ReactNode> = {
   text: <Type className="w-3 h-3" />,
   email: <Mail className="w-3 h-3" />,
@@ -165,7 +169,16 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
   const [state, setState] = useState<ModalState>("loading");
   const [appFormName, setAppFormName] = useState("");
   const [appFormDescription, setAppFormDescription] = useState("");
-  const [appFormData, setAppFormData] = useState<any>(null);
+  const [appFormData, setAppFormData] = useState<{
+    id: string;
+    acuityFormId: number;
+    name: string;
+    description: string | null;
+    isActive: boolean;
+    fields: AppFormField[];
+    createdAt?: string;
+    updatedAt?: string;
+  } | null>(null);
   const [fields, setFields] = useState<AppFormField[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [expandedFields, setExpandedFields] = useState<string[]>([]);
@@ -209,7 +222,18 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
 
       const data = await response.json();
       if (data.success && data.data) {
-        const appForm = data.data;
+        const appForm = data.data as {
+          id: string;
+          createdAt?: string;
+          updatedAt?: string;
+          name: string;
+          description: string | null;
+          isActive: boolean;
+          acuityFormId: number;
+          fields: ApiAppFormField[];
+        };
+
+        let computedFields: AppFormField[] = [];
 
         // Fetch the Acuity form fields to get field types
         try {
@@ -221,18 +245,17 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
             const acuityFormData = await acuityFormResponse.json();
             if (acuityFormData.success && acuityFormData.data?.fields) {
               // Map Acuity field data to app form fields
-              const fieldsWithAcuityData = appForm.fields.map((field: any) => {
+              const fieldsWithAcuityData = (appForm.fields as ApiAppFormField[]).map((field) => {
                 const acuityField = acuityFormData.data.fields.find(
-                  (af: any) => af.id === field.acuityFieldId
+                  (af: { id: number }) => af.id === field.acuityFieldId
                 );
                 return {
                   ...field,
                   staticValue: field.staticValue ?? "", // Ensure staticValue is always defined
-                  acuityFieldName:
-                    field.acuityFieldName || acuityField?.name || `Field ${field.acuityFieldId}`,
+                  acuityFieldName: acuityField?.name || `Field ${field.acuityFieldId}`,
                   acuityField: acuityField || {
                     id: field.acuityFieldId,
-                    name: field.acuityFieldName || `Field ${field.acuityFieldId}`,
+                    name: `Field ${field.acuityFieldId}`,
                     type: "textbox", // default if not found
                     required: false,
                     options: null,
@@ -243,11 +266,12 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
               fieldsWithAcuityData.sort(
                 (a: AppFormField, b: AppFormField) => a.displayOrder - b.displayOrder
               );
+              computedFields = fieldsWithAcuityData;
               setFields(fieldsWithAcuityData);
             } else {
               // If we can't get Acuity fields, ensure all required fields are present
-              const fieldsWithDefaults = appForm.fields.map(
-                (field: any) =>
+              const fieldsWithDefaults = (appForm.fields as ApiAppFormField[]).map(
+                (field) =>
                   ({
                     ...field,
                     staticValue: field.staticValue ?? "", // Ensure staticValue is always defined
@@ -265,12 +289,13 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
               fieldsWithDefaults.sort(
                 (a: AppFormField, b: AppFormField) => a.displayOrder - b.displayOrder
               );
+              computedFields = fieldsWithDefaults;
               setFields(fieldsWithDefaults);
             }
           } else {
             // If Acuity form fetch fails, ensure all required fields are present
-            const fieldsWithDefaults = appForm.fields.map(
-              (field: any) =>
+            const fieldsWithDefaults = (appForm.fields as ApiAppFormField[]).map(
+              (field) =>
                 ({
                   ...field,
                   acuityFieldName: field.acuityFieldName || `Field ${field.acuityFieldId}`,
@@ -287,12 +312,13 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
             fieldsWithDefaults.sort(
               (a: AppFormField, b: AppFormField) => a.displayOrder - b.displayOrder
             );
+            computedFields = fieldsWithDefaults;
             setFields(fieldsWithDefaults);
           }
         } catch {
           // If fetching Acuity fields fails, ensure all required fields are present
-          const fieldsWithDefaults = appForm.fields.map(
-            (field: any) =>
+          const fieldsWithDefaults = (appForm.fields as ApiAppFormField[]).map(
+            (field) =>
               ({
                 ...field,
                 acuityFieldName: field.acuityFieldName || `Field ${field.acuityFieldId}`,
@@ -309,10 +335,20 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
           fieldsWithDefaults.sort(
             (a: AppFormField, b: AppFormField) => a.displayOrder - b.displayOrder
           );
+          computedFields = fieldsWithDefaults;
           setFields(fieldsWithDefaults);
         }
 
-        setAppFormData(appForm);
+        setAppFormData({
+          id: appForm.id,
+          acuityFormId: appForm.acuityFormId,
+          name: appForm.name,
+          description: appForm.description ?? null,
+          isActive: !!appForm.isActive,
+          fields: computedFields,
+          createdAt: appForm.createdAt,
+          updatedAt: appForm.updatedAt,
+        });
         setAppFormName(appForm.name);
         setAppFormDescription(appForm.description || "");
         setState("form");
@@ -340,7 +376,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error((error as any).error || "Failed to create app form");
+        throw new Error((error as { error?: string }).error || "Failed to create app form");
       }
 
       const data = await response.json();
@@ -352,8 +388,8 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
           onClose();
         }, 1500);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to create app form");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create app form");
       setState("error");
     }
   };
@@ -397,8 +433,8 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
         onSuccess?.();
         onClose();
       }, 1500);
-    } catch (err: any) {
-      setError(err.message || "Failed to update app form");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update app form");
       setState("error");
     }
   };
@@ -430,7 +466,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
   const handleValidationRuleUpdate = (
     fieldId: string,
     ruleKey: keyof ValidationRules,
-    value: any
+    value: string | number | boolean | undefined
   ) => {
     setFields((prev) =>
       prev.map((field) => {
@@ -440,7 +476,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
           if (value === null || value === undefined || value === "") {
             delete updatedRules[ruleKey];
           } else {
-            updatedRules[ruleKey] = value;
+            updatedRules[ruleKey] = value as never;
           }
 
           return { ...field, validationRules: updatedRules };
@@ -472,8 +508,8 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
         onSuccess?.();
         onClose();
       }, 1500);
-    } catch (err: any) {
-      setError(err.message || "Failed to delete app form");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete app form");
       setState("error");
     }
   };
@@ -551,8 +587,8 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                       <Alert>
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
-                          Once created, you'll be able to configure individual field settings and
-                          customize the form's appearance.
+                          Once created, you&apos;ll be able to configure individual field settings
+                          and customize the form&apos;s appearance.
                         </AlertDescription>
                       </Alert>
                     )}
@@ -689,7 +725,10 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                               </Badge>
                                             )}
                                             {field.examineeFieldMapping && (
-                                              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                                              <Badge
+                                                variant="secondary"
+                                                className="text-xs bg-blue-100 text-blue-700 border-blue-200"
+                                              >
                                                 <UserCheck className="w-3 h-3 mr-1" />
                                                 {examineeFieldLabels[field.examineeFieldMapping]}
                                               </Badge>
@@ -743,7 +782,11 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                               size="sm"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                const updates: any = { isHidden: !field.isHidden };
+                                                const updates: {
+                                                  isHidden?: boolean;
+                                                  isStatic?: boolean;
+                                                  staticValue?: string;
+                                                } = { isHidden: !field.isHidden };
                                                 // Initialize staticValue when hiding a field if it doesn't exist
                                                 if (
                                                   !field.isHidden &&
@@ -823,7 +866,10 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                               value={field.examineeFieldMapping || "none"}
                                               onValueChange={(value) =>
                                                 handleFieldUpdate(field.id, {
-                                                  examineeFieldMapping: value === "none" ? null : (value as ExamineeFieldType),
+                                                  examineeFieldMapping:
+                                                    value === "none"
+                                                      ? null
+                                                      : (value as ExamineeFieldType),
                                                 })
                                               }
                                             >
@@ -832,10 +878,16 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                               </SelectTrigger>
                                               <SelectContent>
                                                 <SelectItem value="none">
-                                                  <span className="text-muted-foreground">Not mapped</span>
+                                                  <span className="text-muted-foreground">
+                                                    Not mapped
+                                                  </span>
                                                 </SelectItem>
                                                 <Separator className="my-1" />
-                                                {(Object.keys(examineeFieldLabels) as ExamineeFieldType[]).map((fieldType) => (
+                                                {(
+                                                  Object.keys(
+                                                    examineeFieldLabels
+                                                  ) as ExamineeFieldType[]
+                                                ).map((fieldType) => (
                                                   <SelectItem key={fieldType} value={fieldType}>
                                                     {examineeFieldLabels[fieldType]}
                                                   </SelectItem>
@@ -844,7 +896,11 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                             </Select>
                                             {field.examineeFieldMapping && (
                                               <p className="text-xs text-muted-foreground">
-                                                This field will be mapped to the examinee's {examineeFieldLabels[field.examineeFieldMapping].toLowerCase()}.
+                                                This field will be mapped to the examinee&apos;s{" "}
+                                                {examineeFieldLabels[
+                                                  field.examineeFieldMapping
+                                                ].toLowerCase()}
+                                                .
                                               </p>
                                             )}
                                           </div>
@@ -995,8 +1051,8 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                                     <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                                                     <div className="flex-1">
                                                       <p className="text-xs text-amber-900">
-                                                        This field is hidden from users. You can set a
-                                                        static value that will be submitted
+                                                        This field is hidden from users. You can set
+                                                        a static value that will be submitted
                                                         automatically.
                                                       </p>
                                                       <div
@@ -1050,7 +1106,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                                         handleValidationRuleUpdate(
                                                           field.id,
                                                           "type",
-                                                          value === "none" ? null : value
+                                                          value === "none" ? undefined : value
                                                         )
                                                       }
                                                     >
@@ -1086,7 +1142,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                                         handleValidationRuleUpdate(
                                                           field.id,
                                                           "pattern",
-                                                          e.target.value || null
+                                                          e.target.value
                                                         )
                                                       }
                                                       className="h-8 text-xs"
@@ -1117,7 +1173,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                                             "minLength",
                                                             e.target.value
                                                               ? parseInt(e.target.value)
-                                                              : null
+                                                              : undefined
                                                           )
                                                         }
                                                         className="h-8 text-xs"
@@ -1140,7 +1196,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                                             "maxLength",
                                                             e.target.value
                                                               ? parseInt(e.target.value)
-                                                              : null
+                                                              : undefined
                                                           )
                                                         }
                                                         className="h-8 text-xs"
@@ -1166,7 +1222,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                                             "min",
                                                             e.target.value
                                                               ? parseFloat(e.target.value)
-                                                              : null
+                                                              : undefined
                                                           )
                                                         }
                                                         className="h-8 text-xs"
@@ -1186,7 +1242,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                                             "max",
                                                             e.target.value
                                                               ? parseFloat(e.target.value)
-                                                              : null
+                                                              : undefined
                                                           )
                                                         }
                                                         className="h-8 text-xs"
@@ -1209,7 +1265,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                                           handleValidationRuleUpdate(
                                                             field.id,
                                                             "min",
-                                                            e.target.value || null
+                                                            e.target.value
                                                           )
                                                         }
                                                         className="h-8 text-xs"
@@ -1226,7 +1282,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                                           handleValidationRuleUpdate(
                                                             field.id,
                                                             "max",
-                                                            e.target.value || null
+                                                            e.target.value
                                                           )
                                                         }
                                                         className="h-8 text-xs"
@@ -1247,7 +1303,7 @@ export function AppFormModal({ open, onClose, form, onSuccess }: AppFormModalPro
                                                       handleValidationRuleUpdate(
                                                         field.id,
                                                         "message",
-                                                        e.target.value || null
+                                                        e.target.value
                                                       )
                                                     }
                                                     className="h-8 text-xs"

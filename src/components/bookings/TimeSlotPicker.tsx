@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO, isSameDay } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
@@ -21,19 +21,8 @@ import { Calendar as CalendarIcon, Clock, Video, MapPin } from "lucide-react";
 import { specialistsClient } from "@/lib/hono-client";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/calendar";
-import { today, CalendarDate, parseDate } from "@internationalized/date";
+import { today, CalendarDate, parseDate, DateValue } from "@internationalized/date";
 import { timeZones } from "@/lib/utils/timezones";
-
-interface TimeSlot {
-  datetime: string;
-  duration: number;
-  appointmentTypeId: number;
-}
-
-interface AvailabilityResponse {
-  slots: TimeSlot[];
-  timezone: string;
-}
 
 interface TimeSlotPickerProps {
   specialistId: string;
@@ -174,7 +163,7 @@ export function TimeSlotPicker({
   });
 
   // Pass date strings directly to calendar (expects YYYY-MM-DD format)
-  const availableDates = availableDatesData || [];
+  const availableDates = React.useMemo(() => availableDatesData || [], [availableDatesData]);
 
   // Auto-select first available date if user hasn't selected one
   useEffect(() => {
@@ -194,8 +183,10 @@ export function TimeSlotPicker({
     }
   }, [availableDates, visibleMonth]);
 
-  const handleDateSelect = (value: any) => {
-    setSelectedDate(value);
+  const handleDateSelect = (value: DateValue) => {
+    // Normalize to CalendarDate if needed
+    const newDate = new CalendarDate(value.year, value.month, value.day);
+    setSelectedDate(newDate);
     hasUserSelectedDate.current = true;
   };
 
@@ -203,10 +194,8 @@ export function TimeSlotPicker({
     setVisibleMonth({ month, year });
   };
 
-  const handleTimeSelect = (slot: any) => {
+  const handleTimeSelect = (slot: { datetime: string }) => {
     const dateTime = parseISO(slot.datetime);
-    console.log("TimeSlotPicker - Selecting time with timezone:", timeZone);
-    console.log("TimeSlotPicker - Original datetime string:", slot.datetime);
     onSelect(dateTime, slot.datetime, timeZone);
   };
 

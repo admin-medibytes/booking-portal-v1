@@ -351,6 +351,7 @@ const CropperRoot: React.FC<CropperRootProps> = ({
     }
   }, [
     imageWrapperWidth,
+    imageWrapperHeight,
     imgHeight,
     cropAreaWidth,
     cropAreaHeight,
@@ -666,7 +667,7 @@ const CropperRoot: React.FC<CropperRootProps> = ({
   useEffect(() => {
     const node = containerRef.current;
     if (!node) return;
-    const options = { passive: false } as any;
+    const options: AddEventListenerOptions = { passive: false };
     node.addEventListener("wheel", handleWheel, options);
     node.addEventListener("touchstart", handleTouchStart, options);
     node.addEventListener("touchmove", handleTouchMove, options);
@@ -798,7 +799,13 @@ const CropperImage: React.FC<
 
   return (
     <div style={getImageWrapperStyle()}>
-      <img {...imageProps} className={cn(imageProps.className, className)} {...restProps} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        {...imageProps}
+        alt={imageProps.alt || "Image being cropped"}
+        className={cn(imageProps.className, className)}
+        {...restProps}
+      />
     </div>
   );
 };

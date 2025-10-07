@@ -1,11 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { BookingDetailCard } from "@/components/bookings/booking-detail-card";
-import { BookingProgressTracker } from "@/components/bookings/booking-progress-tracker";
 import { BookingProgressUpdate } from "@/components/bookings/booking-progress-update";
 import { useBookingWithDetails } from "@/hooks/use-booking";
 import type { BookingWithDetails } from "@/hooks/use-booking";
@@ -29,11 +26,7 @@ interface BookingDetailClientProps {
   canUpdateProgress: boolean;
 }
 
-export function BookingDetailClient({
-  booking: initialBooking,
-  canUpdateProgress,
-}: BookingDetailClientProps) {
-  const router = useRouter();
+export function BookingDetailClient({ booking: initialBooking }: BookingDetailClientProps) {
   const [isProgressUpdateOpen, setIsProgressUpdateOpen] = useState(false);
 
   // Use client-side query for real-time updates

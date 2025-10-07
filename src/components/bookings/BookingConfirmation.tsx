@@ -25,7 +25,7 @@ import { ApiError } from "@/lib/hono-utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { formatLocationFull, getLocationDisplay } from "@/lib/utils/location";
+import { getLocationDisplay } from "@/lib/utils/location";
 import type { Specialist } from "@/types/specialist";
 import { ScrollArea } from "../ui/scroll-area";
 
@@ -41,6 +41,30 @@ interface IntakeFormData {
     value: string;
   }>;
   termsAccepted: boolean;
+}
+
+// Minimal shape of the form configuration used for rendering confirmation
+interface AppointmentFormConfiguration {
+  id: string;
+  name: string;
+  description?: string | null;
+  fields: Array<{
+    acuityFieldId: number;
+    customLabel?: string | null;
+    isHidden: boolean;
+    acuityField?: {
+      id: number;
+      name: string;
+      type: string;
+      required: boolean;
+      options?: string[] | null;
+    };
+  }>;
+  acuityForm?: {
+    id: number;
+    name: string;
+    description: string | null;
+  } | null;
 }
 
 interface BookingConfirmationProps {
@@ -59,7 +83,7 @@ interface BookingConfirmationProps {
   timezone: string;
   organizationSlug: string;
   intakeFormFields: IntakeFormData;
-  formConfiguration?: any;
+  formConfiguration?: AppointmentFormConfiguration;
   onConfirm: (bookingId: string) => void;
   bookingId: string | null;
 }
@@ -67,9 +91,9 @@ interface BookingConfirmationProps {
 // Helper function to format form data for display
 function formatFormDataForDisplay(
   data: IntakeFormData,
-  formConfig?: any
-): Array<{ label: string; value: any; section?: string }> {
-  const formatted: Array<{ label: string; value: any; section?: string }> = [];
+  formConfig?: AppointmentFormConfiguration
+): Array<{ label: string; value: string; section?: string }> {
+  const formatted: Array<{ label: string; value: string; section?: string }> = [];
 
   // Add referrer information
   formatted.push(
@@ -87,7 +111,7 @@ function formatFormDataForDisplay(
   const hiddenFieldsSet = new Set<number>();
 
   if (formConfig && formConfig.fields) {
-    formConfig.fields.forEach((field: any) => {
+    formConfig.fields.forEach((field: AppointmentFormConfiguration["fields"][number]) => {
       const fieldId = field.acuityFieldId;
       // Use customLabel if available, otherwise use the acuity field name
       const label = field.customLabel || field.acuityField?.name || `Field ${fieldId}`;
@@ -129,7 +153,7 @@ export function BookingConfirmation({
 }: BookingConfirmationProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
 
   const createBookingMutation = useMutation({
     mutationFn: async () => {
@@ -363,7 +387,7 @@ export function BookingConfirmation({
                 }
                 return acc;
               },
-              {} as Record<string, Array<{ label: string; value: any }>>
+              {} as Record<string, Array<{ label: string; value: string }>>
             );
 
             return Object.entries(sections).map(([sectionName, fields]) => {

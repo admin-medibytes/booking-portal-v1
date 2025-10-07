@@ -15,9 +15,6 @@ import * as appFormsSchema from "./schema/appForms";
 const poolSize = parseInt(env.DB_POOL_SIZE || "10", 10);
 
 let connectionString = env.DATABASE_URL;
-if (env.DB_SSL === "false" && !connectionString.includes("?")) {
-  connectionString += "?sslmode=disable";
-}
 
 const globalForDb = globalThis as unknown as {
   client: postgres.Sql | undefined;
@@ -26,12 +23,11 @@ const globalForDb = globalThis as unknown as {
 const client =
   globalForDb.client ??
   postgres(connectionString, {
-    max: poolSize,
-    idle_timeout: 30,
-    connect_timeout: 10,
-    max_lifetime: 60 * 30,
-    prepare: false,
-    ssl: env.DB_SSL === "true" ? "require" : false,
+    // max: poolSize,
+    // idle_timeout: 30,
+    // connect_timeout: 10,
+    // max_lifetime: 60 * 30,
+    // prepare: false,
     onnotice: () => {},
   });
 
@@ -62,16 +58,6 @@ export async function testDatabaseConnection(): Promise<boolean> {
   } catch (error) {
     logger.dbError("connection test", error as Error);
     return false;
-  }
-}
-
-export async function closeDatabaseConnection(): Promise<void> {
-  try {
-    await client.end();
-    logger.dbConnection("disconnected");
-  } catch (error) {
-    logger.dbError("close connection", error as Error);
-    throw error;
   }
 }
 

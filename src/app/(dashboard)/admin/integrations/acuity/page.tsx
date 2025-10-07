@@ -26,7 +26,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AppointmentTypesSyncModal } from "./components/AppointmentTypesSyncModal";
+import {
+  AppointmentTypesSyncModal,
+  ComparisonResult,
+} from "./components/AppointmentTypesSyncModal";
 import { FormsSyncModal } from "./components/FormsSyncModal";
 import { FormManagementModal } from "./components/FormManagementModal";
 import { AppFormModal } from "./components/AppFormModal";
@@ -153,9 +156,9 @@ export default function AcuityIntegrationPage() {
       if ("success" in data && data.success) {
         setAppointmentTypes(data.data || []);
       } else {
-        throw new Error((data as any).error || "Failed to fetch appointment types");
+        throw new Error("Failed to fetch appointment types");
       }
-    } catch (error) {
+    } catch (_err) {
       toast.error("Failed to fetch appointment types");
     } finally {
       setIsLoading(false);
@@ -163,7 +166,7 @@ export default function AcuityIntegrationPage() {
   };
 
   // Handle sync confirmation
-  const handleConfirmSync = async (comparisonData: any) => {
+  const handleConfirmSync = async (comparisonData: ComparisonResult) => {
     const response = await adminClient.integration.acuity["appointment-types"].sync.$post({
       json: comparisonData,
     });
@@ -177,7 +180,7 @@ export default function AcuityIntegrationPage() {
     if ("success" in result && result.success) {
       toast.success(`Synced ${result.synced} appointment types`);
     } else {
-      throw new Error((result as any).error || "Sync failed");
+      throw new Error("Sync failed");
     }
 
     // Refresh the list
@@ -216,7 +219,7 @@ export default function AcuityIntegrationPage() {
                   };
                 }
               }
-            } catch (err) {
+            } catch (_err) {
               // If checking fails, just return the form without app status
             }
             return form;
@@ -225,9 +228,9 @@ export default function AcuityIntegrationPage() {
 
         setForms(formsWithAppStatus);
       } else {
-        throw new Error((data as any).error || "Failed to fetch forms");
+        throw new Error("Failed to fetch forms");
       }
-    } catch (error) {
+    } catch (_err) {
       toast.error("Failed to fetch forms");
     } finally {
       setIsLoadingForms(false);
@@ -256,7 +259,7 @@ export default function AcuityIntegrationPage() {
     if ("success" in result && result.success) {
       toast.success(`Synced ${result.synced} forms`);
     } else {
-      throw new Error((result as any).error || "Sync failed");
+      throw new Error("Sync failed");
     }
 
     // Refresh the list

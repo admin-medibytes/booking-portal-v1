@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   User,
@@ -34,6 +33,30 @@ interface IntakeFormData {
     value: string;
   }>;
   termsAccepted: boolean;
+}
+
+// Minimal shape of the form configuration used in confirmation and intake
+interface AppointmentFormConfiguration {
+  id: string;
+  name: string;
+  description?: string | null;
+  fields: Array<{
+    acuityFieldId: number;
+    customLabel?: string | null;
+    isHidden: boolean;
+    acuityField?: {
+      id: number;
+      name: string;
+      type: string;
+      required: boolean;
+      options?: string[] | null;
+    };
+  }>;
+  acuityForm?: {
+    id: number;
+    name: string;
+    description: string | null;
+  } | null;
 }
 
 const steps = [
@@ -90,7 +113,9 @@ export default function NewBookingPage() {
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
   const [selectedOrganizationSlug, setSelectedOrganizationSlug] = useState<string | null>(null);
   const [intakeFormData, setIntakeFormData] = useState<IntakeFormData | null>(null);
-  const [formConfiguration, setFormConfiguration] = useState<any>(null);
+  const [formConfiguration, setFormConfiguration] = useState<AppointmentFormConfiguration | null>(
+    null
+  );
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [isIntakeFormValid, setIsIntakeFormValid] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -171,7 +196,11 @@ export default function NewBookingPage() {
     setBookingId(id);
   };
 
-  const handleSettingsConfirm = (timezone: string, organizationId: string, organizationSlug: string) => {
+  const handleSettingsConfirm = (
+    timezone: string,
+    organizationId: string,
+    organizationSlug: string
+  ) => {
     setSelectedTimezone(timezone);
     setSelectedOrganizationId(organizationId);
     setSelectedOrganizationSlug(organizationSlug);
@@ -237,7 +266,10 @@ export default function NewBookingPage() {
           </div>
         );
       case 4:
-        return selectedSpecialist && selectedAppointmentType && selectedDateTime && selectedDatetimeString ? (
+        return selectedSpecialist &&
+          selectedAppointmentType &&
+          selectedDateTime &&
+          selectedDatetimeString ? (
           <DynamicIntake
             ref={intakeFormRef}
             specialist={selectedSpecialist}
@@ -271,7 +303,7 @@ export default function NewBookingPage() {
             timezone={selectedTimezone}
             organizationSlug={selectedOrganizationSlug}
             intakeFormFields={intakeFormData}
-            formConfiguration={formConfiguration}
+            formConfiguration={formConfiguration ?? undefined}
             onConfirm={handleBookingConfirm}
             bookingId={bookingId}
           />

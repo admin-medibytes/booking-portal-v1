@@ -107,7 +107,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       teamId: string;
       role: "referrer" | "specialist" | "admin";
       sendEmailInvitation: boolean;
-      acuityCalendarId: string;
+      acuityCalendarId: number;
       slug?: string;
     }) => {
       const response = await adminClient.users.$post({
@@ -181,6 +181,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       await createUserMutation.mutateAsync({
         ...value,
         jobTitle: value.jobTitle || "N/A",
+        acuityCalendarId: Number(value.acuityCalendarId),
         slug: value.role === "specialist" ? value.slug : undefined,
       });
     },
@@ -533,7 +534,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                                   <p className="text-sm text-green-500">This slug is available</p>
                                 )}
                                 <p className="text-xs text-muted-foreground">
-                                  Unique URL identifier for the specialist's panel page
+                                  Unique URL identifier for the specialist&apos;s panel page
                                 </p>
                               </div>
                             );

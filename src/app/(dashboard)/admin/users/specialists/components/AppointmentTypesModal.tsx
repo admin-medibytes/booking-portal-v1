@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Loader2, Clock, DollarSign, AlertCircle, Search, CheckCircle2, CalendarDays, Video, MapPin } from "lucide-react";
+import { Loader2, Clock, DollarSign, AlertCircle, Search, Video, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { adminClient } from "@/lib/hono-client";
@@ -51,20 +51,26 @@ export function AppointmentTypesModal({
   const [saving, setSaving] = useState(false);
   const [appointmentTypes, setAppointmentTypes] = useState<AppointmentType[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<Set<number>>(new Set());
-  const [appointmentModes, setAppointmentModes] = useState<Map<number, "in-person" | "telehealth">>(new Map());
+  const [appointmentModes, setAppointmentModes] = useState<Map<number, "in-person" | "telehealth">>(
+    new Map()
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   // Fetch all appointment types and current specialist selections
-  useEffect(() => {
-    if (open) {
-      fetchData();
-    } else {
-      // Reset state when modal closes
-      setSearchQuery("");
-      setError(null);
-    }
-  }, [open, specialistId]);
+  useEffect(
+    () => {
+      if (open) {
+        fetchData();
+      } else {
+        // Reset state when modal closes
+        setSearchQuery("");
+        setError(null);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [open, specialistId]
+  );
 
   const fetchData = async () => {
     setLoading(true);
@@ -92,12 +98,12 @@ export function AppointmentTypesModal({
         // Set selected types and modes based on current associations
         const selected = new Set<number>();
         const modes = new Map<number, "in-person" | "telehealth">();
-        
-        specialistData.data?.forEach((item: any) => {
+
+        specialistData.data.forEach((item) => {
           selected.add(item.appointmentTypeId);
           modes.set(item.appointmentTypeId, item.appointmentMode || "telehealth");
         });
-        
+
         setSelectedTypes(selected);
         setAppointmentModes(modes);
       }
@@ -115,7 +121,7 @@ export function AppointmentTypesModal({
   const handleToggle = (typeId: number) => {
     const newSelected = new Set(selectedTypes);
     const newModes = new Map(appointmentModes);
-    
+
     if (newSelected.has(typeId)) {
       newSelected.delete(typeId);
       newModes.delete(typeId);
@@ -124,11 +130,11 @@ export function AppointmentTypesModal({
       // Default to telehealth when first selected
       newModes.set(typeId, "telehealth");
     }
-    
+
     setSelectedTypes(newSelected);
     setAppointmentModes(newModes);
   };
-  
+
   const handleModeToggle = (typeId: number, isInPerson: boolean) => {
     const newModes = new Map(appointmentModes);
     newModes.set(typeId, isInPerson ? "in-person" : "telehealth");
@@ -141,7 +147,7 @@ export function AppointmentTypesModal({
 
     try {
       // Build appointment types array with modes
-      const appointmentTypesData = Array.from(selectedTypes).map(typeId => ({
+      const appointmentTypesData = Array.from(selectedTypes).map((typeId) => ({
         id: typeId,
         mode: appointmentModes.get(typeId) || "telehealth",
       }));
@@ -154,17 +160,17 @@ export function AppointmentTypesModal({
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error((error as any).error || "Failed to save appointment types");
+        const result = await response.json();
+        const { success } = result;
+        throw new Error(!success ? result.error : "Failed to save appointment types");
       }
 
       toast.success("Appointment types updated successfully");
       onSuccess?.();
       onClose();
-    } catch (err: any) {
-      console.error("Error saving appointment types:", err);
-      setError(err.message || "Failed to save appointment types");
-      toast.error(err.message || "Failed to save appointment types");
+    } catch (_err) {
+      setError("Failed to save appointment types");
+      toast.error("Failed to save appointment types");
     } finally {
       setSaving(false);
     }
@@ -179,19 +185,6 @@ export function AppointmentTypesModal({
       type.category?.toLowerCase().includes(query)
     );
   });
-
-  // Group types by category
-  const groupedTypes = filteredTypes.reduce(
-    (acc, type) => {
-      const category = type.category || "Uncategorized";
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(type);
-      return acc;
-    },
-    {} as Record<string, AppointmentType[]>
-  );
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -244,7 +237,7 @@ export function AppointmentTypesModal({
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <p className="text-sm text-blue-700">Active</p>
                   <p className="text-xl font-semibold text-blue-700">
-                    {appointmentTypes.filter(t => t.active).length}
+                    {appointmentTypes.filter((t) => t.active).length}
                   </p>
                 </div>
               </div>
@@ -259,7 +252,7 @@ export function AppointmentTypesModal({
                   ) : (
                     filteredTypes.map((type) => {
                       const isSelected = selectedTypes.has(type.id);
-                      
+
                       return (
                         <div
                           key={type.id}
@@ -318,14 +311,16 @@ export function AppointmentTypesModal({
                               <Badge variant="outline">Available</Badge>
                             )}
                           </div>
-                          
+
                           {/* Appointment Mode Selector - Only show when selected */}
                           {isSelected && type.active && (
                             <div className="pl-7 pr-2">
                               <div className="bg-muted/50 inline-flex h-9 rounded-md p-0.5 w-full">
                                 <RadioGroup
                                   value={appointmentModes.get(type.id) || "telehealth"}
-                                  onValueChange={(value) => handleModeToggle(type.id, value === "in-person")}
+                                  onValueChange={(value) =>
+                                    handleModeToggle(type.id, value === "in-person")
+                                  }
                                   className="group after:bg-background has-focus-visible:after:border-ring has-focus-visible:after:ring-ring/50 relative inline-grid grid-cols-2 items-center gap-0 text-sm font-medium after:absolute after:inset-y-0 after:w-1/2 after:rounded-sm after:shadow-xs after:transition-[translate,box-shadow] after:duration-300 after:ease-[cubic-bezier(0.16,1,0.3,1)] has-focus-visible:after:ring-[3px] data-[state=telehealth]:after:translate-x-0 data-[state=in-person]:after:translate-x-full w-full"
                                   data-state={appointmentModes.get(type.id) || "telehealth"}
                                 >

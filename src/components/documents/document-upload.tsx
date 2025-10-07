@@ -144,9 +144,12 @@ export function DocumentUpload({
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { uploadDocument } = useUploadDocument();
-  
+
   const role = documentPermissionsService.getUserRole(userRole);
-  const availableCategories = documentPermissionsService.getAvailableCategoriesForSection(role, section);
+  const availableCategories = documentPermissionsService.getAvailableCategoriesForSection(
+    role,
+    section
+  );
 
   const handleFilesAdded = useCallback(
     (newFiles: FileList | File[]) => {
@@ -161,8 +164,8 @@ export function DocumentUpload({
       const validFiles = fileArray.slice(0, remainingSlots).map((file) => {
         const suggestedCategory = suggestCategory(file);
         // Ensure suggested category is available for this user/section
-        const finalCategory = availableCategories.includes(suggestedCategory) 
-          ? suggestedCategory 
+        const finalCategory = availableCategories.includes(suggestedCategory)
+          ? suggestedCategory
           : availableCategories[0] || "document_brief";
 
         if (file.size > maxSize) {
@@ -194,53 +197,48 @@ export function DocumentUpload({
           uploadFile(fileWithProgress);
         });
     },
-    [files, maxFiles, maxSize]
+    [files, maxFiles, maxSize, availableCategories]
   );
 
-  const uploadFile = useCallback(async (fileWithProgress: FileWithProgress) => {
-    setFiles((prev) =>
-      prev.map((f) =>
-        f.id === fileWithProgress.id ? { ...f, status: "uploading" } : f
-      )
-    );
-
-    try {
-      await uploadDocument(
-        {
-          file: fileWithProgress.file,
-          bookingId,
-          section,
-          category: fileWithProgress.category,
-        },
-        (progress) => {
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === fileWithProgress.id ? { ...f, progress } : f
-            )
-          );
-        }
-      );
-
+  const uploadFile = useCallback(
+    async (fileWithProgress: FileWithProgress) => {
       setFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileWithProgress.id
-            ? { ...f, status: "completed", progress: 100 }
-            : f
-        )
+        prev.map((f) => (f.id === fileWithProgress.id ? { ...f, status: "uploading" } : f))
       );
 
-      onUploadComplete?.();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Upload failed";
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileWithProgress.id
-            ? { ...f, status: "error", error: errorMessage }
-            : f
-        )
-      );
-    }
-  }, [bookingId, onUploadComplete, uploadDocument]);
+      try {
+        await uploadDocument(
+          {
+            file: fileWithProgress.file,
+            bookingId,
+            section,
+            category: fileWithProgress.category,
+          },
+          (progress) => {
+            setFiles((prev) =>
+              prev.map((f) => (f.id === fileWithProgress.id ? { ...f, progress } : f))
+            );
+          }
+        );
+
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileWithProgress.id ? { ...f, status: "completed", progress: 100 } : f
+          )
+        );
+
+        onUploadComplete?.();
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Upload failed";
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileWithProgress.id ? { ...f, status: "error", error: errorMessage } : f
+          )
+        );
+      }
+    },
+    [bookingId, onUploadComplete, uploadDocument]
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -275,21 +273,22 @@ export function DocumentUpload({
   }, []);
 
   const updateFileCategory = useCallback((id: string, category: DocumentCategory) => {
-    setFiles((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, category } : f))
-    );
+    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, category } : f)));
   }, []);
 
-  const retryUpload = useCallback((fileWithProgress: FileWithProgress) => {
-    setFiles((prev) =>
-      prev.map((f) =>
-        f.id === fileWithProgress.id
-          ? { ...f, status: "pending", progress: 0, error: undefined }
-          : f
-      )
-    );
-    uploadFile(fileWithProgress);
-  }, []);
+  const retryUpload = useCallback(
+    (fileWithProgress: FileWithProgress) => {
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileWithProgress.id
+            ? { ...f, status: "pending", progress: 0, error: undefined }
+            : f
+        )
+      );
+      uploadFile(fileWithProgress);
+    },
+    [uploadFile]
+  );
 
   const completedCount = files.filter((f) => f.status === "completed").length;
   const uploadingCount = files.filter((f) => f.status === "uploading").length;
@@ -300,9 +299,7 @@ export function DocumentUpload({
       <div
         className={cn(
           "relative border-2 border-dashed rounded-lg p-8 text-center transition-colors",
-          isDragging
-            ? "border-primary bg-primary/5"
-            : "border-gray-300 hover:border-gray-400",
+          isDragging ? "border-primary bg-primary/5" : "border-gray-300 hover:border-gray-400",
           files.length >= maxFiles && "opacity-50 cursor-not-allowed"
         )}
         onDragOver={handleDragOver}
@@ -319,14 +316,11 @@ export function DocumentUpload({
           disabled={files.length >= maxFiles}
         />
         <UploadIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        <p className="text-lg font-medium mb-2">
-          Drag and drop files here, or click to browse
-        </p>
-        <p className="text-sm text-gray-500 mb-2">
-          Maximum file size: {formatBytes(maxSize)}
-        </p>
+        <p className="text-lg font-medium mb-2">Drag and drop files here, or click to browse</p>
+        <p className="text-sm text-gray-500 mb-2">Maximum file size: {formatBytes(maxSize)}</p>
         <p className="text-xs text-gray-400 mb-4">
-          Accepted formats: PDF, Word docs, images (JPG, PNG), audio files (MP3, M4A, WAV), and ZIP archives
+          Accepted formats: PDF, Word docs, images (JPG, PNG), audio files (MP3, M4A, WAV), and ZIP
+          archives
         </p>
         <Button
           onClick={() => inputRef.current?.click()}
@@ -336,9 +330,7 @@ export function DocumentUpload({
           Select Files
         </Button>
         {files.length >= maxFiles && (
-          <p className="text-sm text-orange-600 mt-2">
-            Maximum {maxFiles} files allowed
-          </p>
+          <p className="text-sm text-orange-600 mt-2">Maximum {maxFiles} files allowed</p>
         )}
       </div>
 
@@ -371,9 +363,7 @@ export function DocumentUpload({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <p className="text-sm font-medium truncate">{fileItem.file.name}</p>
-                    <span className="text-xs text-gray-500">
-                      {formatBytes(fileItem.file.size)}
-                    </span>
+                    <span className="text-xs text-gray-500">{formatBytes(fileItem.file.size)}</span>
                   </div>
                   {fileItem.status === "uploading" && (
                     <div className="flex items-center gap-2">
@@ -400,7 +390,7 @@ export function DocumentUpload({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableCategories.map(cat => (
+                        {availableCategories.map((cat) => (
                           <SelectItem key={cat} value={cat}>
                             {cat === "consent_form" && "Consent Form"}
                             {cat === "document_brief" && "Document Brief"}
@@ -431,11 +421,7 @@ export function DocumentUpload({
                     </Button>
                   )}
                   {(fileItem.status === "pending" || fileItem.status === "error") && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeFile(fileItem.id)}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => removeFile(fileItem.id)}>
                       <Trash2Icon className="w-4 h-4" />
                     </Button>
                   )}

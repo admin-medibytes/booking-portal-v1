@@ -47,7 +47,35 @@ export default async function BookingDetailPage({ params }: BookingDetailPagePro
 
   return (
     <BookingDetailClient
-      booking={booking}
+      booking={{
+        acuityAppointmentId: booking.acuityAppointmentId,
+        acuityAppointmentTypeId: booking.acuityAppointmentTypeId,
+        acuityCalendarId: booking.acuityCalendarId,
+        cancelledAt: booking.cancelledAt,
+        completedAt: booking.completedAt,
+        createdAt: booking.createdAt,
+        createdById: booking.createdById,
+        dateTime: booking.dateTime,
+        duration: booking.duration,
+        currentProgress: booking.currentProgress,
+        documents: booking.documents,
+        id: booking.id,
+        location: booking.location,
+        organizationId: booking.organizationId,
+        specialist: booking.specialist,
+        status: booking.status,
+        examinee: booking.examinee,
+        referrer: booking.referrer,
+        progress: booking.progress,
+        teamId: booking.teamId,
+        type: booking.type,
+        referrerOrganization: booking.referrer.organization,
+        examineeId: booking.examineeId,
+        referrerId: booking.referrerId,
+        specialistId: booking.specialistId,
+        updatedAt: booking.updatedAt,
+        scheduledAt: booking.scheduledAt,
+      }}
       session={{
         user: {
           id: session.user.id,
