@@ -9,7 +9,6 @@ import {
   bookingProgress,
   referrers,
   examinees,
-  organizations,
   specialistAppointmentTypes,
   appForms,
   appFormFields,
@@ -17,8 +16,7 @@ import {
 } from "@/server/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import type { User } from "@/types/user";
-import type { BookingFilters, BookingWithSpecialist } from "@/types/booking";
-import type { BookingWithDetails } from "@/hooks/use-booking";
+import type { BookingFilters } from "@/types/booking";
 import type { ExamineeFieldType } from "@/server/db/schema/appForms";
 import { acuityService } from "@/server/services/acuity.service";
 import { auditService } from "@/server/services/audit.service";

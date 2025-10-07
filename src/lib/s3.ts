@@ -22,18 +22,18 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/lib/env";
 
 const s3Client = new S3Client({
-  region: env.AWS_S3_REGION || "ap-southeast-2",
-  credentials: env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
-    ? {
-        accessKeyId: env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-      }
-    : undefined,
+  region: env.STORAGE_REGION,
+  endpoint: env.STORAGE_ENDPOINT,
+  credentials: {
+    accessKeyId: env.STORAGE_ACCESS_KEY,
+    secretAccessKey: env.STORAGE_SECRET_KEY,
+  },
+  forcePathStyle: env.STORAGE_ENDPOINT?.includes('localhost') || env.STORAGE_ENDPOINT?.includes('127.0.0.1'),
 });
 
-const BUCKET_NAME = env.AWS_S3_BUCKET_NAME;
-const MULTIPART_THRESHOLD = 5 * 1024 * 1024; // 5MB
-const PART_SIZE = 5 * 1024 * 1024; // 5MB minimum part size
+const BUCKET_NAME = env.STORAGE_BUCKET;
+const MULTIPART_THRESHOLD = 512 * 1024 * 1024; // 512MB
+const PART_SIZE = 512 * 1024 * 1024; // 512MB minimum part size
 
 export interface UploadOptions {
   key: string;
@@ -146,18 +146,42 @@ export async function uploadMultipart(options: MultipartUploadOptions): Promise<
   }
 }
 
-export async function getPresignedUrl(key: string, expiresIn = 300): Promise<string> {
-  const params: GetObjectCommandInput = {
-    Bucket: BUCKET_NAME,
-    Key: key,
-  };
+export async function getPresignedUrl(
+  key: string,
+  expiresIn = 300,
+  contentType?: string,
+  metadata?: Record<string, string>
+): Promise<string> {
+  // If contentType is provided, this is for upload, otherwise download
+  if (contentType) {
+    const params: PutObjectCommandInput = {
+      Bucket: BUCKET_NAME,
+      Key: key,
+      ContentType: contentType,
+      ServerSideEncryption: "AES256",
+      Metadata: metadata,
+    };
 
-  try {
-    const url = await getSignedUrl(s3Client, new GetObjectCommand(params), { expiresIn });
-    return url;
-  } catch (error) {
-    console.error("Error generating presigned URL:", error);
-    throw new Error("Failed to generate download URL");
+    try {
+      const url = await getSignedUrl(s3Client, new PutObjectCommand(params), { expiresIn });
+      return url;
+    } catch (error) {
+      console.error("Error generating presigned upload URL:", error);
+      throw new Error("Failed to generate upload URL");
+    }
+  } else {
+    const params: GetObjectCommandInput = {
+      Bucket: BUCKET_NAME,
+      Key: key,
+    };
+
+    try {
+      const url = await getSignedUrl(s3Client, new GetObjectCommand(params), { expiresIn });
+      return url;
+    } catch (error) {
+      console.error("Error generating presigned download URL:", error);
+      throw new Error("Failed to generate download URL");
+    }
   }
 }
 

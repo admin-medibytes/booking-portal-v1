@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { bookingsClient } from "@/lib/hono-client";
 import { handleApiResponse } from "@/lib/hono-utils";
-import type { BookingWithSpecialist, BookingProgress } from "@/types/booking";
+import type { BookingWithSpecialist, BookingProgress, Organization } from "@/types/booking";
 
 export interface BookingWithDetails extends BookingWithSpecialist {
   progress: (BookingProgress & {
@@ -17,6 +17,7 @@ export interface BookingWithDetails extends BookingWithSpecialist {
     type: string;
     uploadedAt: Date;
   }>;
+  organization: Organization;
   currentProgress: string;
 }
 

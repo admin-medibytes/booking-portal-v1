@@ -2,9 +2,12 @@ import { eq, and, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { documents } from "@/server/db/schema/documents";
 import { type Document, type CreateDocumentInput, type DocumentSection, type DocumentCategory } from "@/types/document";
+import { getS3Bucket } from "@/server/utils/s3";
 
 export class DocumentRepository {
   async create(data: CreateDocumentInput & { id: string; s3Key: string }): Promise<Document> {
+    const bucket = getS3Bucket();
+
     const [document] = await db
       .insert(documents)
       .values({
@@ -14,7 +17,7 @@ export class DocumentRepository {
         section: data.section,
         category: data.category,
         s3Key: data.s3Key,
-        s3Bucket: process.env.AWS_S3_BUCKET_NAME!,
+        s3Bucket: bucket,
         fileName: data.fileName,
         fileSize: data.fileSize,
         mimeType: data.mimeType,
@@ -27,6 +30,9 @@ export class DocumentRepository {
   async findById(id: string): Promise<Document | null> {
     const document = await db.query.documents.findFirst({
       where: and(eq(documents.id, id), isNull(documents.deletedAt)),
+      with: {
+        uploadedBy: true,
+      },
     });
 
     return document ? this.mapToDocument(document) : null;
@@ -101,24 +107,20 @@ export class DocumentRepository {
   }
 
 
-  private mapToDocument(dbDocument: {
-    id: string;
-    bookingId: string;
-    uploadedBy: string;
-    section: DocumentSection;
-    category: DocumentCategory;
-    s3Key: string;
-    fileName: string;
-    fileSize: number;
-    mimeType: string;
-    createdAt: Date;
-    updatedAt?: Date;
-    deletedAt: Date | null;
-  }): Document {
+  private mapToDocument(dbDocument: any): Document {
     return {
       id: dbDocument.id,
       bookingId: dbDocument.bookingId,
-      uploadedById: dbDocument.uploadedBy,
+      uploadedById: typeof dbDocument.uploadedBy === 'string'
+        ? dbDocument.uploadedBy
+        : dbDocument.uploadedBy?.id || dbDocument.uploadedBy,
+      uploadedBy: typeof dbDocument.uploadedBy === 'object' && dbDocument.uploadedBy?.id
+        ? {
+            id: dbDocument.uploadedBy.id,
+            name: dbDocument.uploadedBy.name || 'Unknown User',
+            email: dbDocument.uploadedBy.email || '',
+          }
+        : undefined,
       s3Key: dbDocument.s3Key,
       fileName: dbDocument.fileName,
       fileSize: dbDocument.fileSize,

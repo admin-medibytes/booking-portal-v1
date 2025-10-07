@@ -16,14 +16,15 @@ import {
   Video,
   Clock,
   VideoIcon,
-  Briefcase,
   FileText,
   AlertCircle,
   Globe,
   ChevronDown,
   Check,
   Mail,
+  BriefcaseBusiness,
 } from "lucide-react";
+import { BookingDocumentsSection } from "./booking-documents-section";
 import {
   Dialog,
   DialogContent,
@@ -274,7 +275,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
               {/* Referrer Section */}
               <div>
                 <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <Briefcase className="h-4 w-4 text-primary" />
+                  <BriefcaseBusiness className="h-4 w-4 text-primary" />
                   Referrer Information
                 </h4>
                 <div className="space-y-2">
@@ -297,7 +298,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
                       <div>
                         <p className="text-sm text-muted-foreground">Organization</p>
                         <p className="font-medium">
-                          {booking.referrerOrganization?.name || "Not specified"}
+                          {booking.organization?.name || "Not specified"}
                         </p>
                       </div>
                     </>
@@ -342,81 +343,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
         </Card>
 
         {/* Documents */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Documents
-              </CardTitle>
-              <div className="flex gap-2 text-xs">
-                <span className="px-2 py-1 bg-muted rounded">IME</span>
-                <span className="px-2 py-1 bg-muted rounded">Supplementary</span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-medium text-sm">Consent Form</p>
-                <Button variant="ghost" size="sm" className="h-8">
-                  Upload
-                </Button>
-              </div>
-              <div className="p-3 border border-dashed rounded-lg bg-muted/20">
-                <p className="text-sm text-muted-foreground text-center">No files uploaded</p>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-medium text-sm">Brief Documents</p>
-                <Button variant="ghost" size="sm" className="h-8">
-                  Upload
-                </Button>
-              </div>
-              <div className="p-3 border border-dashed rounded-lg bg-muted/20">
-                <p className="text-sm text-muted-foreground text-center">No files uploaded</p>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-medium text-sm">Dictation</p>
-                <Button variant="ghost" size="sm" className="h-8">
-                  Upload
-                </Button>
-              </div>
-              <div className="p-3 border border-dashed rounded-lg bg-muted/20">
-                <p className="text-sm text-muted-foreground text-center">No files uploaded</p>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-medium text-sm">Draft Reports</p>
-                <Button variant="ghost" size="sm" className="h-8">
-                  Upload
-                </Button>
-              </div>
-              <div className="p-3 border border-dashed rounded-lg bg-muted/20">
-                <p className="text-sm text-muted-foreground text-center">No files uploaded</p>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-medium text-sm">Final Report</p>
-                <Button variant="ghost" size="sm" className="h-8">
-                  Upload
-                </Button>
-              </div>
-              <div className="p-3 border border-dashed rounded-lg bg-muted/20">
-                <p className="text-sm text-muted-foreground text-center">No files uploaded</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <BookingDocumentsSection bookingId={booking.id} />
       </div>
 
       {/* Sidebar */}
@@ -497,7 +424,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
                   <Button variant="outline" size="sm" className="w-auto justify-between gap-2">
                     <Globe className="h-4 w-4" />
                     <span className="text-xs">
-                      {timeZones.find((tz) => tz.tzCode === selectedTimezone)?.label ||
+                      {timeZones.find((tz) => tz.tzCode === selectedTimezone)?.tzCode ||
                         selectedTimezone}
                     </span>
                     <ChevronDown className="h-3 w-3 opacity-50" />

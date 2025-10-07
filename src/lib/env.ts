@@ -33,6 +33,13 @@ export const env = createEnv({
     S3_UPLOAD_MAX_SIZE: type("string"),
     S3_PRESIGNED_URL_EXPIRY: type("string"),
 
+    // S3 Storage
+    STORAGE_REGION: type("string"),
+    STORAGE_ENDPOINT: type("string"),
+    STORAGE_ACCESS_KEY: type("string"),
+    STORAGE_SECRET_KEY: type("string"),
+    STORAGE_BUCKET: type("string"),
+
     // AWS SES
     AWS_SES_REGION: type("string"),
     SES_FROM_EMAIL: type("string.email"),
@@ -103,6 +110,11 @@ export const env = createEnv({
     AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
     AWS_S3_BUCKET_NAME: process.env.AWS_S3_BUCKET_NAME,
     AWS_S3_REGION: process.env.AWS_S3_REGION,
+    STORAGE_REGION: process.env.STORAGE_REGION,
+    STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT,
+    STORAGE_ACCESS_KEY: process.env.STORAGE_ACCESS_KEY,
+    STORAGE_SECRET_KEY: process.env.STORAGE_SECRET_KEY,
+    STORAGE_BUCKET: process.env.STORAGE_BUCKET,
     S3_UPLOAD_MAX_SIZE: process.env.S3_UPLOAD_MAX_SIZE,
     S3_PRESIGNED_URL_EXPIRY: process.env.S3_PRESIGNED_URL_EXPIRY,
     AWS_SES_REGION: process.env.AWS_SES_REGION,

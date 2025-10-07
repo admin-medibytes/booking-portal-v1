@@ -1,32 +1,21 @@
-import { type } from "arktype";
 import { randomUUID } from "crypto";
 import {
-  uploadObject,
-  uploadMultipart,
-  getPresignedUrl,
-  downloadObject,
-  deleteObject as deleteS3Object,
-  shouldUseMultipart,
-} from "@/lib/s3";
+  generateS3Key,
+  generatePresignedUploadUrl,
+  generatePresignedDownloadUrl,
+  downloadS3ObjectStream,
+  deleteS3Object,
+  s3Client,
+  getS3Bucket,
+  PRESIGNED_URL_EXPIRATION,
+} from "@/server/utils/s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { documentRepository } from "@/server/repositories/document.repository";
 import { auditService } from "@/server/services/audit.service";
 import { bookingService } from "@/server/services/booking.service";
 import { documentPermissionsService } from "@/server/services/document-permissions.service";
 import { type Document, type CreateDocumentInput, type UpdateDocumentInput, type DocumentSection, type DocumentCategory } from "@/types/document";
-import { env } from "@/lib/env";
-
-const MAX_FILE_SIZE = parseInt(env.S3_UPLOAD_MAX_SIZE || "104857600"); // 100MB default
-const PRESIGNED_URL_EXPIRY = parseInt(env.S3_PRESIGNED_URL_EXPIRY || "300"); // 5 minutes default
-
-const uploadDocumentSchema = type({
-  bookingId: "string",
-  uploadedById: "string",
-  fileName: "string",
-  fileSize: "number",
-  mimeType: "string",
-  section: "'ime_documents' | 'supplementary_documents'",
-  category: "'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report'",
-});
+import { validateBookingDocumentUpload } from "@/server/utils/file-validation";
 
 const AUDIO_MIME_TYPES = [
   "audio/mpeg",
@@ -37,34 +26,154 @@ const AUDIO_MIME_TYPES = [
   "audio/x-m4a",
 ];
 
+export interface InitiateUploadInput {
+  bookingId: string;
+  uploadedById: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  section: DocumentSection;
+  category: DocumentCategory;
+}
+
+export interface InitiateUploadResult {
+  documentId: string;
+  uploadUrl: string;
+  s3Key: string;
+  expiresIn: number;
+}
+
 export class DocumentService {
-  async uploadDocument(
-    data: {
-      bookingId: string;
-      uploadedById: string;
-      fileName: string;
-      fileSize: number;
-      mimeType: string;
-      section: DocumentSection;
-      category: DocumentCategory;
-      fileBuffer: Buffer;
+  /**
+   * Initiate file upload - Generate presigned URL for client-side upload
+   * HIPAA Compliance: Validates file before allowing upload
+   */
+  async initiateUpload(
+    input: InitiateUploadInput,
+    context?: {
+      ipAddress?: string;
+      userAgent?: string;
       userRole?: string;
-    },
-    onProgress?: (progress: number) => void
+    }
+  ): Promise<InitiateUploadResult> {
+    // Auto-detect audio files and set category to dictation
+    let finalCategory = input.category;
+    if (AUDIO_MIME_TYPES.includes(input.mimeType.toLowerCase())) {
+      finalCategory = "dictation";
+    }
+
+    // Validate file upload
+    validateBookingDocumentUpload(input.fileName, input.mimeType, input.fileSize, finalCategory);
+
+    // Check upload permission
+    if (context?.userRole) {
+      const role = documentPermissionsService.getUserRole(context.userRole);
+      if (!documentPermissionsService.hasPermission({ role, category: finalCategory, permission: "upload" })) {
+        throw new Error("You do not have permission to upload this document type");
+      }
+    }
+
+    const documentId = randomUUID();
+    const s3Key = generateS3Key(input.bookingId, input.fileName, input.uploadedById);
+
+    // Generate presigned URL
+    const uploadUrl = await generatePresignedUploadUrl(s3Key, input.mimeType, {
+      uploadedBy: input.uploadedById,
+      bookingId: input.bookingId,
+      originalFileName: input.fileName,
+    });
+
+    // Log upload initiation
+    await auditService.log({
+      action: "document.upload_initiated",
+      userId: input.uploadedById,
+      resourceType: "document",
+      resourceId: documentId,
+      metadata: {
+        bookingId: input.bookingId,
+        fileName: input.fileName,
+        fileSize: input.fileSize,
+        section: input.section,
+        category: finalCategory,
+      },
+      ipAddress: context?.ipAddress,
+      userAgent: context?.userAgent,
+    });
+
+    return {
+      documentId,
+      uploadUrl,
+      s3Key,
+      expiresIn: PRESIGNED_URL_EXPIRATION,
+    };
+  }
+
+  /**
+   * Confirm upload - Save document metadata after successful S3 upload
+   * HIPAA Compliance: Only creates database record if upload confirmed
+   */
+  async confirmUpload(
+    documentId: string,
+    s3Key: string,
+    input: CreateDocumentInput,
+    context?: {
+      ipAddress?: string;
+      userAgent?: string;
+    }
   ): Promise<Document> {
-    const { fileBuffer, userRole, ...dataWithoutBuffer } = data;
-    
+    // Create document record in database
+    const document = await documentRepository.create({
+      ...input,
+      id: documentId,
+      s3Key,
+    });
+
+    // Log successful upload
+    await auditService.log({
+      action: "document.uploaded",
+      userId: input.uploadedById,
+      resourceType: "document",
+      resourceId: documentId,
+      metadata: {
+        bookingId: input.bookingId,
+        s3Key,
+        fileName: input.fileName,
+        fileSize: input.fileSize,
+      },
+      ipAddress: context?.ipAddress,
+      userAgent: context?.userAgent,
+    });
+
+    return document;
+  }
+
+  /**
+   * Direct upload - Upload file directly to S3 from server
+   * Simpler approach for smaller files without client-side presigned URLs
+   */
+  async uploadDocumentDirect(data: {
+    bookingId: string;
+    uploadedById: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    section: DocumentSection;
+    category: DocumentCategory;
+    fileBuffer: Buffer;
+    userRole?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<Document> {
+    const { fileBuffer, userRole, ipAddress, userAgent } = data;
+
     // Auto-detect audio files and set category to dictation
     let finalCategory = data.category;
     if (AUDIO_MIME_TYPES.includes(data.mimeType.toLowerCase())) {
       finalCategory = "dictation";
     }
-    
-    const validationData = { ...dataWithoutBuffer, category: finalCategory };
-    const validation = uploadDocumentSchema(validationData);
-    if (validation instanceof type.errors) {
-      throw new Error(`Invalid document data: ${validation.summary}`);
-    }
+
+    // Validate file upload
+    validateBookingDocumentUpload(data.fileName, data.mimeType, data.fileSize, finalCategory);
 
     // Check upload permission
     if (userRole) {
@@ -74,42 +183,30 @@ export class DocumentService {
       }
     }
 
-    if (data.fileSize > MAX_FILE_SIZE) {
-      throw new Error(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes`);
-    }
-
     const documentId = randomUUID();
-    const timestamp = new Date().toISOString();
-    const sanitizedFileName = data.fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const s3Key = `${data.bookingId}/${documentId}/${timestamp}_${sanitizedFileName}`;
+    const s3Key = generateS3Key(data.bookingId, data.fileName, data.uploadedById);
+    const bucket = getS3Bucket();
 
     try {
-      if (shouldUseMultipart(data.fileSize)) {
-        await uploadMultipart({
-          key: s3Key,
-          body: fileBuffer,
-          contentType: data.mimeType,
-          metadata: {
-            uploadedBy: data.uploadedById,
-            bookingId: data.bookingId,
-            originalFileName: data.fileName,
+      // Upload to S3
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: s3Key,
+          Body: fileBuffer,
+          ContentType: data.mimeType,
+          ServerSideEncryption: "AES256",
+          Metadata: {
+            "phi-data": "true",
+            "booking-id": data.bookingId,
+            "uploaded-by": data.uploadedById,
           },
-          onProgress,
-        });
-      } else {
-        await uploadObject({
-          key: s3Key,
-          body: fileBuffer,
-          contentType: data.mimeType,
-          metadata: {
-            uploadedBy: data.uploadedById,
-            bookingId: data.bookingId,
-            originalFileName: data.fileName,
-          },
-        });
-      }
+        })
+      );
 
-      const documentInput: CreateDocumentInput = {
+      // Create document record
+      const document = await documentRepository.create({
+        id: documentId,
         bookingId: data.bookingId,
         uploadedById: data.uploadedById,
         fileName: data.fileName,
@@ -117,31 +214,35 @@ export class DocumentService {
         mimeType: data.mimeType,
         section: data.section,
         category: finalCategory,
-      };
-
-      const document = await documentRepository.create({
-        ...documentInput,
-        id: documentId,
         s3Key,
       });
 
+      // Log successful upload
       await auditService.log({
         action: "document.uploaded",
         userId: data.uploadedById,
         resourceType: "document",
-        resourceId: document.id,
+        resourceId: documentId,
         metadata: {
           bookingId: data.bookingId,
+          s3Key,
           fileName: data.fileName,
           fileSize: data.fileSize,
           section: data.section,
           category: finalCategory,
         },
+        ipAddress,
+        userAgent,
       });
 
       return document;
     } catch (error) {
-      await this.cleanupFailedUpload(s3Key);
+      // Cleanup S3 object if database insert fails
+      try {
+        await deleteS3Object(s3Key);
+      } catch (cleanupError) {
+        console.error("Failed to cleanup S3 object:", cleanupError);
+      }
       throw error;
     }
   }
@@ -259,7 +360,7 @@ export class DocumentService {
       }
 
       // Stream the document - never expose S3 URLs
-      const downloadResult = await downloadObject(document.s3Key, context?.range);
+      const downloadResult = await downloadS3ObjectStream(document.s3Key, context?.range);
       
       if (!downloadResult.stream) {
         throw new Error("Failed to download document");
@@ -314,7 +415,7 @@ export class DocumentService {
   }
 
   async getPresignedDownloadUrl(
-    id: string, 
+    id: string,
     userId: string,
     context?: {
       userRole?: string;
@@ -322,22 +423,22 @@ export class DocumentService {
     }
   ): Promise<string> {
     const document = await this.getDocument(id, userId, context);
-    
+
     if (!document) {
       throw new Error("Document not found");
     }
 
-    const url = await getPresignedUrl(document.s3Key, PRESIGNED_URL_EXPIRY);
+    const url = await generatePresignedDownloadUrl(document.s3Key, document.fileName);
 
     await auditService.log({
       action: "document.presigned_url_generated",
       userId,
       impersonatedUserId: context?.impersonatedUserId,
-      resourceType: "document", 
+      resourceType: "document",
       resourceId: id,
       metadata: {
         bookingId: document.bookingId,
-        expiresIn: PRESIGNED_URL_EXPIRY,
+        expiresIn: PRESIGNED_URL_EXPIRATION,
       },
     });
 
@@ -418,7 +519,7 @@ export class DocumentService {
   }
 
   async getDocumentsByBooking(
-    bookingId: string, 
+    bookingId: string,
     userId: string,
     filters?: {
       section?: DocumentSection;
@@ -428,18 +529,26 @@ export class DocumentService {
     }
   ): Promise<Document[]> {
     const documents = await documentRepository.findByBookingId(bookingId, filters);
-    
+
+    console.log(`[getDocumentsByBooking] Found ${documents.length} documents for booking ${bookingId}`);
+    console.log(`[getDocumentsByBooking] userId: ${userId}, userRole: ${filters?.userRole}`);
+
     // For impersonation, check access as the impersonated user
     const effectiveUserId = filters?.impersonatedUserId || userId;
-    
+
     const accessibleDocuments = [];
     for (const doc of documents) {
       const hasAccess = await this.verifyAccess(doc, effectiveUserId, filters?.userRole);
+      console.log(`[getDocumentsByBooking] Document ${doc.id} - hasAccess: ${hasAccess}`);
+
       if (hasAccess) {
         // Check download permission based on role
         if (filters?.userRole) {
           const role = documentPermissionsService.getUserRole(filters.userRole);
-          if (documentPermissionsService.hasPermission({ role, category: doc.category, permission: "download" })) {
+          const hasDownloadPermission = documentPermissionsService.hasPermission({ role, category: doc.category, permission: "download" });
+          console.log(`[getDocumentsByBooking] Document ${doc.id} - role: ${role}, hasDownloadPermission: ${hasDownloadPermission}`);
+
+          if (hasDownloadPermission) {
             accessibleDocuments.push(doc);
           }
         } else {
@@ -448,18 +557,25 @@ export class DocumentService {
       }
     }
 
+    console.log(`[getDocumentsByBooking] Returning ${accessibleDocuments.length} accessible documents`);
     return accessibleDocuments;
   }
 
   private async verifyAccess(document: Document, userId: string, userRole?: string): Promise<boolean> {
+    console.log(`[verifyAccess] Checking access for document ${document.id}`);
+    console.log(`[verifyAccess] document.uploadedById: ${document.uploadedById}, userId: ${userId}`);
+
     // Check if user is the document uploader
     if (document.uploadedById === userId) {
+      console.log(`[verifyAccess] User is the uploader - granting access`);
       return true;
     }
 
     try {
       // Use role-based access checks
+      console.log(`[verifyAccess] Checking role-based access for bookingId: ${document.bookingId}`);
       const hasRoleBasedAccess = await this.checkRoleBasedAccess(document.bookingId, userId, userRole);
+      console.log(`[verifyAccess] Role-based access result: ${hasRoleBasedAccess}`);
       return hasRoleBasedAccess;
     } catch (error) {
       // For errors, log and deny access

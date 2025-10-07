@@ -12,11 +12,8 @@ import {
   documentUploadRateLimit,
   createRateLimiter,
 } from "@/server/middleware/rate-limit.middleware";
-import { env } from "@/lib/env";
 import { convertToPdf } from "@/lib/pdf-converter";
 import type { DocumentCategory } from "@/types/document";
-
-const MAX_FILE_SIZE = parseInt(env.S3_UPLOAD_MAX_SIZE || "104857600");
 
 // Create download rate limiter - 100 downloads per hour per user
 const documentDownloadRateLimit = createRateLimiter({
@@ -35,19 +32,20 @@ const documentsRoutes = new Hono()
   .use("*", requireAuth)
   .use("*", checkImpersonation)
 
+  // Initiate upload - Generate presigned URL
   .post(
-    "/",
+    "/initiate-upload",
     documentUploadRateLimit,
     arktypeValidator(
-      "form",
+      "json",
       type({
         bookingId: "string",
-        section: "'ime_documents' | 'supplementary_documents'",
-        category:
-          "'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report'",
         fileName: "string",
         fileSize: "number",
         mimeType: "string",
+        section: "'ime_documents' | 'supplementary_documents'",
+        category:
+          "'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report'",
       })
     ),
     async (c) => {
@@ -58,44 +56,182 @@ const documentsRoutes = new Hono()
           return c.json({ error: "Unauthorized" }, 401);
         }
 
+        const body = await c.req.json();
+        const memberRole =
+          "user" in authContext && authContext.user && "memberRole" in authContext.user
+            ? (authContext.user as { memberRole?: string }).memberRole
+            : undefined;
+
+        const ipAddress = c.req.header("x-forwarded-for") || c.req.header("x-real-ip");
+        const userAgent = c.req.header("user-agent");
+
+        const result = await documentService.initiateUpload(
+          {
+            bookingId: body.bookingId,
+            uploadedById: user.id,
+            fileName: body.fileName,
+            fileSize: body.fileSize,
+            mimeType: body.mimeType,
+            section: body.section,
+            category: body.category,
+          },
+          {
+            ipAddress,
+            userAgent,
+            userRole: memberRole,
+          }
+        );
+
+        return c.json({ data: result });
+      } catch (error) {
+        console.error("Initiate upload error:", error);
+        if (error instanceof Error) {
+          return c.json({ error: error.message }, 400);
+        }
+        return c.json({ error: "Failed to initiate upload" }, 500);
+      }
+    }
+  )
+
+  // Confirm upload - Save document metadata after S3 upload
+  .post(
+    "/confirm-upload",
+    arktypeValidator(
+      "json",
+      type({
+        documentId: "string",
+        s3Key: "string",
+        bookingId: "string",
+        fileName: "string",
+        fileSize: "number",
+        mimeType: "string",
+        section: "'ime_documents' | 'supplementary_documents'",
+        category:
+          "'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report'",
+      })
+    ),
+    async (c) => {
+      try {
+        const authContext = c.get("auth");
+        const user = authContext?.user;
+        if (!user) {
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+
+        const body = await c.req.json();
+        const ipAddress = c.req.header("x-forwarded-for") || c.req.header("x-real-ip");
+        const userAgent = c.req.header("user-agent");
+
+        const document = await documentService.confirmUpload(
+          body.documentId,
+          body.s3Key,
+          {
+            bookingId: body.bookingId,
+            uploadedById: user.id,
+            fileName: body.fileName,
+            fileSize: body.fileSize,
+            mimeType: body.mimeType,
+            section: body.section,
+            category: body.category,
+          },
+          {
+            ipAddress,
+            userAgent,
+          }
+        );
+
+        return c.json({ data: document });
+      } catch (error) {
+        console.error("Confirm upload error:", error);
+        if (error instanceof Error) {
+          return c.json({ error: error.message }, 400);
+        }
+        return c.json({ error: "Failed to confirm upload" }, 500);
+      }
+    }
+  )
+
+  // Direct file upload endpoint (server-side upload to S3)
+  .post(
+    "/upload",
+    documentUploadRateLimit,
+    async (c) => {
+      try {
+        const authContext = c.get("auth");
+        const user = authContext?.user;
+        if (!user) {
+          return c.json({ error: "Unauthorized" }, 401);
+        }
+
         const formData = await c.req.formData();
-        const file = formData.get("file") as File;
-        const metadata = JSON.parse(formData.get("metadata") as string);
+        const bookingId = formData.get("bookingId") as string;
+        const section = formData.get("section") as "ime_documents" | "supplementary_documents";
+        const category = formData.get("category") as DocumentCategory;
 
-        if (!file) {
-          return c.json({ error: "No file provided" }, 400);
+        if (!bookingId || !section || !category) {
+          return c.json({ error: "Missing required fields" }, 400);
         }
-
-        if (file.size > MAX_FILE_SIZE) {
-          return c.json(
-            { error: `File size exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes` },
-            400
-          );
-        }
-
-        const fileBuffer = Buffer.from(await file.arrayBuffer());
 
         const memberRole =
           "user" in authContext && authContext.user && "memberRole" in authContext.user
             ? (authContext.user as { memberRole?: string }).memberRole
             : undefined;
 
-        const document = await documentService.uploadDocument({
-          bookingId: metadata.bookingId,
-          uploadedById: user.id,
-          fileName: file.name,
-          fileSize: file.size,
-          mimeType: file.type,
-          section: metadata.section,
-          category: metadata.category,
-          fileBuffer,
-          userRole: memberRole,
-        });
+        const uploadResults = [];
+        const fileEntries = formData.getAll("files");
 
-        return c.json({ data: document });
+        if (fileEntries.length === 0) {
+          return c.json({ error: "No files provided" }, 400);
+        }
+
+        const ipAddress = c.req.header("x-forwarded-for") || c.req.header("x-real-ip");
+        const userAgent = c.req.header("user-agent");
+
+        for (const fileEntry of fileEntries) {
+          const file = fileEntry as File;
+          if (!file) continue;
+
+          try {
+            const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+            const document = await documentService.uploadDocumentDirect({
+              bookingId,
+              uploadedById: user.id,
+              fileName: file.name,
+              fileSize: file.size,
+              mimeType: file.type,
+              section,
+              category,
+              fileBuffer,
+              userRole: memberRole,
+              ipAddress,
+              userAgent,
+            });
+
+            uploadResults.push({
+              id: document.id,
+              name: document.fileName,
+              uploadSuccess: true,
+            });
+          } catch (error) {
+            console.error(`Error uploading file ${file.name}:`, error);
+            uploadResults.push({
+              name: file.name,
+              uploadSuccess: false,
+              error: error instanceof Error ? error.message : "Unknown error during upload",
+            });
+          }
+        }
+
+        return c.json({
+          totalFiles: fileEntries.length,
+          successfulUploads: uploadResults.filter((r) => r.uploadSuccess).length,
+          failedUploads: uploadResults.filter((r) => !r.uploadSuccess).length,
+          files: uploadResults,
+        });
       } catch (error) {
         console.error("Document upload error:", error);
-        return c.json({ error: "Failed to upload document" }, 500);
+        return c.json({ error: "Failed to upload documents" }, 500);
       }
     }
   )

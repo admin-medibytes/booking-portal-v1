@@ -47,13 +47,52 @@ export const ALLOWED_MIME_TYPES = {
     'application/msword',
     'text/plain',
   ],
+  // Booking document types (HIPAA-compliant)
+  booking_document: [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/msword', // .doc
+  ],
+  // Individual booking document categories
+  consent_form: [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/msword', // .doc
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+  ],
+  document_brief: [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/msword', // .doc
+  ],
+  dictation: [
+    'audio/mpeg', // .mp3
+    'audio/wav',
+    'audio/mp4', // .m4a
+    'audio/webm',
+    'audio/ogg',
+    'audio/x-m4a',
+    'application/pdf', // Transcripts
+  ],
+  draft_report: [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/msword', // .doc
+  ],
+  final_report: [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/msword', // .doc
+  ],
 } as const;
 
 // File size limits (in bytes)
 export const FILE_SIZE_LIMITS = {
-  default: 10 * 1024 * 1024, // 10MB
+  default: 512 * 1024 * 1024, // 512MB
   image: 5 * 1024 * 1024, // 5MB
-  document: 20 * 1024 * 1024, // 20MB
+  document: 512 * 1024 * 1024, // 512MB
 } as const;
 
 // Get max file size from env or use default
@@ -64,44 +103,92 @@ const getMaxFileSize = (): number => {
 
 // File validation schema using ArkType
 export const fileUploadSchema = type({
-  fileName: type('string').and((name: string) => {
-    if (name.length === 0) throw new ValidationError('File name cannot be empty');
-    if (name.length > 255) throw new ValidationError('File name must be under 255 characters');
-    
-    // Check for dangerous file names
-    const dangerous = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
-    if (dangerous.test(name)) {
-      throw new ValidationError('Invalid file name');
-    }
-    
-    // Check for path traversal attempts
-    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
-      throw new ValidationError('File name cannot contain path characters');
-    }
-    
-    return name;
-  }),
+  fileName: 'string',
   mimeType: 'string',
-  size: type('number').and((size: number) => {
-    const maxSize = getMaxFileSize();
-    if (size <= 0) throw new ValidationError('File size must be positive');
-    if (size > maxSize) throw new ValidationError(`File size must be under ${maxSize} bytes`);
-    return size;
-  }),
-  documentType: type("'medical_report' | 'test_result' | 'prescription' | 'insurance_card' | 'referral_letter' | 'other'"),
+  size: 'number',
+  documentType: "'medical_report' | 'test_result' | 'prescription' | 'insurance_card' | 'referral_letter' | 'other' | 'booking_document' | 'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report'",
 });
 
 export type FileUploadInput = typeof fileUploadSchema.infer;
 
+// Validate booking document upload
+export function validateBookingDocumentUpload(
+  fileName: string,
+  mimeType: string,
+  fileSize: number,
+  category: 'consent_form' | 'document_brief' | 'dictation' | 'draft_report' | 'final_report'
+): void {
+  // Check file size
+  const maxSize = parseInt(env.S3_UPLOAD_MAX_SIZE || '536870912', 10);
+  if (fileSize > maxSize) {
+    throw new ValidationError(`File size exceeds maximum allowed size of ${maxSize} bytes`);
+  }
+
+  // Check MIME type for the specific category
+  const allowedMimes = ALLOWED_MIME_TYPES[category];
+  if (!(allowedMimes as readonly string[]).includes(mimeType)) {
+    throw new ValidationError(
+      `Invalid file type for ${category}. Allowed types: ${allowedMimes.join(', ')}`
+    );
+  }
+
+  // Validate file name
+  if (fileName.length === 0) {
+    throw new ValidationError('File name cannot be empty');
+  }
+  if (fileName.length > 255) {
+    throw new ValidationError('File name must be under 255 characters');
+  }
+
+  // Check for dangerous file names
+  const dangerous = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
+  if (dangerous.test(fileName)) {
+    throw new ValidationError('Invalid file name');
+  }
+
+  // Check for path traversal attempts
+  if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+    throw new ValidationError('File name cannot contain path characters');
+  }
+}
+
 // Validate file upload
 export function validateFileUpload(input: unknown): FileUploadInput {
   const result = fileUploadSchema(input);
-  
+
   if (result instanceof type.errors) {
     const firstError = (result as { summary?: string }).summary || 'Validation failed';
     throw new ValidationError(`File validation failed: ${firstError}`);
   }
-  
+
+  // Validate file name
+  if (result.fileName.length === 0) {
+    throw new ValidationError('File name cannot be empty');
+  }
+  if (result.fileName.length > 255) {
+    throw new ValidationError('File name must be under 255 characters');
+  }
+
+  // Check for dangerous file names
+  const dangerous = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
+  if (dangerous.test(result.fileName)) {
+    throw new ValidationError('Invalid file name');
+  }
+
+  // Check for path traversal attempts
+  if (result.fileName.includes('..') || result.fileName.includes('/') || result.fileName.includes('\\')) {
+    throw new ValidationError('File name cannot contain path characters');
+  }
+
+  // Validate file size
+  const maxSize = getMaxFileSize();
+  if (result.size <= 0) {
+    throw new ValidationError('File size must be positive');
+  }
+  if (result.size > maxSize) {
+    throw new ValidationError(`File size must be under ${maxSize} bytes`);
+  }
+
   // Additional MIME type validation based on document type
   const allowedMimes = ALLOWED_MIME_TYPES[result.documentType];
   if (!(allowedMimes as readonly string[]).includes(result.mimeType)) {
@@ -111,19 +198,19 @@ export function validateFileUpload(input: unknown): FileUploadInput {
       result.mimeType
     );
   }
-  
+
   // Additional size validation based on file type
   const isImage = result.mimeType.startsWith('image/');
-  const maxSize = isImage ? FILE_SIZE_LIMITS.image : FILE_SIZE_LIMITS.document;
-  
-  if (result.size > maxSize) {
+  const maxSizeForType = isImage ? FILE_SIZE_LIMITS.image : FILE_SIZE_LIMITS.document;
+
+  if (result.size > maxSizeForType) {
     throw new ValidationError(
-      `File too large. Maximum size for ${isImage ? 'images' : 'documents'}: ${maxSize / 1024 / 1024}MB`,
+      `File too large. Maximum size for ${isImage ? 'images' : 'documents'}: ${maxSizeForType / 1024 / 1024}MB`,
       'size',
       result.size
     );
   }
-  
+
   return result;
 }
 
@@ -150,8 +237,8 @@ export function sanitizeFileName(fileName: string): string {
   return sanitized;
 }
 
-// Generate S3 key for file storage
-export function generateS3Key(
+// Generate S3 key for file storage (legacy - use generateS3Key from @/server/utils/s3 instead)
+export function generateS3KeyLegacy(
   organizationId: string,
   bookingId: string,
   documentType: string,
@@ -159,7 +246,7 @@ export function generateS3Key(
 ): string {
   const timestamp = Date.now();
   const sanitized = sanitizeFileName(fileName);
-  
+
   return `organizations/${organizationId}/bookings/${bookingId}/${documentType}/${timestamp}-${sanitized}`;
 }
 
@@ -169,8 +256,8 @@ export function requiresVirusScan(mimeType: string, size: number): boolean {
     return false;
   }
   
-  // Skip virus scan for small images
-  if (mimeType.startsWith('image/') && size < 1024 * 1024) { // 1MB
+  // Skip virus scan for small images and audio files
+  if ((mimeType.startsWith('image/') || mimeType.startsWith('audio/')) && size < 1024 * 1024) { // 1MB
     return false;
   }
   

@@ -14,6 +14,7 @@ import formsRoutes from "./routes/forms.routes";
 import { bookingsRoutes } from "./routes/bookings.routes";
 
 import { ContentfulStatusCode } from "hono/utils/http-status";
+import { documentsRoutes } from "./routes/documents.routes";
 
 const app = new Hono()
   .basePath("/api")
@@ -63,6 +64,9 @@ const app = new Hono()
 
   // Mount bookings routes (authenticated)
   .route("/bookings", bookingsRoutes)
+
+  // Mount documents routes (authenticated)
+  .route("/documents", documentsRoutes)
 
   .get("/health", async (c) => {
     const dbHealth = await healthCheck();
