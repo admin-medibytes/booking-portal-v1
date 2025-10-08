@@ -32,15 +32,14 @@ export class BookingRepository {
       conditions.push(eq(bookings.specialistId, filters.specialistId));
     }
 
-    // Handle search across examinee fields
+    // Handle search across examinee fields (name and email only)
     if (filters?.search) {
       const searchTerm = `%${filters.search}%`;
       conditions.push(
         or(
           ilike(examinees.firstName, searchTerm),
           ilike(examinees.lastName, searchTerm),
-          ilike(examinees.email, searchTerm),
-          ilike(examinees.phoneNumber, searchTerm)
+          ilike(examinees.email, searchTerm)
         )!
       );
     }
@@ -54,6 +53,56 @@ export class BookingRepository {
     const limit = filters?.limit || 20;
     const offset = (page - 1) * limit;
 
+    // If searching, we need to use the query builder with explicit joins
+    if (filters?.search) {
+      const results = await db
+        .select()
+        .from(bookings)
+        .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(bookings.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      // Get the booking IDs from the results
+      const bookingIds = results.map((r) => r.bookings.id);
+
+      // Fetch full booking details with relations
+      const fullResults = await db.query.bookings.findMany({
+        where: inArray(bookings.id, bookingIds),
+        orderBy: desc(bookings.createdAt),
+        with: {
+          specialist: {
+            with: { user: true },
+          },
+          referrer: {
+            with: { organization: true },
+          },
+          examinee: true,
+          createdBy: true,
+          organization: true,
+        },
+      });
+
+      // Build count query with examinees join
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(bookings)
+        .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+      return {
+        data: fullResults,
+        pagination: {
+          page,
+          limit,
+          total: count,
+          totalPages: Math.ceil(Number(count) / limit),
+        },
+      };
+    }
+
+    // No search - use the simpler query
     const results = await db.query.bookings.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
       orderBy: desc(bookings.createdAt),
@@ -72,19 +121,10 @@ export class BookingRepository {
       },
     });
 
-    // Build count query - need to include examinees join if searching
-    const countQuery = filters?.search
-      ? db
-          .select({ count: sql<number>`count(*)` })
-          .from(bookings)
-          .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
-          .where(conditions.length > 0 ? and(...conditions) : undefined)
-      : db
-          .select({ count: sql<number>`count(*)` })
-          .from(bookings)
-          .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-    const [{ count }] = await countQuery;
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(bookings)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     return {
       data: results,

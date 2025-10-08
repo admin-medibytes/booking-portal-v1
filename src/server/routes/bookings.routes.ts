@@ -199,6 +199,94 @@ const bookingsRoutes = new Hono()
       booking,
       message: "Progress updated successfully",
     });
-  });
+  })
+
+  // POST /api/bookings/:id/reschedule - Reschedule booking
+  .post(
+    "/:id/reschedule",
+    arktypeValidator(
+      "json",
+      type({
+        datetime: "string",
+        timezone: "string",
+      })
+    ),
+    async (c) => {
+      const authContext = c.get("auth");
+      const user = authContext?.user;
+      if (!user) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+
+      const bookingId = c.req.param("id");
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(bookingId)) {
+        return c.json({ error: "Invalid booking ID format" }, 400);
+      }
+
+      // Validate request body
+      const input = c.req.valid("json");
+
+      // Reschedule booking
+      const booking = await bookingService.rescheduleBooking(bookingId, {
+        datetime: input.datetime,
+        timezone: input.timezone,
+        userId: user.id,
+        userRole: user.role as "user" | "admin" | null,
+      });
+
+      return c.json({
+        success: true,
+        booking,
+        message: "Booking rescheduled successfully",
+      });
+    }
+  )
+
+  // POST /api/bookings/:id/cancel - Cancel booking
+  .post(
+    "/:id/cancel",
+    arktypeValidator(
+      "json",
+      type({
+        noShow: "boolean",
+      })
+    ),
+    async (c) => {
+      const authContext = c.get("auth");
+      const user = authContext?.user;
+      if (!user) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+
+      const bookingId = c.req.param("id");
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(bookingId)) {
+        return c.json({ error: "Invalid booking ID format" }, 400);
+      }
+
+      // Validate request body
+      const input = c.req.valid("json");
+
+      // Cancel booking
+      const booking = await bookingService.cancelBooking(bookingId, {
+        noShow: input.noShow,
+        userId: user.id,
+        userRole: user.role as "user" | "admin" | null,
+      });
+
+      return c.json({
+        success: true,
+        booking,
+        message: input.noShow
+          ? "Booking marked as no-show successfully"
+          : "Booking cancelled successfully",
+      });
+    }
+  );
 
 export { bookingsRoutes };

@@ -458,6 +458,31 @@ export class AcuityService {
     return parsed;
   }
 
+  async rescheduleAppointment(appointmentId: number, data: {
+    datetime: string;
+  }): Promise<AcuityAppointmentType> {
+    const appointment = await this.request<unknown>("PUT", `/appointments/${appointmentId}/reschedule`, data);
+    const parsed = AcuityAppointment(appointment);
+
+    if (parsed instanceof type.errors) {
+      logger.error(
+        {
+          errors: parsed.map((e) => ({ path: e.path, message: e.message })),
+          data: appointment,
+        },
+        "Invalid appointment data from Acuity"
+      );
+      throw new AcuityAPIError("Invalid appointment data received from Acuity");
+    }
+
+    // Invalidate availability cache for this calendar
+    if (parsed.calendarID) {
+      await invalidateAvailabilityCache(parsed.calendarID.toString());
+    }
+
+    return parsed;
+  }
+
   async updateAppointment(
     appointmentId: number,
     data: Partial<{
@@ -489,20 +514,31 @@ export class AcuityService {
     return parsed;
   }
 
-  async cancelAppointment(appointmentId: number): Promise<void> {
+  async cancelAppointment(appointmentId: number, noShow: boolean = false): Promise<AcuityAppointmentType> {
     // Get appointment details first to know which calendar to invalidate
-    try {
-      const appointment = await this.getAppointment(appointmentId);
-      await this.request("DELETE", `/appointments/${appointmentId}`);
+    const appointment = await this.request<unknown>("PUT", `/appointments/${appointmentId}/cancel?noEmail=true`, {
+      noShow,
+    });
 
-      // Invalidate availability cache for this calendar
-      await invalidateAvailabilityCache(appointment.calendarID.toString());
-    } catch {
-      // If we can't get the appointment, still try to cancel it
-      await this.request("DELETE", `/appointments/${appointmentId}`);
-      // Invalidate all availability caches as fallback
-      await invalidateAvailabilityCache();
+    const parsed = AcuityAppointment(appointment);
+
+    if (parsed instanceof type.errors) {
+      logger.error(
+        {
+          errors: parsed.map((e) => ({ path: e.path, message: e.message })),
+          data: appointment,
+        },
+        "Invalid appointment data from Acuity"
+      );
+      throw new AcuityAPIError("Invalid appointment data received from Acuity");
     }
+
+    // Invalidate availability cache for this calendar
+    if (parsed.calendarID) {
+      await invalidateAvailabilityCache(parsed.calendarID.toString());
+    }
+
+    return parsed;
   }
 
   async getAppointment(appointmentId: number): Promise<AcuityAppointmentType> {

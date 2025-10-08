@@ -652,6 +652,180 @@ export class BookingService {
     // Return updated booking with details
     return this.getBookingById(bookingId, { id: context.userId, role: context.userRole });
   }
+
+  // Reschedule booking
+  async rescheduleBooking(
+    bookingId: string,
+    data: {
+      datetime: string;
+      timezone: string;
+      userId: string;
+      userRole: "user" | "admin" | null;
+    }
+  ) {
+    // Get current booking
+    const bookingData = await bookingRepository.findByIdWithDetails(bookingId);
+    if (!bookingData) {
+      const error = new Error("Booking not found");
+      error.name = "BookingNotFoundError";
+      throw error;
+    }
+
+    // Check access
+    const hasAccess = await this.userHasAccessToBooking(
+      { id: data.userId, role: data.userRole },
+      bookingData
+    );
+    if (!hasAccess) {
+      const error = new Error("Access denied");
+      error.name = "AccessDeniedError";
+      throw error;
+    }
+
+    // Reschedule Acuity appointment
+    try {
+      await acuityService.rescheduleAppointment(bookingData.acuityAppointmentId, {
+        datetime: data.datetime,
+      });
+    } catch (error) {
+      console.error("Failed to reschedule Acuity appointment:", error);
+      throw new Error("Failed to reschedule appointment in scheduling system");
+    }
+
+    // Update booking in database
+    const newDateTime = new Date(data.datetime);
+    await db.transaction(async (tx) => {
+      // Update booking datetime
+      await tx
+        .update(bookings)
+        .set({
+          dateTime: newDateTime,
+          updatedAt: new Date(),
+        })
+        .where(eq(bookings.id, bookingId));
+
+      // Get current progress
+      const progressHistory = await this.getBookingProgressHistory(bookingId);
+      const currentProgress = progressHistory[0]?.toStatus || "scheduled";
+
+      // Add progress entry for reschedule
+      await tx.insert(bookingProgress).values({
+        bookingId,
+        fromStatus: currentProgress as
+          | "scheduled"
+          | "rescheduled"
+          | "cancelled"
+          | "no-show"
+          | "generating-report"
+          | "report-generated"
+          | "payment-received"
+          | null,
+        toStatus: "rescheduled",
+        changedById: data.userId,
+      });
+    });
+
+    // Create audit log
+    await auditService.log({
+      userId: data.userId,
+      action: "booking.rescheduled",
+      resourceType: "booking",
+      resourceId: bookingId,
+      metadata: {
+        previousDateTime: bookingData.dateTime,
+        newDateTime: newDateTime,
+        timezone: data.timezone,
+      },
+    });
+
+    // Return updated booking with details
+    return this.getBookingById(bookingId, { id: data.userId, role: data.userRole });
+  }
+
+  // Cancel booking
+  async cancelBooking(
+    bookingId: string,
+    data: {
+      noShow: boolean;
+      userId: string;
+      userRole: "user" | "admin" | null;
+    }
+  ) {
+    // Get current booking
+    const bookingData = await bookingRepository.findByIdWithDetails(bookingId);
+    if (!bookingData) {
+      const error = new Error("Booking not found");
+      error.name = "BookingNotFoundError";
+      throw error;
+    }
+
+    // Check access
+    const hasAccess = await this.userHasAccessToBooking(
+      { id: data.userId, role: data.userRole },
+      bookingData
+    );
+    if (!hasAccess) {
+      const error = new Error("Access denied");
+      error.name = "AccessDeniedError";
+      throw error;
+    }
+
+    // Cancel Acuity appointment
+    try {
+      await acuityService.cancelAppointment(bookingData.acuityAppointmentId, data.noShow);
+    } catch (error) {
+      console.error("Failed to cancel Acuity appointment:", error);
+      throw new Error("Failed to cancel appointment in scheduling system");
+    }
+
+    // Update booking in database
+    await db.transaction(async (tx) => {
+      // Update booking status
+      await tx
+        .update(bookings)
+        .set({
+          status: "closed",
+          cancelledAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(bookings.id, bookingId));
+
+      // Get current progress
+      const progressHistory = await this.getBookingProgressHistory(bookingId);
+      const currentProgress = progressHistory[0]?.toStatus || "scheduled";
+
+      // Add progress entry for cancellation
+      await tx.insert(bookingProgress).values({
+        bookingId,
+        fromStatus: currentProgress as
+          | "scheduled"
+          | "rescheduled"
+          | "cancelled"
+          | "no-show"
+          | "generating-report"
+          | "report-generated"
+          | "payment-received"
+          | null,
+        toStatus: data.noShow ? "no-show" : "cancelled",
+        changedById: data.userId,
+      });
+    });
+
+    // Create audit log
+    await auditService.log({
+      userId: data.userId,
+      action: data.noShow ? "booking.marked-no-show" : "booking.cancelled",
+      resourceType: "booking",
+      resourceId: bookingId,
+      metadata: {
+        noShow: data.noShow,
+        cancelledAt: new Date(),
+      },
+    });
+
+    // Return updated booking with details
+    return this.getBookingById(bookingId, { id: data.userId, role: data.userRole });
+  }
 }
 
 export const bookingService = new BookingService();

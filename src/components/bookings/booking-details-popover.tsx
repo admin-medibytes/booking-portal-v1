@@ -10,9 +10,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import type { BookingWithSpecialist } from "@/types/booking";
-import { CalendarIcon, ClockIcon, UserIcon, BuildingIcon, MapPin, Video } from "lucide-react";
+import { UserIcon, MapPin, Video, Calendar } from "lucide-react";
 
 interface BookingDetailsPopoverProps {
   booking: BookingWithSpecialist;
@@ -24,6 +23,11 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
 
   const handleViewDetails = () => {
     router.push(`/bookings/${booking.id}`);
+    onClose();
+  };
+
+  const handleReschedule = () => {
+    router.push(`/bookings/${booking.id}/reschedule`);
     onClose();
   };
 
@@ -77,17 +81,21 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
             <div className="ml-6">
               <p className="text-sm font-medium">{booking.specialist?.name || "Unassigned"}</p>
               <p className="text-sm text-muted-foreground">
-                {booking.specialist?.jobTitle || "N/A"}
+                {booking.specialist.user.jobTitle}
               </p>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="mt-6">
-          <Button variant="outline" onClick={onClose}>
-            Close
+        <DialogFooter className="mt-6 flex-col sm:flex-row gap-2">
+        
+          <Button variant="outline" onClick={handleReschedule} className="w-full sm:w-auto">
+            <Calendar className="h-4 w-4 mr-2" />
+            Reschedule
           </Button>
-          <Button onClick={handleViewDetails}>View Full Details</Button>
+          <Button onClick={handleViewDetails} className="w-full sm:w-auto">
+            View Full Details
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -25,6 +25,7 @@ import {
   BriefcaseBusiness,
 } from "lucide-react";
 import { BookingDocumentsSection } from "./booking-documents-section";
+import { CancelBookingModal } from "./cancel-booking-modal";
 import {
   Dialog,
   DialogContent,
@@ -35,10 +36,11 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useState } from "react";
-import { addMinutes } from "date-fns";
+import { addMinutes, format as formatDate } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { timeZones } from "@/lib/utils/timezones";
 import { BookingWithDetails } from "@/hooks/use-booking";
+import { useRouter } from "next/navigation";
 
 interface BookingDetailCardProps {
   booking: BookingWithDetails;
@@ -49,6 +51,7 @@ const australianTimezones = timeZones.filter((tz) => tz.label.includes("Australi
 
 export function BookingDetailCard({ booking }: BookingDetailCardProps) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const router = useRouter();
 
   // Get user's default timezone
   const getUserTimezone = () => {
@@ -61,6 +64,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
 
   const [selectedTimezone, setSelectedTimezone] = useState(getUserTimezone());
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -125,18 +129,15 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
   };
 
   const handleReschedule = () => {
-    setLoadingAction("reschedule");
-    // TODO: Implement reschedule logic
-    toast.info("Reschedule feature coming soon!");
-    setLoadingAction(null);
+    router.push(`/bookings/${booking.id}/reschedule`);
   };
 
-  const handleCancel = () => {
-    setLoadingAction("cancel");
-    // TODO: Implement cancel logic
-    toast.info("Cancel feature coming soon!");
-    setLoadingAction(null);
+  const handleCancelSuccess = () => {
+    // Refresh the page to show updated booking status
+    router.refresh();
   };
+
+  const isClosed = booking.status === "closed" || booking.status === "archived";
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -164,7 +165,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
               </Avatar>
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">{booking.specialist.name}</h3>
-                <p className="text-muted-foreground">{booking.specialist.jobTitle}</p>
+                <p className="text-muted-foreground">{booking.specialist.user.jobTitle}</p>
               </div>
             </div>
 
@@ -465,7 +466,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
                 className="w-full bg-transparent"
                 variant="outline"
                 onClick={handleJoinMeeting}
-                disabled={loadingAction === "join"}
+                disabled={loadingAction === "join" || isClosed}
               >
                 <VideoIcon className="h-4 w-4 mr-2" />
                 Join Video Call
@@ -475,7 +476,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
               className="w-full bg-transparent"
               variant="outline"
               onClick={handleReschedule}
-              disabled={loadingAction === "reschedule"}
+              disabled={loadingAction === "reschedule" || isClosed}
             >
               <Clock4 className="h-4 w-4 mr-2" />
               Reschedule Appointment
@@ -494,8 +495,8 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
             <Button
               className="w-full"
               variant="destructive"
-              onClick={handleCancel}
-              disabled={loadingAction === "cancel"}
+              onClick={() => setShowCancelModal(true)}
+              disabled={isClosed}
             >
               <XCircle className="h-4 w-4 mr-2" />
               Cancel Booking
@@ -561,6 +562,23 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Cancel Booking Modal */}
+        <CancelBookingModal
+          open={showCancelModal}
+          onOpenChange={setShowCancelModal}
+          bookingId={booking.id}
+          bookingDetails={{
+            examineeName: `${booking.examinee.firstName} ${booking.examinee.lastName}`,
+            appointmentDate: booking.dateTime
+              ? formatDate(new Date(booking.dateTime), "EEEE, MMMM d, yyyy")
+              : "Not scheduled",
+            appointmentTime: booking.dateTime
+              ? formatDate(new Date(booking.dateTime), "h:mm a")
+              : "Not scheduled",
+          }}
+          onCancelSuccess={handleCancelSuccess}
+        />
       </div>
     </div>
   );

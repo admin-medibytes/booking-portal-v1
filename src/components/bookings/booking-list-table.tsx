@@ -154,7 +154,7 @@ export const BookingListTable = memo(function BookingListTable({
         return (
           <div>
             <div className="font-medium">{specialist.name}</div>
-            <div className="text-sm text-muted-foreground">{specialist.jobTitle || "N/A"}</div>
+            <div className="text-sm text-muted-foreground">{specialist.user.jobTitle}</div>
           </div>
         );
       },
@@ -292,8 +292,7 @@ export const BookingListTable = memo(function BookingListTable({
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
-                  // TODO: Implement reschedule logic
-                  console.log("Reschedule", booking.id);
+                  router.push(`/bookings/${booking.id}/reschedule`);
                 }}
               >
                 <Clock4 className="mr-2 h-4 w-4" />

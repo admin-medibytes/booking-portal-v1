@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
         ? null
         : ["active", "closed"].includes(urlStatus)
           ? (urlStatus as "active" | "closed")
-          : null;
+          : "active"; // Default to "active" instead of null
     const specialistIds = searchParams.get("specialists")?.split(",").filter(Boolean) || [];
     const search = searchParams.get("search") || "";
 
@@ -65,6 +65,22 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
   const [open, setOpen] = useState(false);
   const [searchInput, setSearchInput] = useState(filters.search);
 
+  // Use ref to store latest filters without causing re-renders
+  const filtersRef = useRef(filters);
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
+  // Initialize URL with default status if not present
+  useEffect(() => {
+    const currentStatus = searchParams.get("status");
+    if (!currentStatus && filters.status === "active") {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("status", "active");
+      router.replace(`?${params.toString()}`);
+    }
+  }, []); // Only run once on mount
+
   // Update URL when filters change
   const updateUrl = useCallback(
     (newFilters: FilterState) => {
@@ -74,7 +90,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
       if (newFilters.status) {
         params.set("status", newFilters.status);
       } else {
-        params.delete("status");
+        params.set("status", "all"); // Set to "all" when no specific status is selected
       }
 
       // Specialist filter
@@ -99,24 +115,20 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
     [router, searchParams]
   );
 
-  // Create a stable debounced function
-  const debouncedUpdateSearch = useMemo(
-    () =>
-      debounce((value: string, currentFilters: FilterState) => {
-        const newFilters = { ...currentFilters, search: value };
-        setFilters(newFilters);
-        updateUrl(newFilters);
-        onFiltersChange?.(newFilters);
-      }, 300),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+  // Create stable debounced function using ref
+  const debouncedSearchRef = useRef(
+    debounce((value: string) => {
+      const newFilters = { ...filtersRef.current, search: value };
+      setFilters(newFilters);
+      updateUrl(newFilters);
+      onFiltersChange?.(newFilters);
+    }, 300)
   );
 
   // Handle search input change
-  const handleSearchChange = (value: string) => {
-    setSearchInput(value);
-    debouncedUpdateSearch(value, filters);
-  };
+  const handleSearchChange = useCallback((value: string) => {
+    debouncedSearchRef.current(value);
+  }, []);
 
   // Handle status filter change
   const handleStatusChange = (value: string) => {
@@ -167,14 +179,20 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search by examinee name, email or phone"
+            placeholder="Search by examinee name or email"
             value={searchInput}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            onChange={(e) => {
+              setSearchInput(e.target.value);
+              handleSearchChange(e.target.value);
+            }}
             className="pl-9 pr-3 bg-background"
           />
           {searchInput && (
             <button
-              onClick={() => handleSearchChange("")}
+              onClick={() => {
+                setSearchInput("");
+                handleSearchChange("");
+              }}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4" />

@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import type { BookingWithSpecialist } from "@/types/booking";
@@ -32,14 +33,44 @@ import { BookingDetailsPopover } from "./booking-details-popover";
 interface BookingCalendarProps {
   bookings: BookingWithSpecialist[];
   onEventSelect?: (booking: BookingWithSpecialist) => void;
+  isLoading?: boolean;
 }
 
 type ViewType = "month" | "week" | "day" | "agenda";
 
-export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProps) {
+export function BookingCalendar({ bookings, onEventSelect, isLoading = false }: BookingCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>("month");
   const [selectedBooking, setSelectedBooking] = useState<BookingWithSpecialist | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Hydration fix: only restore from localStorage after mount
+  useEffect(() => {
+    setIsClient(true);
+    const savedDate = localStorage.getItem("booking-calendar-date");
+    const savedView = localStorage.getItem("booking-calendar-view");
+
+    if (savedDate) {
+      setCurrentDate(new Date(savedDate));
+    }
+    if (savedView && ["month", "week", "day", "agenda"].includes(savedView)) {
+      setViewType(savedView as ViewType);
+    }
+  }, []);
+
+  // Save currentDate to localStorage when it changes
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem("booking-calendar-date", currentDate.toISOString());
+    }
+  }, [currentDate, isClient]);
+
+  // Save viewType to localStorage when it changes
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem("booking-calendar-view", viewType);
+    }
+  }, [viewType, isClient]);
 
   // Navigation functions
   const navigatePrevious = useCallback(() => {
@@ -217,6 +248,7 @@ export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProp
           currentDate={currentDate}
           bookingsByDate={bookingsByDate}
           onBookingClick={handleBookingClick}
+          isLoading={isLoading}
         />
       )}
 
@@ -225,6 +257,7 @@ export function BookingCalendar({ bookings, onEventSelect }: BookingCalendarProp
           currentDate={currentDate}
           bookingsByDate={bookingsByDate}
           onBookingClick={handleBookingClick}
+          isLoading={isLoading}
         />
       )}
 
@@ -257,9 +290,10 @@ interface MonthViewProps {
   currentDate: Date;
   bookingsByDate: Record<string, BookingWithSpecialist[]>;
   onBookingClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
+  isLoading?: boolean;
 }
 
-function MonthView({ currentDate, bookingsByDate, onBookingClick }: MonthViewProps) {
+function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = false }: MonthViewProps) {
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
@@ -302,16 +336,20 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick }: MonthViewPro
               )}
             >
               <div className="flex items-center justify-between mb-1">
-                <span
-                  className={cn(
-                    "text-sm font-medium",
-                    !isCurrentMonth && "text-muted-foreground",
-                    isToday && "text-blue-600 dark:text-blue-400"
-                  )}
-                >
-                  {format(day, "d")}
-                </span>
-                {dayBookings.length > 0 && (
+                {isLoading ? (
+                  <Skeleton className="h-5 w-6" />
+                ) : (
+                  <span
+                    className={cn(
+                      "text-sm font-medium",
+                      !isCurrentMonth && "text-muted-foreground",
+                      isToday && "text-blue-600 dark:text-blue-400"
+                    )}
+                  >
+                    {format(day, "d")}
+                  </span>
+                )}
+                {!isLoading && dayBookings.length > 0 && (
                   <Badge variant="secondary" className="text-xs">
                     {dayBookings.length}
                   </Badge>
@@ -364,15 +402,16 @@ interface WeekViewProps {
   currentDate: Date;
   bookingsByDate: Record<string, BookingWithSpecialist[]>;
   onBookingClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
+  isLoading?: boolean;
 }
 
-function WeekView({ currentDate, bookingsByDate, onBookingClick }: WeekViewProps) {
+function WeekView({ currentDate, bookingsByDate, onBookingClick, isLoading = false }: WeekViewProps) {
   const weekDays = useMemo(() => {
     const start = startOfWeek(currentDate);
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [currentDate]);
 
-  const businessHours = Array.from({ length: 11 }, (_, i) => i + 8); // 8am to 6pm
+  const allHours = Array.from({ length: 24 }, (_, i) => i); // 12am to 11pm (0-23)
 
   return (
     <div className="overflow-hidden border rounded-lg shadow">
@@ -402,7 +441,7 @@ function WeekView({ currentDate, bookingsByDate, onBookingClick }: WeekViewProps
 
       {/* Time slots grid */}
       <div className="grid grid-cols-8 overflow-y-auto ">
-        {businessHours.map((hour) => (
+        {allHours.map((hour) => (
           <React.Fragment key={hour}>
             {/* Hour label */}
             <div className="sticky left-0 p-2 text-sm border-b border-r text-muted-foreground bg-background">
@@ -452,7 +491,7 @@ interface DayViewProps {
 function DayView({ currentDate, bookingsByDate, onBookingClick }: DayViewProps) {
   const dateKey = format(currentDate, "yyyy-MM-dd");
   const dayBookings = bookingsByDate[dateKey] || [];
-  const businessHours = Array.from({ length: 11 }, (_, i) => i + 8); // 8am to 6pm
+  const allHours = Array.from({ length: 24 }, (_, i) => i); // 12am to 11pm (0-23)
 
   return (
     <div className="overflow-hidden border rounded-lg shadow">
@@ -466,7 +505,7 @@ function DayView({ currentDate, bookingsByDate, onBookingClick }: DayViewProps) 
 
       {/* Hourly slots */}
       <div className="max-h-[600px] overflow-y-auto">
-        {businessHours.map((hour) => {
+        {allHours.map((hour) => {
           const hourBookings = dayBookings.filter((booking) => {
             if (!booking.dateTime) return false;
             const bookingDate = new Date(booking.dateTime);

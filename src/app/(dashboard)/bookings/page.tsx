@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useBookings } from "@/hooks/use-bookings";
 import { BookingListTable } from "@/components/bookings/booking-list-table";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
 import { BookingFilters, type FilterState } from "@/components/bookings/booking-filters";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, List, Plus, Loader2 } from "lucide-react";
 import type { BookingFilters as BookingFiltersType } from "@/types/booking";
 import { startOfMonth, endOfMonth } from "date-fns";
@@ -35,11 +36,13 @@ export default function BookingsPage() {
   const [filters, setFilters] = useState<BookingFiltersType>(() => {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
+    const urlStatus = searchParams.get("status");
+    const status = urlStatus === null || urlStatus === "" ? "active" : (urlStatus === "all" ? undefined : urlStatus);
 
     return {
       page,
       limit,
-      status: searchParams.get("status") || undefined,
+      status: status,
       specialistIds: searchParams.get("specialists")?.split(",").filter(Boolean),
       search: searchParams.get("search") || undefined,
     };
@@ -58,6 +61,24 @@ export default function BookingsPage() {
   // Fetch bookings data
   const { data, isLoading, error } = useBookings(filters);
   const { data: specialists } = useSpecialists();
+
+  // Sync filters with URL params when they change
+  useEffect(() => {
+    const urlStatus = searchParams.get("status");
+    const status = urlStatus === null || urlStatus === "" ? "active" : (urlStatus === "all" ? undefined : urlStatus);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const specialistIds = searchParams.get("specialists")?.split(",").filter(Boolean);
+    const search = searchParams.get("search") || undefined;
+
+    setFilters({
+      page,
+      limit,
+      status: status,
+      specialistIds,
+      search,
+    });
+  }, [searchParams]);
 
   const handleFiltersChange = (filterState: FilterState) => {
     // Map filter state to booking filters
@@ -151,27 +172,25 @@ export default function BookingsPage() {
       </div>
 
       {/* Content Area */}
-      {isLoading ? (
-        <div className="bg-white border rounded-lg shadow-sm">
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-stone-400" />
+      {view === "list" ? (
+        isLoading ? (
+          <div className="bg-white border rounded-lg shadow-sm">
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-stone-400" />
+            </div>
           </div>
-        </div>
+        ) : (
+          <BookingListTable
+            bookings={data?.bookings || []}
+            totalCount={data?.pagination.total || 0}
+            currentPage={filters.page || 1}
+            pageSize={filters.limit || 10}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        )
       ) : (
-        <>
-          {view === "list" ? (
-            <BookingListTable
-              bookings={data?.bookings || []}
-              totalCount={data?.pagination.total || 0}
-              currentPage={filters.page || 1}
-              pageSize={filters.limit || 10}
-              onPageChange={handlePageChange}
-              onPageSizeChange={handlePageSizeChange}
-            />
-          ) : (
-            <BookingCalendar bookings={data?.bookings || []} />
-          )}
-        </>
+        <BookingCalendar bookings={data?.bookings || []} isLoading={isLoading} />
       )}
     </div>
   );

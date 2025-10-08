@@ -8,7 +8,7 @@ import {
   organizations,
   type SpecialistLocation,
 } from "@/server/db/schema";
-
+import { User } from "@/types/user";
 export type Booking = InferSelectModel<typeof bookings>;
 export type BookingProgress = InferSelectModel<typeof bookingProgress>;
 export type Specialist = InferSelectModel<typeof specialists>;
@@ -23,6 +23,7 @@ export interface BookingWithSpecialist extends Booking {
     image: string;
     jobTitle: string;
     location?: SpecialistLocation | null;
+    user: User;
   };
   referrer: Referrer | null;
   examinee: Examinee;

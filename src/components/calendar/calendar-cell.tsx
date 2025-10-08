@@ -71,7 +71,7 @@ export function CalendarCell({
             isFocusVisible && isInteractive && !isLoading &&
               "ring-2 group-focus:z-2 ring-gray-900 ring-offset-1",
             // Darker selection background for the start and end.
-            isSelected && isInteractive && !isLoading && "bg-gray-900 text-white border-gray-900",
+            isSelected && isInteractive && !isLoading && "bg-primary text-white border-primary",
             // Hover state for interactive cells.
             !isSelected && isInteractive && !isLoading && "hover:border-gray-400",
             // Show availability indicator
