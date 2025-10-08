@@ -5,7 +5,7 @@ export const env = createEnv({
   server: {
     NODE_ENV: type("'development' | 'production' | 'test'"),
     PORT: type("string.numeric"),
-    HOST: type("string"),
+    // HOST: type("string"),
     APP_NAME: type("string"),
     APP_URL: type("string.url"),
 
@@ -91,7 +91,7 @@ export const env = createEnv({
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
     PORT: process.env.PORT,
-    HOST: process.env.HOST,
+    // HOST: process.env.HOST,
     APP_NAME: process.env.APP_NAME,
     APP_URL: process.env.APP_URL,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
