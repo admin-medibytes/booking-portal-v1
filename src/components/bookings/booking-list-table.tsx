@@ -64,7 +64,7 @@ const SpecialistCell = memo(
     return (
       <div>
         <div className="font-medium">{specialist.name}</div>
-        <div className="text-sm text-muted-foreground">{specialist.jobTitle || "N/a"}</div>
+        <div className="text-sm text-muted-foreground">{specialist.user.jobTitle}</div>
       </div>
     );
   }

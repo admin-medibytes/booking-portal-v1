@@ -11,8 +11,6 @@ export default async function HomePage() {
     redirect("/login");
   }
 
-  console.log("IMAGEE", session.user.image);
-
   if (session.user.image !== "initialized") {
     redirect("/onboarding");
   }

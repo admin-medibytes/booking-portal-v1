@@ -1,12 +1,5 @@
 import { db } from "@/server/db";
-import {
-  bookings,
-  specialists,
-  users,
-  referrers,
-  examinees,
-  organizations,
-} from "@/server/db/schema";
+import { bookings, examinees } from "@/server/db/schema";
 import { eq, and, gte, lte, desc, sql, SQL, or, ilike, inArray } from "drizzle-orm";
 import type { BookingFilters } from "@/types/booking";
 

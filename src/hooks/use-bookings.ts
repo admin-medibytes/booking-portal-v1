@@ -55,20 +55,37 @@ export function useBookings(filters?: BookingFilters) {
       const data = await res.json();
 
       // Transform date strings to Date objects for TypeScript compatibility
+      const rawBookings = (data.bookings || []) as Array<Record<string, unknown>>;
+      const transformedBookings = rawBookings.map((booking) => {
+        const referrerObj = booking.referrer as Record<string, unknown> | null | undefined;
+        const referrerOrganizationObj = booking.referrerOrganization as
+          | Record<string, unknown>
+          | null
+          | undefined;
+
+        return {
+          ...(booking as Record<string, unknown>),
+          createdAt: new Date(booking.createdAt as string),
+          updatedAt: new Date(booking.updatedAt as string),
+          appointmentDate: booking.dateTime ? new Date(booking.dateTime as string) : null,
+          completedAt: booking.completedAt
+            ? new Date(booking.completedAt as string)
+            : null,
+          cancelledAt: booking.cancelledAt
+            ? new Date(booking.cancelledAt as string)
+            : null,
+          referrer:
+            referrerObj && Object.keys(referrerObj).length > 0 ? referrerObj : null,
+          referrerOrganization:
+            referrerOrganizationObj && Object.keys(referrerOrganizationObj).length > 0
+              ? referrerOrganizationObj
+              : null,
+        } as unknown as BookingWithSpecialist;
+      });
+
       const transformedData: BookingListResponse = {
         ...data,
-        bookings:
-          data.bookings.map((booking: any) => ({
-            ...booking,
-            createdAt: new Date(booking.createdAt),
-            updatedAt: new Date(booking.updatedAt),
-            appointmentDate: booking.dateTime ? new Date(booking.dateTime) : null,
-            completedAt: booking.completedAt ? new Date(booking.completedAt) : null,
-            cancelledAt: booking.cancelledAt ? new Date(booking.cancelledAt) : null,
-            // Convert empty objects to null for proper typing
-            referrer: booking.referrer && Object.keys(booking.referrer).length > 0 ? booking.referrer : null,
-            referrerOrganization: booking.referrerOrganization && Object.keys(booking.referrerOrganization).length > 0 ? booking.referrerOrganization : null,
-          })) || [],
+        bookings: transformedBookings,
       };
 
       return transformedData;

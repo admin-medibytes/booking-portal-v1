@@ -405,7 +405,7 @@ interface WeekViewProps {
   isLoading?: boolean;
 }
 
-function WeekView({ currentDate, bookingsByDate, onBookingClick, isLoading = false }: WeekViewProps) {
+function WeekView({ currentDate, bookingsByDate, onBookingClick, isLoading: _isLoading = false }: WeekViewProps) {
   const weekDays = useMemo(() => {
     const start = startOfWeek(currentDate);
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
@@ -694,7 +694,7 @@ function BookingItem({ booking, view, onClick }: BookingItemProps) {
             </div>
             <div className="text-sm opacity-75">
               with {booking.specialist?.name || "Unassigned"} (
-              {booking.specialist?.jobTitle || "N/A"})
+              {booking.specialist.user.jobTitle})
             </div>
           </div>
         </div>

@@ -7,7 +7,6 @@ import { BookingListTable } from "@/components/bookings/booking-list-table";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
 import { BookingFilters, type FilterState } from "@/components/bookings/booking-filters";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, List, Plus, Loader2 } from "lucide-react";
 import type { BookingFilters as BookingFiltersType } from "@/types/booking";
 import { startOfMonth, endOfMonth } from "date-fns";

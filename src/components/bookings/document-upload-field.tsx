@@ -199,7 +199,7 @@ export function DocumentUploadField({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Document</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{fileToDelete?.fileName}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{fileToDelete?.fileName}&quot;? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

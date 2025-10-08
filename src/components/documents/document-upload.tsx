@@ -151,6 +151,46 @@ export function DocumentUpload({
     section
   );
 
+  const uploadFile = useCallback(
+    async (fileWithProgress: FileWithProgress) => {
+      setFiles((prev) =>
+        prev.map((f) => (f.id === fileWithProgress.id ? { ...f, status: "uploading" } : f))
+      );
+
+      try {
+        await uploadDocument(
+          {
+            file: fileWithProgress.file,
+            bookingId,
+            section,
+            category: fileWithProgress.category,
+          },
+          (progress) => {
+            setFiles((prev) =>
+              prev.map((f) => (f.id === fileWithProgress.id ? { ...f, progress } : f))
+            );
+          }
+        );
+
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileWithProgress.id ? { ...f, status: "completed", progress: 100 } : f
+          )
+        );
+
+        onUploadComplete?.();
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Upload failed";
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileWithProgress.id ? { ...f, status: "error", error: errorMessage } : f
+          )
+        );
+      }
+    },
+    [bookingId, onUploadComplete, uploadDocument, section]
+  );
+
   const handleFilesAdded = useCallback(
     (newFiles: FileList | File[]) => {
       const fileArray = Array.from(newFiles);
@@ -197,47 +237,7 @@ export function DocumentUpload({
           uploadFile(fileWithProgress);
         });
     },
-    [files, maxFiles, maxSize, availableCategories]
-  );
-
-  const uploadFile = useCallback(
-    async (fileWithProgress: FileWithProgress) => {
-      setFiles((prev) =>
-        prev.map((f) => (f.id === fileWithProgress.id ? { ...f, status: "uploading" } : f))
-      );
-
-      try {
-        await uploadDocument(
-          {
-            file: fileWithProgress.file,
-            bookingId,
-            section,
-            category: fileWithProgress.category,
-          },
-          (progress) => {
-            setFiles((prev) =>
-              prev.map((f) => (f.id === fileWithProgress.id ? { ...f, progress } : f))
-            );
-          }
-        );
-
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === fileWithProgress.id ? { ...f, status: "completed", progress: 100 } : f
-          )
-        );
-
-        onUploadComplete?.();
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Upload failed";
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === fileWithProgress.id ? { ...f, status: "error", error: errorMessage } : f
-          )
-        );
-      }
-    },
-    [bookingId, onUploadComplete, uploadDocument]
+    [files, maxFiles, maxSize, availableCategories, uploadFile]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {

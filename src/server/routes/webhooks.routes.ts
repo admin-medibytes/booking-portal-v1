@@ -1,267 +1,319 @@
 import { Hono } from "hono";
 import { type } from "arktype";
-import { acuityService } from "@/server/services/acuity.service";
-import { bookingService } from "@/server/services/booking.service";
+import { arktypeValidator } from "@/server/middleware/validate.middleware";
 import { db } from "@/server/db";
-import { webhookEvents } from "@/server/db/schema";
+import {
+  bookings,
+  specialists,
+  examinees,
+  referrers,
+  organizations,
+  appFormFields,
+  appForms,
+  acuityAppointmentTypeForms
+} from "@/server/db/schema";
+import { eq, and } from "drizzle-orm";
 import { logger } from "@/server/utils/logger";
-import { invalidateAvailabilityCache } from "@/lib/redis";
+import type { ExamineeFieldType } from "@/server/db/schema/appForms";
 
-// Import eq for database queries
-import { eq } from "drizzle-orm";
 export { webhooksRoutes };
 
-// Webhook event schema
-const AcuityWebhookPayload = type({
-  id: "number",
-  action: "'scheduled' | 'rescheduled' | 'canceled' | 'changed'",
-  calendarID: "number",
-  appointmentTypeID: "number",
-  datetime: "string",
-  firstName: "string",
-  lastName: "string",
-  email: "string.email",
-  "phone?": "string",
-  "notes?": "string",
+// Appointment creation webhook schema (from automation)
+const AppointmentWebhookSchema = type({
+  // Required fields
+  acuityAppointmentId: "string",
+  location: "string",
+
+  // Optional fields (required for new bookings created in Acuity)
+  "datetime?": "string",
+  "duration?": "string",
+  "acuityCalendarId?": "string",
+  "acuityAppointmentTypeId?": "string",
+  "type?": "string",
+  "referrerFirstName?": "string",
+  "referrerLastName?": "string",
+  "referrerEmail?": "string",
+  "referrerPhone?": "string",
+  "organizationName?": "string",
+  "fields?": type({
+    id: "number",
+    value: "string",
+  }).array(),
 });
+
+// Helper function to extract examinee data from Acuity fields using form configuration
+async function extractExamineeDataFromFields(
+  appointmentTypeId: number,
+  fields: Array<{ id: number; value: string }>
+): Promise<Record<string, string>> {
+  // Get the form configuration with field mappings
+  const formMappings = await db
+    .select({
+      acuityFieldId: appFormFields.acuityFieldId,
+      examineeFieldMapping: appFormFields.examineeFieldMapping,
+    })
+    .from(appFormFields)
+    .innerJoin(appForms, eq(appFormFields.appFormId, appForms.id))
+    .innerJoin(
+      acuityAppointmentTypeForms,
+      eq(appForms.acuityFormId, acuityAppointmentTypeForms.formId)
+    )
+    .where(
+      and(
+        eq(acuityAppointmentTypeForms.appointmentTypeId, appointmentTypeId),
+        eq(appForms.isActive, true)
+      )
+    );
+
+  // Create a map of field ID to examinee field mapping
+  const fieldMappingMap = new Map<number, ExamineeFieldType>();
+  formMappings.forEach((mapping) => {
+    if (mapping.examineeFieldMapping) {
+      fieldMappingMap.set(mapping.acuityFieldId, mapping.examineeFieldMapping);
+    }
+  });
+
+  // Extract examinee data from submitted fields
+  const examineeData: Record<string, string> = {};
+  for (const field of fields) {
+    const mapping = fieldMappingMap.get(field.id);
+    if (mapping && field.value) {
+      examineeData[mapping] = field.value;
+    }
+  }
+
+  return examineeData;
+}
 
 const webhooksRoutes = new Hono()
 
-  // POST /webhooks/acuity - Handle Acuity webhook events
-  .post("/acuity", async (c) => {
+  // POST /webhooks/appointment - Handle appointment creation/update from automation
+  .post("/appointment", arktypeValidator("json", AppointmentWebhookSchema), async (c) => {
     try {
-      // Get the raw body for signature validation
-      const rawBody = await c.req.text();
-      const signature = c.req.header("X-Acuity-Signature");
-      const timestamp = c.req.header("X-Acuity-Timestamp");
+      const data = c.req.valid("json");
+      const acuityAppointmentId = Number(data.acuityAppointmentId);
 
-      if (!signature) {
-        logger.warn("Acuity webhook received without signature");
-        return c.json({ error: "Missing signature" }, 401);
+      logger.info("Appointment webhook received from automation", {
+        acuityAppointmentId,
+        location: data.location,
+      });
+
+      // Check if booking exists
+      const existingBooking = await db.query.bookings.findFirst({
+        where: eq(bookings.acuityAppointmentId, acuityAppointmentId),
+      });
+
+      if (existingBooking) {
+        // Scenario 1: Booking exists - just update the location
+        await db
+          .update(bookings)
+          .set({
+            location: data.location,
+            updatedAt: new Date(),
+          })
+          .where(eq(bookings.id, existingBooking.id));
+
+        logger.info("Updated existing booking with location from automation", {
+          bookingId: existingBooking.id,
+          acuityAppointmentId,
+        });
+
+        return c.json({
+          success: true,
+          message: "Booking updated successfully",
+          bookingId: existingBooking.id,
+        });
       }
 
-      // Validate timestamp to prevent replay attacks (5 minute window)
-      if (timestamp) {
-        const webhookTime = parseInt(timestamp, 10);
-        const currentTime = Math.floor(Date.now() / 1000);
-        const timeDiff = Math.abs(currentTime - webhookTime);
+      // Scenario 2: Booking doesn't exist - create new booking
+      // Validate required fields for new bookings
+      if (!data.datetime || !data.duration || !data.acuityCalendarId || !data.acuityAppointmentTypeId) {
+        logger.warn("Missing required fields for new booking from automation", {
+          acuityAppointmentId,
+          hasDatetime: !!data.datetime,
+          hasDuration: !!data.duration,
+          hasCalendarId: !!data.acuityCalendarId,
+          hasAppointmentTypeId: !!data.acuityAppointmentTypeId,
+        });
 
-        if (isNaN(webhookTime) || timeDiff > 300) {
-          // 5 minutes
-          logger.warn("Acuity webhook timestamp validation failed", {
-            webhookTime,
-            currentTime,
-            timeDiff,
-          });
-          logger.audit("webhook_security_event", "system", "webhook", "acuity", {
-            event: "timestamp_validation_failed",
-            timeDiff,
-          });
-          return c.json({ error: "Invalid or expired timestamp" }, 401);
+        return c.json(
+          {
+            success: false,
+            error: "Missing required fields for new booking",
+          },
+          400
+        );
+      }
+
+      // Find specialist by Acuity calendar ID
+      const specialist = await db.query.specialists.findFirst({
+        where: eq(specialists.acuityCalendarId, Number(data.acuityCalendarId)),
+      });
+
+      if (!specialist) {
+        logger.error("Specialist not found for calendar ID from automation",  undefined, {
+          acuityCalendarId: data.acuityCalendarId,
+        });
+
+        return c.json(
+          {
+            success: false,
+            error: "Specialist not found",
+          },
+          404
+        );
+      }
+
+      // Extract examinee data from fields using form configuration
+      const examineeData = await extractExamineeDataFromFields(
+        Number(data.acuityAppointmentTypeId),
+        data.fields || []
+      );
+
+      // Find or create organization
+      let organizationId: string;
+      if (data.organizationName) {
+        const slug = data.organizationName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+
+        const existingOrg = await db.query.organizations.findFirst({
+          where: eq(organizations.slug, slug),
+        });
+
+        if (existingOrg) {
+          organizationId = existingOrg.id;
+          logger.info("Found existing organization", { organizationId, slug });
+        } else {
+          // Use default organization - you should configure this
+        organizationId = process.env.DEFAULT_ORGANIZATION_ID || "default";
+        logger.warn("No organization name provided, using default", { organizationId });
         }
+      } else {
+        // Use default organization - you should configure this
+        organizationId = process.env.DEFAULT_ORGANIZATION_ID || "default";
+        logger.warn("No organization name provided, using default", { organizationId });
       }
 
-      // Validate signature (include timestamp in signature if provided)
-      const payloadToVerify = timestamp ? `${timestamp}.${rawBody}` : rawBody;
-      const isValid = acuityService.validateWebhookSignature(payloadToVerify, signature);
-      if (!isValid) {
-        logger.warn("Invalid Acuity webhook signature", {
-          hasTimestamp: !!timestamp,
+      // Create or find referrer
+      let referrerId: string;
+      if (data.referrerEmail) {
+        const existingReferrer = await db.query.referrers.findFirst({
+          where: eq(referrers.email, data.referrerEmail),
         });
-        logger.audit("webhook_security_event", "system", "webhook", "acuity", {
-          event: "signature_validation_failed",
-          hasTimestamp: !!timestamp,
-        });
-        return c.json({ error: "Invalid signature" }, 401);
+
+        if (existingReferrer) {
+          referrerId = existingReferrer.id;
+          logger.info("Found existing referrer", { referrerId, email: data.referrerEmail });
+        } else {
+          const [newReferrer] = await db
+            .insert(referrers)
+            .values({
+              firstName: data.referrerFirstName || "",
+              lastName: data.referrerLastName || "",
+              email: data.referrerEmail,
+              phone: data.referrerPhone || "",
+              organizationId,
+            })
+            .returning();
+          referrerId = newReferrer.id;
+          logger.info("Created new referrer", { referrerId, email: data.referrerEmail });
+        }
+      } else {
+        // Create anonymous referrer if no email provided
+        const timestamp = Date.now();
+        const [newReferrer] = await db
+          .insert(referrers)
+          .values({
+            firstName: data.referrerFirstName || "Unknown",
+            lastName: data.referrerLastName || "Referrer",
+            email: `unknown-${timestamp}@placeholder.com`,
+            phone: "",
+            organizationId,
+          })
+          .returning();
+        referrerId = newReferrer.id;
+        logger.info("Created anonymous referrer", { referrerId });
       }
 
-      // Parse the payload
-      let payload;
-      try {
-        payload = JSON.parse(rawBody);
-      } catch (error) {
-        logger.error("Failed to parse webhook payload", error as Error);
-        return c.json({ error: "Invalid payload" }, 400);
-      }
-
-      // Validate payload structure
-      const validated = AcuityWebhookPayload(payload);
-      if (validated instanceof type.errors) {
-        logger.error("Invalid webhook payload structure", undefined, {
-          errors: validated.map((e) => ({ path: e.path, message: e.message })),
-          payload,
-        });
-        return c.json({ error: "Invalid payload structure" }, 400);
-      }
-
-      // Store the webhook event
-      const [webhookEvent] = await db
-        .insert(webhookEvents)
+      // Create examinee with extracted data
+      const [examinee] = await db
+        .insert(examinees)
         .values({
-          source: "acuity",
-          eventType: validated.action,
-          resourceId: validated.id.toString(),
-          payload: payload as Record<string, unknown>,
+          referrerId,
+
+          firstName: examineeData.firstName,
+          lastName: examineeData.lastName,
+          dateOfBirth: examineeData.dateOfBirth,
+          address: examineeData.address,
+          email: examineeData.email,
+          phoneNumber: examineeData.phoneNumber,
+          authorizedContact: examineeData.authorizedContact === "yes",
+          condition: examineeData.condition,
+          caseType: examineeData.caseType,
         })
         .returning();
 
-      logger.info("Acuity webhook event received", {
-        webhookEventId: webhookEvent.id,
-        action: validated.action,
-        appointmentId: validated.id,
-        calendarId: validated.calendarID,
-        timestamp: timestamp || "not provided",
+      logger.info("Created examinee", {
+        examineeId: examinee.id,
+        name: `${examinee.firstName} ${examinee.lastName}`,
+        extractedFields: Object.keys(examineeData)
       });
 
-      // Process the webhook based on action
-      try {
-        switch (validated.action) {
-          case "scheduled":
-            await handleAppointmentScheduled(validated);
-            break;
+      // Determine appointment type
+      const appointmentType = data.type?.toLowerCase().includes("telehealth")
+        ? "telehealth"
+        : "in-person";
 
-          case "rescheduled":
-            await handleAppointmentRescheduled(validated);
-            break;
+      // Get system user ID for creator
+      const systemUserId = process.env.SYSTEM_USER_ID || "system";
 
-          case "canceled":
-            await handleAppointmentCanceled(validated);
-            break;
+      // Create booking
+      const [newBooking] = await db
+        .insert(bookings)
+        .values({
+          acuityAppointmentId,
+          acuityAppointmentTypeId: Number(data.acuityAppointmentTypeId),
+          acuityCalendarId: Number(data.acuityCalendarId),
+          dateTime: new Date(data.datetime),
+          duration: Number(data.duration),
+          type: appointmentType,
+          location: data.location,
+          specialistId: specialist.id,
+          examineeId: examinee.id,
+          referrerId,
+          organizationId,
+          createdById: systemUserId,
+          status: "active",
+        })
+        .returning();
 
-          case "changed":
-            await handleAppointmentChanged(validated);
-            break;
+      logger.info("Created new booking from automation webhook", {
+        bookingId: newBooking.id,
+        acuityAppointmentId,
+        examineeId: examinee.id,
+        specialistId: specialist.id,
+      });
 
-          default:
-            logger.warn("Unknown webhook action", { action: validated.action });
-        }
-
-        // Mark webhook as processed
-        await db
-          .update(webhookEvents)
-          .set({ processedAt: new Date() })
-          .where(eq(webhookEvents.id, webhookEvent.id));
-
-        // Invalidate availability cache for the affected calendar
-        await invalidateAvailabilityCache(validated.calendarID.toString());
-      } catch (error) {
-        // Store error in webhook event
-        await db
-          .update(webhookEvents)
-          .set({
-            error: error instanceof Error ? error.message : "Unknown error",
-            processedAt: new Date(),
-          })
-          .where(eq(webhookEvents.id, webhookEvent.id));
-
-        logger.error("Failed to process webhook", error as Error, {
-          webhookEventId: webhookEvent.id,
-        });
-
-        // Still return 200 to Acuity to prevent retries
-        return c.json({
-          success: true,
-          message: "Webhook received but processing failed",
-        });
-      }
-
-      return c.json({ success: true, message: "Webhook processed successfully" });
-    } catch (error) {
-      logger.error("Webhook handler error", error as Error);
-      // Return 200 to prevent Acuity from retrying
       return c.json({
         success: true,
-        message: "Webhook received but an error occurred",
+        message: "Booking created successfully",
+        bookingId: newBooking.id,
+      }, 201);
+
+    } catch (error) {
+      logger.error("Appointment webhook error", undefined, {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
+
+      return c.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : "Internal server error",
+        },
+        500
+      );
     }
   });
-
-// Handler functions for different webhook actions
-async function handleAppointmentScheduled(data: typeof AcuityWebhookPayload.infer) {
-  logger.info("Processing scheduled appointment webhook", {
-    appointmentId: data.id,
-    calendarId: data.calendarID,
-    datetime: data.datetime,
-  });
-
-  // Find booking by Acuity appointment ID if it exists
-  // This might be a booking created through our system
-  try {
-    const booking = await bookingService.findByAcuityAppointmentId(data.id.toString());
-    if (booking) {
-      // Update booking status to ensure it's synced
-      await bookingService.updateBookingStatus(booking.id, "active");
-      logger.info("Updated booking status for scheduled appointment", { bookingId: booking.id });
-    }
-  } catch (error) {
-    logger.error("Failed to update booking for scheduled appointment", error as Error, {
-      appointmentId: data.id,
-    });
-  }
-}
-
-async function handleAppointmentRescheduled(data: typeof AcuityWebhookPayload.infer) {
-  logger.info("Processing rescheduled appointment webhook", {
-    appointmentId: data.id,
-    calendarId: data.calendarID,
-    datetime: data.datetime,
-  });
-
-  try {
-    const booking = await bookingService.findByAcuityAppointmentId(data.id.toString());
-    if (booking) {
-      // Update booking with new exam date/time
-      await bookingService.updateBookingExamDate(booking.id, new Date(data.datetime));
-      logger.info("Updated booking exam date for rescheduled appointment", {
-        bookingId: booking.id,
-      });
-    }
-  } catch (error) {
-    logger.error("Failed to update booking for rescheduled appointment", error as Error, {
-      appointmentId: data.id,
-    });
-  }
-}
-
-async function handleAppointmentCanceled(data: typeof AcuityWebhookPayload.infer) {
-  logger.info("Processing canceled appointment webhook", {
-    appointmentId: data.id,
-    calendarId: data.calendarID,
-  });
-
-  try {
-    const booking = await bookingService.findByAcuityAppointmentId(data.id.toString());
-    if (booking) {
-      // Update booking status to closed
-      await bookingService.updateBookingStatus(booking.id, "closed");
-      logger.info("Updated booking status for canceled appointment", { bookingId: booking.id });
-    }
-  } catch (error) {
-    logger.error("Failed to update booking for canceled appointment", error as Error, {
-      appointmentId: data.id,
-    });
-  }
-}
-
-async function handleAppointmentChanged(data: typeof AcuityWebhookPayload.infer) {
-  logger.info("Processing changed appointment webhook", {
-    appointmentId: data.id,
-    calendarId: data.calendarID,
-  });
-
-  try {
-    const booking = await bookingService.findByAcuityAppointmentId(data.id.toString());
-    if (booking) {
-      // Fetch full appointment details from Acuity
-      const appointment = await acuityService.getAppointment(data.id);
-
-      // Update booking with latest info
-      await bookingService.syncWithAcuityAppointment(booking.id, appointment);
-      logger.info("Synced booking with changed appointment", { bookingId: booking.id });
-    }
-  } catch (error) {
-    logger.error("Failed to update booking for changed appointment", error as Error, {
-      appointmentId: data.id,
-    });
-  }
-}

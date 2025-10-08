@@ -48,6 +48,7 @@ export default async function BookingDetailPage({ params }: BookingDetailPagePro
   return (
     <BookingDetailClient
       booking={{
+        organization: booking.organization,
         acuityAppointmentId: booking.acuityAppointmentId,
         acuityAppointmentTypeId: booking.acuityAppointmentTypeId,
         acuityCalendarId: booking.acuityCalendarId,
@@ -62,7 +63,13 @@ export default async function BookingDetailPage({ params }: BookingDetailPagePro
         id: booking.id,
         location: booking.location,
         organizationId: booking.organizationId,
-        specialist: booking.specialist,
+        specialist: {
+          id: booking.specialist.id,
+          name: booking.specialist.name,
+          image: booking.specialist.image || "",
+          user: booking.specialist.user,
+          location: booking.specialist.location,
+        },
         status: booking.status,
         examinee: booking.examinee,
         referrer: booking.referrer,

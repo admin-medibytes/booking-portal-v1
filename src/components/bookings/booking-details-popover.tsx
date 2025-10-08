@@ -33,7 +33,6 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
 
   const appointmentDate = booking.dateTime ? new Date(booking.dateTime) : null;
   // For now, we'll use a default status since currentProgress isn't available
-  const statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
 
   return (
     <Dialog open={true} onOpenChange={onClose}>

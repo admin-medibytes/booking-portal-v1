@@ -7,7 +7,7 @@ import {
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
-import { useFileUpload, type FileWithPreview } from "@/hooks/use-file-upload";
+import { useFileUpload } from "@/hooks/use-file-upload";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

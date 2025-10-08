@@ -21,7 +21,6 @@ export interface BookingWithSpecialist extends Booking {
     id: string;
     name: string;
     image: string;
-    jobTitle: string;
     location?: SpecialistLocation | null;
     user: User;
   };

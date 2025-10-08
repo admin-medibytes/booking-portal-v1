@@ -79,7 +79,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
       params.set("status", "active");
       router.replace(`?${params.toString()}`);
     }
-  }, []); // Only run once on mount
+  }, [filters.status, router, searchParams]);
 
   // Update URL when filters change
   const updateUrl = useCallback(

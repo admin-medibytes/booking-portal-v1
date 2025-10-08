@@ -14,7 +14,7 @@ import * as appFormsSchema from "./schema/appForms";
 
 const poolSize = parseInt(env.DB_POOL_SIZE || "10", 10);
 
-let connectionString = env.DATABASE_URL;
+const connectionString = env.DATABASE_URL;
 
 const globalForDb = globalThis as unknown as {
   client: postgres.Sql | undefined;

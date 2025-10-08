@@ -107,13 +107,26 @@ export class DocumentRepository {
   }
 
 
-  private mapToDocument(dbDocument: any): Document {
+  private mapToDocument(dbDocument: {
+    id: string;
+    bookingId: string;
+    uploadedBy: string | { id: string; name?: string; email?: string } | undefined;
+    s3Key: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    section: DocumentSection;
+    category: DocumentCategory;
+    createdAt: Date;
+    updatedAt?: Date;
+    deletedAt?: Date | null;
+  }): Document {
     return {
       id: dbDocument.id,
       bookingId: dbDocument.bookingId,
       uploadedById: typeof dbDocument.uploadedBy === 'string'
         ? dbDocument.uploadedBy
-        : dbDocument.uploadedBy?.id || dbDocument.uploadedBy,
+        : dbDocument.uploadedBy?.id || '',
       uploadedBy: typeof dbDocument.uploadedBy === 'object' && dbDocument.uploadedBy?.id
         ? {
             id: dbDocument.uploadedBy.id,
@@ -129,7 +142,7 @@ export class DocumentRepository {
       category: dbDocument.category,
       createdAt: dbDocument.createdAt,
       updatedAt: dbDocument.updatedAt || dbDocument.createdAt,
-      deletedAt: dbDocument.deletedAt,
+      deletedAt: dbDocument.deletedAt || null,
     };
   }
 }
