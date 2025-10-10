@@ -530,24 +530,19 @@ export class DocumentService {
   ): Promise<Document[]> {
     const documents = await documentRepository.findByBookingId(bookingId, filters);
 
-    console.log(`[getDocumentsByBooking] Found ${documents.length} documents for booking ${bookingId}`);
-    console.log(`[getDocumentsByBooking] userId: ${userId}, userRole: ${filters?.userRole}`);
-
     // For impersonation, check access as the impersonated user
     const effectiveUserId = filters?.impersonatedUserId || userId;
 
     const accessibleDocuments = [];
     for (const doc of documents) {
       const hasAccess = await this.verifyAccess(doc, effectiveUserId, filters?.userRole);
-      console.log(`[getDocumentsByBooking] Document ${doc.id} - hasAccess: ${hasAccess}`);
-
+    
       if (hasAccess) {
         // Check download permission based on role
         if (filters?.userRole) {
           const role = documentPermissionsService.getUserRole(filters.userRole);
           const hasDownloadPermission = documentPermissionsService.hasPermission({ role, category: doc.category, permission: "download" });
-          console.log(`[getDocumentsByBooking] Document ${doc.id} - role: ${role}, hasDownloadPermission: ${hasDownloadPermission}`);
-
+       
           if (hasDownloadPermission) {
             accessibleDocuments.push(doc);
           }
@@ -556,8 +551,6 @@ export class DocumentService {
         }
       }
     }
-
-    console.log(`[getDocumentsByBooking] Returning ${accessibleDocuments.length} accessible documents`);
     return accessibleDocuments;
   }
 
