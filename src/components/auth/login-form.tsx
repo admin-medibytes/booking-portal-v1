@@ -126,10 +126,10 @@ export function LoginForm() {
           <form.Field
             name="email"
             validators={{
-              onChange: ({ value }) => {
+              onSubmit: ({ value }) => {
                 const result = type({ email: "string.email" })({ email: value });
                 if (result instanceof type.errors) {
-                  return result[0]?.message || "Invalid email";
+                  return "Invalid email";
                 }
                 return undefined;
               },
@@ -162,10 +162,10 @@ export function LoginForm() {
           <form.Field
             name="password"
             validators={{
-              onChange: ({ value }) => {
+              onSubmit: ({ value }) => {
                 const result = type({ password: "string>=8" })({ password: value });
                 if (result instanceof type.errors) {
-                  return result[0]?.message || "Invalid password";
+                  return "Invalid password";
                 }
                 return undefined;
               },
