@@ -41,6 +41,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { timeZones } from "@/lib/utils/timezones";
 import { BookingWithDetails } from "@/hooks/use-booking";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface BookingDetailCardProps {
   booking: BookingWithDetails;
@@ -118,14 +119,6 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
   const getEndTime = () => {
     if (!booking.dateTime || !booking.duration) return null;
     return addMinutes(new Date(booking.dateTime), booking.duration);
-  };
-
-  // Quick action handlers
-  const handleJoinMeeting = () => {
-    setLoadingAction("join");
-    // TODO: Implement join meeting logic
-    toast.info("Join meeting feature coming soon!");
-    setLoadingAction(null);
   };
 
   const handleReschedule = () => {
@@ -465,11 +458,13 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
               <Button
                 className="w-full bg-transparent"
                 variant="outline"
-                onClick={handleJoinMeeting}
                 disabled={loadingAction === "join" || isClosed}
+                asChild
               >
-                <VideoIcon className="h-4 w-4 mr-2" />
-                Join Video Call
+                <Link href={booking.location} target="_blank">
+                  <VideoIcon className="h-4 w-4 mr-2" />
+                  Join Video Call
+                </Link>
               </Button>
             )}
             <Button
