@@ -37,14 +37,16 @@ const AppointmentWebhookSchema = type({
   "organizationName?": "string",
   "fields?": type({
     id: "number",
+    "fieldID?": "number",
     value: "string",
+    "name?": "string",
   }).array(),
 });
 
 // Helper function to extract examinee data from Acuity fields using form configuration
 async function extractExamineeDataFromFields(
   appointmentTypeId: number,
-  fields: Array<{ id: number; value: string }>
+  fields: Array<{ id: number; fieldID?: number; value: string; name?: string }>
 ): Promise<Record<string, string>> {
   // Get the form configuration with field mappings
   const formMappings = await db
@@ -76,7 +78,9 @@ async function extractExamineeDataFromFields(
   // Extract examinee data from submitted fields
   const examineeData: Record<string, string> = {};
   for (const field of fields) {
-    const mapping = fieldMappingMap.get(field.id);
+    // Try fieldID first (from Acuity), fallback to id
+    const fieldId = field.fieldID ?? field.id;
+    const mapping = fieldMappingMap.get(fieldId);
     if (mapping && field.value) {
       examineeData[mapping] = field.value;
     }
