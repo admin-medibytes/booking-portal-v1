@@ -34,7 +34,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { toast } from "sonner";
+
 import { useState } from "react";
 import { addMinutes, format as formatDate } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
@@ -51,7 +51,7 @@ interface BookingDetailCardProps {
 const australianTimezones = timeZones.filter((tz) => tz.label.includes("Australia"));
 
 export function BookingDetailCard({ booking }: BookingDetailCardProps) {
-  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [loadingAction, _setLoadingAction] = useState<string | null>(null);
   const router = useRouter();
 
   // Get user's default timezone

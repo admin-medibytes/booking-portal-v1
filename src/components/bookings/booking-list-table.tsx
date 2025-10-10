@@ -287,6 +287,15 @@ export const BookingListTable = memo(function BookingListTable({
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {booking.type === "telehealth" && booking.location && (
+                <>
+                  <DropdownMenuItem onClick={() => window.open(booking.location, "_blank")}>
+                    <Video className="mr-2 h-4 w-4" />
+                    Join Meeting
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem onClick={() => router.push(`/bookings/${booking.id}`)}>
                 <Eye className="mr-2 h-4 w-4" />
                 See Details
