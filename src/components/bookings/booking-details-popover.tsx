@@ -87,7 +87,16 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
         </div>
 
         <DialogFooter className="mt-6 flex-col sm:flex-row gap-2">
-        
+          {booking.type === "telehealth" && booking.location && (
+            <Button
+              variant="default"
+              onClick={() => window.open(booking.location, "_blank")}
+              className="w-full sm:w-auto"
+            >
+              <Video className="h-4 w-4 mr-2" />
+              Join Meeting
+            </Button>
+          )}
           <Button variant="outline" onClick={handleReschedule} className="w-full sm:w-auto">
             <Calendar className="h-4 w-4 mr-2" />
             Reschedule
