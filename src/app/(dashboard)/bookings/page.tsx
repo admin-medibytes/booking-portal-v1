@@ -20,7 +20,7 @@ export default function BookingsPage() {
 
   // Initialize view from URL or localStorage
   const [view, setView] = useState<ViewType>(() => {
-    const urlView = (searchParams.get("view") as ViewType | undefined) || "list";
+    const urlView = (searchParams.get("view") as ViewType | undefined) || "calendar";
     if (urlView && ["calendar", "list"].includes(urlView)) {
       return urlView;
     }
@@ -28,7 +28,7 @@ export default function BookingsPage() {
     if (savedView && ["calendar", "list"].includes(savedView)) {
       return savedView;
     }
-    return "list";
+    return "calendar";
   });
 
   // Initialize filters from URL
