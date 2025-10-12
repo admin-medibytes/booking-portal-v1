@@ -51,6 +51,10 @@ interface AppointmentFormConfiguration {
   fields: Array<{
     acuityFieldId: number;
     customLabel?: string | null;
+    placeholderText?: string | null;
+    helpText?: string | null;
+    tooltipText?: string | null;
+    customFieldType?: "text" | "email" | "phone" | "number" | "date" | "dob" | "time" | "url" | null;
     isHidden: boolean;
     displayWidth?: "full" | "half" | "third";
     acuityField?: {
@@ -789,10 +793,10 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
                       }
                     : undefined,
                   customLabel: f.customLabel ?? null,
-                  placeholderText: undefined,
-                  helpText: undefined,
-                  tooltipText: undefined,
-                  customFieldType: null,
+                  placeholderText: f.placeholderText ?? null,
+                  helpText: f.helpText ?? null,
+                  tooltipText: f.tooltipText ?? null,
+                  customFieldType: f.customFieldType ?? null,
                   isRequired: f.acuityField?.required ?? false,
                   validationRules: {},
                   isHidden: f.isHidden,
