@@ -578,7 +578,7 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
             <UserCheck className="h-5 w-5 text-primary" />
             Referrer Information
           </CardTitle>
-          <CardDescription>Details of the person making this referral</CardDescription>
+          <CardDescription>Your details or whomever you are making the booking on behalf of</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
