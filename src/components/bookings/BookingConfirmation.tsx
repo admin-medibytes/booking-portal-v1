@@ -176,20 +176,6 @@ export function BookingConfirmation({
         fields: intakeFormFields.fieldsInfo,
       };
 
-      toast(
-        <pre className="mt-2 rounded-md bg-slate-950 p-4">
-          <ScrollArea className="h-[800px] pr-4">
-            <code className="text-white">{JSON.stringify(bookingData, null, 2)}</code>
-          </ScrollArea>
-        </pre>,
-        {
-          style: {
-            width: "fit-content",
-          },
-          dismissible: false,
-        }
-      );
-
       const response = await bookingsClient.$post({
         json: bookingData,
       });
