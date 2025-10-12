@@ -115,23 +115,23 @@ function buildArktypeSchema(fields: AppFormField[]) {
       // For optional fields, use the ? suffix to make the key optional
       // and allow empty string, null, undefined, or the field type
       if (fieldType === "boolean") {
-        schemaObj[`${fieldName}?`] = "boolean|null|undefined";
+        schemaObj[`${fieldName}?`] = "boolean";
       } else if (fieldType === "string[]") {
-        schemaObj[`${fieldName}?`] = "string[]|null|undefined";
+        schemaObj[`${fieldName}?`] = "string[]";
       } else if (fieldType === "'yes'|'no'") {
-        schemaObj[`${fieldName}?`] = "'yes'|'no'|''|null|undefined";
+        schemaObj[`${fieldName}?`] = "'yes'|'no'|''";
       } else if (fieldType === "string.email") {
         // For optional email fields, allow valid email, empty string, null, or undefined
-        schemaObj[`${fieldName}?`] = "string.email|''|null|undefined";
+        schemaObj[`${fieldName}?`] = "string.email|''";
       } else if (fieldType === "number") {
         // For optional number fields
-        schemaObj[`${fieldName}?`] = "number|null|undefined";
+        schemaObj[`${fieldName}?`] = "number|''";
       } else if (fieldType.startsWith("string>")) {
         // For strings with min length, when optional allow empty string, null or undefined
-        schemaObj[`${fieldName}?`] = `${fieldType}|''|null|undefined`;
+        schemaObj[`${fieldName}?`] = `${fieldType}|''`;
       } else {
         // For other string types, allow empty string, null or undefined
-        schemaObj[`${fieldName}?`] = "string|''|null|undefined";
+        schemaObj[`${fieldName}?`] = "string";
       }
     } else if (field.isHidden && field.staticValue) {
       // Hidden fields with static values are always included
@@ -158,6 +158,8 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
     },
     ref
   ) => {
+
+    
     const [submitError, setSubmitError] = useState<string | null>(null);
 
     // Sort fields by displayOrder
@@ -176,9 +178,17 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
       if (field.isHidden && field.staticValue) {
         defaultValues[fieldKey] = field.staticValue;
       }
-      // If no provided default value for this field, initialize it
+      // If no provided default value for this field, initialize it with appropriate type
       if (!(fieldKey in defaultValues)) {
-        defaultValues[fieldKey] = "";
+        if (field.acuityField?.type === "checkbox") {
+          defaultValues[fieldKey] = false;
+        } else if (field.acuityField?.type === "checkboxlist") {
+          defaultValues[fieldKey] = [];
+        } else if (field.acuityField?.type === "yesno") {
+          defaultValues[fieldKey] = "";
+        } else {
+          defaultValues[fieldKey] = "";
+        }
       }
     });
 
@@ -231,15 +241,15 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
     // Group fields into rows based on displayWidth
     const fieldRows: AppFormField[][] = [];
     let currentRow: AppFormField[] = [];
-    let currentRowWidth = 0; // Track cumulative width: third=2, half=3, full=6 (out of 6 units)
+    let currentRowWidth = 0; // Track cumulative width: third=4, half=6, full=12 (out of 12 units)
 
     sortedFields.forEach((field) => {
       if (!field.isHidden) {
         const fieldWidth =
-          field.displayWidth === "full" ? 6 : field.displayWidth === "half" ? 3 : 2;
+          field.displayWidth === "full" ? 12 : field.displayWidth === "half" ? 6 : 4;
 
-        // Check if adding this field would exceed row capacity (6 units)
-        if (field.displayWidth === "full" || currentRowWidth + fieldWidth > 6) {
+        // Check if adding this field would exceed row capacity (12 units)
+        if (field.displayWidth === "full" || currentRowWidth + fieldWidth > 12) {
           // Push current row if it has content
           if (currentRow.length > 0) {
             fieldRows.push(currentRow);
@@ -260,7 +270,7 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
           currentRowWidth += fieldWidth;
 
           // If row is exactly full, push it and reset
-          if (currentRowWidth === 6) {
+          if (currentRowWidth === 12) {
             fieldRows.push(currentRow);
             currentRow = [];
             currentRowWidth = 0;
@@ -570,7 +580,7 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
         >
           {fieldRows.map((row, rowIndex) => {
             return (
-              <div key={rowIndex} className="grid grid-cols-1 md:grid-cols-6 gap-4">
+              <div key={rowIndex} className="grid grid-cols-1 md:grid-cols-12 gap-4">
                 {row.map((field) => {
                   const fieldName = `field_${field.acuityFieldId}`;
                   const label = field.customLabel || field.acuityField?.name || "";
@@ -579,10 +589,10 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
                   // Determine column span based on field width
                   const colSpan =
                     field.displayWidth === "full"
-                      ? "md:col-span-6"
+                      ? "md:col-span-12"
                       : field.displayWidth === "half"
-                        ? "md:col-span-3"
-                        : "md:col-span-2";
+                        ? "md:col-span-6"
+                        : "md:col-span-4";
 
                   if (isCheckbox) {
                     return (

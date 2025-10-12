@@ -155,6 +155,7 @@ export default function NewBookingPage() {
 
   const handleSpecialistSelect = (specialist: Specialist | null) => {
     setSelectedSpecialist(specialist);
+    handleNext();
   };
 
   const handleAppointmentTypeSelect = (appointmentType: {
@@ -167,6 +168,7 @@ export default function NewBookingPage() {
     appointmentMode: "in-person" | "telehealth";
   }) => {
     setSelectedAppointmentType(appointmentType);
+    handleNext();
   };
 
   const handleTimeSlotSelect = (dateTime: Date, datetimeString: string, timezone: string) => {

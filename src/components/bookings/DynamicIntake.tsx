@@ -52,6 +52,7 @@ interface AppointmentFormConfiguration {
     acuityFieldId: number;
     customLabel?: string | null;
     isHidden: boolean;
+    displayWidth?: "full" | "half" | "third";
     acuityField?: {
       id: number;
       name: string;
@@ -797,7 +798,7 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
                   isHidden: f.isHidden,
                   staticValue: null,
                   displayOrder: index + 1,
-                  displayWidth: "full",
+                  displayWidth: f.displayWidth ?? "full",
                 })),
               }}
               defaultValues={extractDynamicFormValues(defaultValues)}
