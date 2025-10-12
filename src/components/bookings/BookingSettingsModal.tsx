@@ -44,7 +44,7 @@ const australianTimezones = timeZones.filter((tz) => tz.label.includes("Australi
 export function BookingSettingsModal({
   isOpen,
   onConfirm,
-  defaultTimezone = "Australia/Sydney",
+  defaultTimezone,
   defaultOrganizationId,
 }: BookingSettingsModalProps) {
   const [selectedTimezone, setSelectedTimezone] = useState(defaultTimezone);
@@ -116,7 +116,10 @@ export function BookingSettingsModal({
             </Label>
             <Select value={selectedTimezone} onValueChange={setSelectedTimezone}>
               <SelectTrigger id="timezone">
-                <SelectValue placeholder="Select timezone" />
+                <SelectValue placeholder="Select timezone">
+                  {timeZones.find((tz) => tz.tzCode === selectedTimezone)?.tzCode ||
+                    selectedTimezone}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {australianTimezones.map((tz) => (

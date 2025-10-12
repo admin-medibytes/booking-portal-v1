@@ -109,7 +109,7 @@ export default function NewBookingPage() {
   } | null>(null);
   const [selectedDateTime, setSelectedDateTime] = useState<Date | null>(null);
   const [selectedDatetimeString, setSelectedDatetimeString] = useState<string | null>(null);
-  const [selectedTimezone, setSelectedTimezone] = useState<string>("Australia/Sydney");
+  const [selectedTimezone, setSelectedTimezone] = useState<string>(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
   const [selectedOrganizationSlug, setSelectedOrganizationSlug] = useState<string | null>(null);
   const [intakeFormData, setIntakeFormData] = useState<IntakeFormData | null>(null);
