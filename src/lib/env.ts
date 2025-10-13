@@ -146,5 +146,5 @@ export const env = createEnv({
     FEATURE_DOCUMENT_VIRUS_SCAN: process.env.FEATURE_DOCUMENT_VIRUS_SCAN,
     MAX_FILE_SIZE: process.env.MAX_FILE_SIZE,
   },
-  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  skipValidation: !!process.env.SKIP_ENV_VALIDATION || !!process.env.MIGRATION_MODE,
 });
