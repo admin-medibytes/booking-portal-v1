@@ -27,7 +27,6 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { getLocationDisplay } from "@/lib/utils/location";
 import type { Specialist } from "@/types/specialist";
-import { ScrollArea } from "../ui/scroll-area";
 
 interface IntakeFormData {
   referrerInfo: {
