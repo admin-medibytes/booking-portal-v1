@@ -69,8 +69,6 @@ export class BookingRepository {
           specialist: {
             columns: {
               id: true,
-              firstName: true,
-              lastName: true,
               name: true,
             },
             with: {
@@ -140,8 +138,6 @@ export class BookingRepository {
         specialist: {
           columns: {
             id: true,
-            firstName: true,
-            lastName: true,
             name: true,
           },
           with: {
