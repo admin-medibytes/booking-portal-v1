@@ -143,7 +143,7 @@ export function useBookingsCalendar(
 
   // Fetch all bookings for the month
   const { data, isLoading, error } = useQuery({
-    queryKey: bookingKeys.calendarMonth(year, month),
+    queryKey: [...bookingKeys.calendarMonth(year, month), clientFilters],
     enabled: options?.enabled ?? true,
     queryFn: async () => {
       // Get first and last day of the month
@@ -177,36 +177,8 @@ export function useBookingsCalendar(
 
       const data = await res.json();
 
-      // Transform date strings to Date objects
-      const rawBookings = (data.bookings || []) as Array<Record<string, unknown>>;
-      const transformedBookings = rawBookings.map((booking) => {
-        const referrerObj = booking.referrer as Record<string, unknown> | null | undefined;
-        const referrerOrganizationObj = booking.referrerOrganization as
-          | Record<string, unknown>
-          | null
-          | undefined;
-
-        return {
-          ...(booking as Record<string, unknown>),
-          createdAt: new Date(booking.createdAt as string),
-          updatedAt: new Date(booking.updatedAt as string),
-          appointmentDate: booking.dateTime ? new Date(booking.dateTime as string) : null,
-          completedAt: booking.completedAt
-            ? new Date(booking.completedAt as string)
-            : null,
-          cancelledAt: booking.cancelledAt
-            ? new Date(booking.cancelledAt as string)
-            : null,
-          referrer:
-            referrerObj && Object.keys(referrerObj).length > 0 ? referrerObj : null,
-          referrerOrganization:
-            referrerOrganizationObj && Object.keys(referrerOrganizationObj).length > 0
-              ? referrerOrganizationObj
-              : null,
-        } as unknown as BookingWithSpecialist;
-      });
-
-      return transformedBookings;
+      // Return bookings as-is - minimal transformation for performance
+      return (data.bookings || []) as unknown as BookingWithSpecialist[];
     },
     staleTime: 2 * 60 * 1000, // 2 minutes - calendar data can be cached longer
     gcTime: 10 * 60 * 1000, // 10 minutes cache time

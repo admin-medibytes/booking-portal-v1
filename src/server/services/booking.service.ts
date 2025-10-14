@@ -81,34 +81,51 @@ export class BookingService {
   }
 
   private async getBookingsForAdmin(filters?: BookingFilters) {
-    const result = await bookingRepository.findAllForAdmin(filters);
+    // Use calendar-optimized query if fetching by date range
+    const isCalendarQuery = filters?.startDate && filters?.endDate;
+    const result = isCalendarQuery
+      ? await bookingRepository.findAllForAdminCalendar(filters)
+      : await bookingRepository.findAllForAdmin(filters);
+
     return {
       bookings: result.data,
-      pagination: result.pagination,
+      pagination: result.pagination || { page: 1, limit: result.data.length, total: result.data.length, totalPages: 1 },
     };
   }
 
   private async getBookingsForReferrer(userId: string, filters?: BookingFilters) {
-    const result = await bookingRepository.findForReferrer(userId, filters);
+    const isCalendarQuery = filters?.startDate && filters?.endDate;
+    const result = isCalendarQuery
+      ? await bookingRepository.findForReferrerCalendar(userId, filters)
+      : await bookingRepository.findForReferrer(userId, filters);
+
     return {
       bookings: result.data,
-      pagination: result.pagination,
+      pagination: result.pagination || { page: 1, limit: result.data.length, total: result.data.length, totalPages: 1 },
     };
   }
 
   private async getBookingsForSpecialist(specialistId: string, filters?: BookingFilters) {
-    const result = await bookingRepository.findForSpecialist(specialistId, filters);
+    const isCalendarQuery = filters?.startDate && filters?.endDate;
+    const result = isCalendarQuery
+      ? await bookingRepository.findForSpecialistCalendar(specialistId, filters)
+      : await bookingRepository.findForSpecialist(specialistId, filters);
+
     return {
       bookings: result.data,
-      pagination: result.pagination,
+      pagination: result.pagination || { page: 1, limit: result.data.length, total: result.data.length, totalPages: 1 },
     };
   }
 
   private async getBookingsForOrganizationOwner(organizationId: string, filters?: BookingFilters) {
-    const result = await bookingRepository.findForOrganization(organizationId, filters);
+    const isCalendarQuery = filters?.startDate && filters?.endDate;
+    const result = isCalendarQuery
+      ? await bookingRepository.findForOrganizationCalendar(organizationId, filters)
+      : await bookingRepository.findForOrganization(organizationId, filters);
+
     return {
       bookings: result.data,
-      pagination: result.pagination,
+      pagination: result.pagination || { page: 1, limit: result.data.length, total: result.data.length, totalPages: 1 },
     };
   }
 

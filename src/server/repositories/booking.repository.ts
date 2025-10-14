@@ -1,9 +1,107 @@
 import { db } from "@/server/db";
-import { bookings, examinees } from "@/server/db/schema";
+import { bookings, examinees, specialists } from "@/server/db/schema";
+import { users } from "@/server/db/schema/auth";
 import { eq, and, gte, lte, desc, sql, SQL, or, ilike, inArray } from "drizzle-orm";
 import type { BookingFilters } from "@/types/booking";
 
 export class BookingRepository {
+  // Optimized calendar query using raw SQL joins for maximum performance
+  async findForCalendar(conditions: SQL[], filters?: BookingFilters) {
+    const limit = filters?.limit || 500;
+
+    // Use raw SQL joins and flatten the selection, then reshape
+    const rows = await db
+      .select({
+        // Booking fields
+        id: bookings.id,
+        organizationId: bookings.organizationId,
+        teamId: bookings.teamId,
+        createdById: bookings.createdById,
+        referrerId: bookings.referrerId,
+        specialistId: bookings.specialistId,
+        examineeId: bookings.examineeId,
+        status: bookings.status,
+        type: bookings.type,
+        duration: bookings.duration,
+        location: bookings.location,
+        dateTime: bookings.dateTime,
+        acuityAppointmentId: bookings.acuityAppointmentId,
+        acuityAppointmentTypeId: bookings.acuityAppointmentTypeId,
+        acuityCalendarId: bookings.acuityCalendarId,
+        scheduledAt: bookings.scheduledAt,
+        completedAt: bookings.completedAt,
+        cancelledAt: bookings.cancelledAt,
+        createdAt: bookings.createdAt,
+        updatedAt: bookings.updatedAt,
+
+        // Specialist fields (flattened)
+        specialistId_: specialists.id,
+        specialistName: specialists.name,
+
+        // User fields (flattened)
+        userId: users.id,
+        userJobTitle: users.jobTitle,
+
+        // Examinee fields (flattened)
+        examineeId_: examinees.id,
+        examineeFirstName: examinees.firstName,
+        examineeLastName: examinees.lastName,
+        examineeEmail: examinees.email,
+      })
+      .from(bookings)
+      .leftJoin(specialists, eq(bookings.specialistId, specialists.id))
+      .leftJoin(users, eq(specialists.userId, users.id))
+      .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(bookings.dateTime))
+      .limit(limit);
+
+    // Reshape the flattened data into the expected structure
+    const results = rows.map((row) => ({
+      id: row.id,
+      organizationId: row.organizationId,
+      teamId: row.teamId,
+      createdById: row.createdById,
+      referrerId: row.referrerId,
+      specialistId: row.specialistId,
+      examineeId: row.examineeId,
+      status: row.status,
+      type: row.type,
+      duration: row.duration,
+      location: row.location,
+      dateTime: row.dateTime,
+      acuityAppointmentId: row.acuityAppointmentId,
+      acuityAppointmentTypeId: row.acuityAppointmentTypeId,
+      acuityCalendarId: row.acuityCalendarId,
+      scheduledAt: row.scheduledAt,
+      completedAt: row.completedAt,
+      cancelledAt: row.cancelledAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      specialist: {
+        id: row.specialistId_,
+        name: row.specialistName,
+        user: row.userId && row.userJobTitle ? {
+          id: row.userId,
+          jobTitle: row.userJobTitle,
+        } : undefined,
+      },
+      examinee: {
+        id: row.examineeId_,
+        firstName: row.examineeFirstName,
+        lastName: row.examineeLastName,
+        email: row.examineeEmail,
+      },
+    }));
+
+    // Calendar queries don't use pagination, but return data in same format
+    return {
+      data: results,
+      // Optional pagination field for compatibility
+      pagination: undefined
+    };
+  }
+
   // Helper method to build common filter conditions
   private buildFilterConditions(filters?: BookingFilters, baseConditions: SQL[] = []): SQL[] {
     const conditions = [...baseConditions];
@@ -129,7 +227,7 @@ export class BookingRepository {
       };
     }
 
-    // No search - use the simpler query with optimized fields
+    // No search - use optimized SQL join query for better performance
     const results = await db.query.bookings.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
       orderBy: desc(bookings.createdAt),
@@ -246,6 +344,30 @@ export class BookingRepository {
     // For now, return empty results
     const conditions = this.buildFilterConditions(filters);
     return this.getPaginatedBookings(conditions, filters);
+  }
+
+  // Calendar-optimized query methods
+  async findAllForAdminCalendar(filters?: BookingFilters) {
+    const conditions = this.buildFilterConditions(filters);
+    return this.findForCalendar(conditions, filters);
+  }
+
+  async findForReferrerCalendar(userId: string, filters?: BookingFilters) {
+    const baseConditions = [eq(bookings.referrerId, userId)];
+    const conditions = this.buildFilterConditions(filters, baseConditions);
+    return this.findForCalendar(conditions, filters);
+  }
+
+  async findForSpecialistCalendar(specialistId: string, filters?: BookingFilters) {
+    const baseConditions = [eq(bookings.specialistId, specialistId)];
+    const conditions = this.buildFilterConditions(filters, baseConditions);
+    return this.findForCalendar(conditions, filters);
+  }
+
+  async findForOrganizationCalendar(organizationId: string, filters?: BookingFilters) {
+    const baseConditions = [eq(bookings.organizationId, organizationId)];
+    const conditions = this.buildFilterConditions(filters, baseConditions);
+    return this.findForCalendar(conditions, filters);
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useBookings, useBookingsCalendar } from "@/hooks/use-bookings";
 import { BookingListTable } from "@/components/bookings/booking-list-table";
@@ -59,6 +59,16 @@ export default function BookingsPage() {
     router.push(`?${params.toString()}`);
   };
 
+  // Memoize calendar filters to prevent unnecessary re-renders and duplicate requests
+  const calendarFilters = useMemo(
+    () => ({
+      search: filters.search,
+      specialistIds: filters.specialistIds,
+      status: filters.status,
+    }),
+    [filters.search, filters.specialistIds, filters.status]
+  );
+
   // Fetch bookings data - only fetch for the active view
   const { data: listData, isLoading: listLoading, error: listError } = useBookings(
     filters,
@@ -66,11 +76,7 @@ export default function BookingsPage() {
   );
   const { bookings: calendarBookings, isLoading: calendarLoading, error: calendarError } = useBookingsCalendar(
     currentMonth,
-    {
-      search: filters.search,
-      specialistIds: filters.specialistIds,
-      status: filters.status,
-    },
+    calendarFilters,
     { enabled: view === "calendar" }
   );
   const { data: specialists } = useSpecialists();
@@ -113,18 +119,12 @@ export default function BookingsPage() {
 
   // Handle pagination changes
   const handlePageChange = (newPage: number) => {
-    const newFilters = { ...filters, page: newPage };
-    setFilters(newFilters);
-
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", newPage.toString());
     router.push(`?${params.toString()}`);
   };
 
   const handlePageSizeChange = (newSize: number) => {
-    const newFilters = { ...filters, limit: newSize, page: 1 };
-    setFilters(newFilters);
-
     const params = new URLSearchParams(searchParams.toString());
     params.set("limit", newSize.toString());
     params.set("page", "1");
@@ -193,7 +193,7 @@ export default function BookingsPage() {
         ) : (
           <BookingListTable
             bookings={data?.bookings || []}
-            totalCount={data?.pagination.total || 0}
+            totalCount={data?.pagination?.total || 0}
             currentPage={filters.page || 1}
             pageSize={filters.limit || 10}
             onPageChange={handlePageChange}

@@ -6,14 +6,26 @@ const TAG_LENGTH = 16;
 const IV_LENGTH = 16;
 const KEY_LENGTH = 32;
 
-// Derive encryption key from environment secret
+// Cache the encryption key to avoid expensive scryptSync on every encrypt/decrypt
+let cachedEncryptionKey: Buffer | null = null;
+
+// Derive encryption key from environment secret (cached for performance)
 const getEncryptionKey = (): Buffer => {
+  // Return cached key if available
+  if (cachedEncryptionKey) {
+    return cachedEncryptionKey;
+  }
+
   const secret = env.ENCRYPTION_KEY || env.BETTER_AUTH_SECRET;
   if (!secret) {
     throw new Error('ENCRYPTION_KEY or BETTER_AUTH_SECRET must be set for data encryption');
   }
   const salt = Buffer.from('medibytes-encryption-salt', 'utf8');
-  return scryptSync(secret, salt, KEY_LENGTH);
+
+  // Cache the derived key to avoid repeated expensive scryptSync calls
+  cachedEncryptionKey = scryptSync(secret, salt, KEY_LENGTH);
+
+  return cachedEncryptionKey;
 };
 
 export const encrypt = (text: string): string => {

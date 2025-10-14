@@ -41,23 +41,28 @@ interface BookingCalendarProps {
 type ViewType = "month" | "week" | "day" | "agenda";
 
 export function BookingCalendar({ bookings, onEventSelect, onMonthChange, isLoading = false }: BookingCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewType, setViewType] = useState<ViewType>("month");
-  const [selectedBooking, setSelectedBooking] = useState<BookingWithSpecialist | null>(null);
   const [isClient, setIsClient] = useState(false);
 
-  // Hydration fix: only restore from localStorage after mount
+  // Initialize state from localStorage on first render to prevent duplicate requests
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (typeof window === "undefined") return new Date();
+    const savedDate = localStorage.getItem("booking-calendar-date");
+    return savedDate ? new Date(savedDate) : new Date();
+  });
+
+  const [viewType, setViewType] = useState<ViewType>(() => {
+    if (typeof window === "undefined") return "month";
+    const savedView = localStorage.getItem("booking-calendar-view");
+    return savedView && ["month", "week", "day", "agenda"].includes(savedView)
+      ? (savedView as ViewType)
+      : "month";
+  });
+
+  const [selectedBooking, setSelectedBooking] = useState<BookingWithSpecialist | null>(null);
+
+  // Set isClient flag after mount
   useEffect(() => {
     setIsClient(true);
-    const savedDate = localStorage.getItem("booking-calendar-date");
-    const savedView = localStorage.getItem("booking-calendar-view");
-
-    if (savedDate) {
-      setCurrentDate(new Date(savedDate));
-    }
-    if (savedView && ["month", "week", "day", "agenda"].includes(savedView)) {
-      setViewType(savedView as ViewType);
-    }
   }, []);
 
   // Save currentDate to localStorage when it changes and notify parent
@@ -66,7 +71,8 @@ export function BookingCalendar({ bookings, onEventSelect, onMonthChange, isLoad
       localStorage.setItem("booking-calendar-date", currentDate.toISOString());
       onMonthChange?.(currentDate);
     }
-  }, [currentDate, isClient, onMonthChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDate, isClient]);
 
   // Save viewType to localStorage when it changes
   useEffect(() => {
@@ -180,11 +186,11 @@ export function BookingCalendar({ bookings, onEventSelect, onMonthChange, isLoad
     }).length;
   }, [bookings, currentDate]);
 
-  const handleBookingClick = (booking: BookingWithSpecialist, e: React.MouseEvent) => {
+  const handleBookingClick = useCallback((booking: BookingWithSpecialist, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedBooking(booking);
     onEventSelect?.(booking);
-  };
+  }, [onEventSelect]);
 
   return (
     <div className="space-y-4">
@@ -664,14 +670,14 @@ function AgendaView({ currentDate, bookings, onBookingClick }: AgendaViewProps) 
   );
 }
 
-// Booking Item Component
+// Booking Item Component - Memoized for performance
 interface BookingItemProps {
   booking: BookingWithSpecialist;
   view: ViewType;
   onClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
 }
 
-function BookingItem({ booking, view, onClick }: BookingItemProps) {
+const BookingItem = React.memo(function BookingItem({ booking, view, onClick }: BookingItemProps) {
   const appointmentDate = booking.dateTime ? new Date(booking.dateTime) : null;
   const timeString = appointmentDate ? format(appointmentDate, "h:mm a") : "";
 
@@ -732,8 +738,8 @@ function BookingItem({ booking, view, onClick }: BookingItemProps) {
               {booking.examinee.firstName} {booking.examinee.lastName}
             </div>
             <div className="text-sm opacity-75">
-              with {booking.specialist?.name || "Unassigned"} (
-              {booking.specialist.user.jobTitle})
+              with {booking.specialist?.name || "Unassigned"}
+              {booking.specialist?.user?.jobTitle && ` (${booking.specialist.user.jobTitle})`}
             </div>
           </div>
         </div>
@@ -742,4 +748,4 @@ function BookingItem({ booking, view, onClick }: BookingItemProps) {
   }
 
   return null;
-}
+});

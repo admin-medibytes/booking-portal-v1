@@ -158,7 +158,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
               </Avatar>
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">{booking.specialist.name}</h3>
-                <p className="text-muted-foreground">{booking.specialist.user.jobTitle}</p>
+                <p className="text-muted-foreground">{booking.specialist.user?.jobTitle}</p>
               </div>
             </div>
 

@@ -81,7 +81,7 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
             <div className="ml-6">
               <p className="text-sm font-medium">{booking.specialist?.name || "Unassigned"}</p>
               <p className="text-sm text-muted-foreground">
-                {booking.specialist.user.jobTitle}
+                {booking.specialist.user?.jobTitle}
               </p>
             </div>
           </div>
