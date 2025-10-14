@@ -41,6 +41,7 @@ export class BookingRepository {
   }
 
   // Helper method to build paginated query with specialist join
+  // Optimized for list view - only loads essential fields
   private async getPaginatedBookings(conditions: SQL[], filters?: BookingFilters) {
     const page = filters?.page || 1;
     const limit = filters?.limit || 20;
@@ -60,20 +61,54 @@ export class BookingRepository {
       // Get the booking IDs from the results
       const bookingIds = results.map((r) => r.bookings.id);
 
-      // Fetch full booking details with relations
+      // Fetch optimized booking details with only essential fields
       const fullResults = await db.query.bookings.findMany({
         where: inArray(bookings.id, bookingIds),
         orderBy: desc(bookings.createdAt),
         with: {
           specialist: {
-            with: { user: true },
+            columns: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              name: true,
+            },
+            with: {
+              user: {
+                columns: {
+                  id: true,
+                  jobTitle: true,
+                },
+              },
+            },
           },
           referrer: {
-            with: { organization: true },
+            columns: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+            with: {
+              organization: {
+                columns: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
           },
-          examinee: true,
-          createdBy: true,
-          organization: true,
+          examinee: {
+            columns: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              condition: true,
+              caseType: true,
+            },
+          },
         },
       });
 
@@ -95,7 +130,7 @@ export class BookingRepository {
       };
     }
 
-    // No search - use the simpler query
+    // No search - use the simpler query with optimized fields
     const results = await db.query.bookings.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
       orderBy: desc(bookings.createdAt),
@@ -103,14 +138,48 @@ export class BookingRepository {
       offset,
       with: {
         specialist: {
-          with: { user: true },
+          columns: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            name: true,
+          },
+          with: {
+            user: {
+              columns: {
+                id: true,
+                jobTitle: true,
+              },
+            },
+          },
         },
         referrer: {
-          with: { organization: true },
+          columns: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+          with: {
+            organization: {
+              columns: {
+                id: true,
+                name: true,
+              },
+            },
+          },
         },
-        examinee: true,
-        createdBy: true,
-        organization: true,
+        examinee: {
+          columns: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            condition: true,
+            caseType: true,
+          },
+        },
       },
     });
 

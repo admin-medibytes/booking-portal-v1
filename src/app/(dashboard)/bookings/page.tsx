@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useBookings } from "@/hooks/use-bookings";
+import { useBookings, useBookingsCalendar } from "@/hooks/use-bookings";
 import { BookingListTable } from "@/components/bookings/booking-list-table";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
 import { BookingFilters, type FilterState } from "@/components/bookings/booking-filters";
 import { Button } from "@/components/ui/button";
 import { Calendar, List, Plus, Loader2 } from "lucide-react";
 import type { BookingFilters as BookingFiltersType } from "@/types/booking";
-import { startOfMonth, endOfMonth } from "date-fns";
 import { useSpecialists } from "@/hooks/use-specialists";
 
 type ViewType = "calendar" | "list";
@@ -34,7 +33,7 @@ export default function BookingsPage() {
   // Initialize filters from URL
   const [filters, setFilters] = useState<BookingFiltersType>(() => {
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const limit = parseInt(searchParams.get("limit") || "5");
     const urlStatus = searchParams.get("status");
     const status = urlStatus === null || urlStatus === "" ? "active" : (urlStatus === "all" ? undefined : urlStatus);
 
@@ -47,6 +46,9 @@ export default function BookingsPage() {
     };
   });
 
+  // Track current month for calendar view
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
   // Update URL when view changes
   const handleViewChange = (newView: ViewType) => {
     setView(newView);
@@ -57,16 +59,29 @@ export default function BookingsPage() {
     router.push(`?${params.toString()}`);
   };
 
-  // Fetch bookings data
-  const { data, isLoading, error } = useBookings(filters);
+  // Fetch bookings data - use different hooks based on view
+  const { data: listData, isLoading: listLoading, error: listError } = useBookings(filters);
+  const { bookings: calendarBookings, isLoading: calendarLoading, error: calendarError } = useBookingsCalendar(
+    currentMonth,
+    {
+      search: filters.search,
+      specialistIds: filters.specialistIds,
+      status: filters.status,
+    }
+  );
   const { data: specialists } = useSpecialists();
+
+  // Use appropriate data based on view
+  const data = view === "calendar" ? { bookings: calendarBookings, pagination: { page: 1, limit: calendarBookings.length, total: calendarBookings.length, totalPages: 1 } } : listData;
+  const isLoading = view === "calendar" ? calendarLoading : listLoading;
+  const error = view === "calendar" ? calendarError : listError;
 
   // Sync filters with URL params when they change
   useEffect(() => {
     const urlStatus = searchParams.get("status");
     const status = urlStatus === null || urlStatus === "" ? "active" : (urlStatus === "all" ? undefined : urlStatus);
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const limit = parseInt(searchParams.get("limit") || "5");
     const specialistIds = searchParams.get("specialists")?.split(",").filter(Boolean);
     const search = searchParams.get("search") || undefined;
 
@@ -88,13 +103,6 @@ export default function BookingsPage() {
       specialistIds: filterState.specialistIds.length > 0 ? filterState.specialistIds : undefined,
       page: 1, // Reset to first page when filters change
     };
-
-    // For calendar view, adjust date range based on current view
-    if (view === "calendar") {
-      const now = new Date();
-      newFilters.startDate = startOfMonth(now);
-      newFilters.endDate = endOfMonth(now);
-    }
 
     setFilters(newFilters);
   };
@@ -189,7 +197,11 @@ export default function BookingsPage() {
           />
         )
       ) : (
-        <BookingCalendar bookings={data?.bookings || []} isLoading={isLoading} />
+        <BookingCalendar
+          bookings={data?.bookings || []}
+          isLoading={isLoading}
+          onMonthChange={setCurrentMonth}
+        />
       )}
     </div>
   );

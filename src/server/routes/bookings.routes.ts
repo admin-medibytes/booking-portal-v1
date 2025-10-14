@@ -55,8 +55,8 @@ const bookingsRoutes = new Hono()
       specialistId: queryParams.specialistId,
       specialistIds: queryParams.specialistIds ? queryParams.specialistIds.split(",") : undefined,
       search: queryParams.search,
-      page: Number(queryParams.page) ?? 1,
-      limit: Number(queryParams.limit) ?? 20,
+      page: Number(queryParams.page) ?? undefined,
+      limit: Number(queryParams.limit) ?? undefined,
     };
 
     const result = await bookingService.getBookingsForUser(typedUser, filters);

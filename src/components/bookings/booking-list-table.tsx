@@ -237,7 +237,7 @@ export const BookingListTable = memo(function BookingListTable({
               {booking.status}
             </div>
             <div className="text-sm text-muted-foreground">{booking.examinee.caseType}</div>
-            <div className="text-sm text-muted-foreground">{booking.examinee.condition}</div>
+            <div className="text-sm text-muted-foreground max-w-[300px] truncate">{booking.examinee.condition}</div>
           </div>
         );
       },
@@ -405,6 +405,7 @@ export const BookingListTable = memo(function BookingListTable({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="5">5</SelectItem>
                 <SelectItem value="10">10</SelectItem>
                 <SelectItem value="20">20</SelectItem>
                 <SelectItem value="50">50</SelectItem>

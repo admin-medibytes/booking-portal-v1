@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { bookingsClient } from "@/lib/hono-client";
 import type { BookingListResponse, BookingWithSpecialist, BookingFilters } from "@/types/booking";
@@ -8,6 +9,8 @@ export const bookingKeys = {
   all: ["bookings"] as const,
   lists: () => [...bookingKeys.all, "list"] as const,
   list: (filters?: BookingFilters) => [...bookingKeys.lists(), filters] as const,
+  calendar: () => [...bookingKeys.all, "calendar"] as const,
+  calendarMonth: (year: number, month: number) => [...bookingKeys.calendar(), year, month] as const,
   details: () => [...bookingKeys.all, "detail"] as const,
   detail: (id: string) => [...bookingKeys.details(), id] as const,
 };
@@ -119,6 +122,129 @@ export function useBooking(id: string) {
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes cache time
   });
+}
+
+// Hook to fetch bookings for calendar view (month-based, client-side filtering)
+export function useBookingsCalendar(
+  currentMonth: Date,
+  clientFilters?: {
+    search?: string;
+    specialistIds?: string[];
+    status?: string;
+  }
+) {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+
+  // Fetch all bookings for the month
+  const { data, isLoading, error } = useQuery({
+    queryKey: bookingKeys.calendarMonth(year, month),
+    queryFn: async () => {
+      // Get first and last day of the month
+      const startDate = new Date(year, month, 1);
+      const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
+      const queryFilters = {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        limit: "1000", // Set a high limit to get all bookings for the month
+        // Don't apply other filters server-side for calendar
+        // We'll filter client-side for better caching
+      };
+
+      const res = await bookingsClient.$get({
+        query: queryFilters,
+      });
+
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "Failed to fetch bookings");
+      }
+
+      const data = await res.json();
+
+      // Transform date strings to Date objects
+      const rawBookings = (data.bookings || []) as Array<Record<string, unknown>>;
+      const transformedBookings = rawBookings.map((booking) => {
+        const referrerObj = booking.referrer as Record<string, unknown> | null | undefined;
+        const referrerOrganizationObj = booking.referrerOrganization as
+          | Record<string, unknown>
+          | null
+          | undefined;
+
+        return {
+          ...(booking as Record<string, unknown>),
+          createdAt: new Date(booking.createdAt as string),
+          updatedAt: new Date(booking.updatedAt as string),
+          appointmentDate: booking.dateTime ? new Date(booking.dateTime as string) : null,
+          completedAt: booking.completedAt
+            ? new Date(booking.completedAt as string)
+            : null,
+          cancelledAt: booking.cancelledAt
+            ? new Date(booking.cancelledAt as string)
+            : null,
+          referrer:
+            referrerObj && Object.keys(referrerObj).length > 0 ? referrerObj : null,
+          referrerOrganization:
+            referrerOrganizationObj && Object.keys(referrerOrganizationObj).length > 0
+              ? referrerOrganizationObj
+              : null,
+        } as unknown as BookingWithSpecialist;
+      });
+
+      return transformedBookings;
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes - calendar data can be cached longer
+    gcTime: 10 * 60 * 1000, // 10 minutes cache time
+  });
+
+  // Apply client-side filtering
+  const filteredBookings = useMemo(() => {
+    if (!data) return [];
+
+    let filtered = [...data];
+
+    // Apply status filter (default to 'active' if not specified)
+    const statusFilter = clientFilters?.status === undefined || clientFilters?.status === ""
+      ? "active"
+      : clientFilters?.status;
+
+    if (statusFilter && statusFilter !== "all") {
+      filtered = filtered.filter((booking) => booking.status === statusFilter);
+    }
+
+    // Apply specialist filter
+    if (clientFilters?.specialistIds && clientFilters.specialistIds.length > 0) {
+      filtered = filtered.filter((booking) =>
+        clientFilters.specialistIds!.includes(booking.specialistId as string)
+      );
+    }
+
+    // Apply search filter (search in examinee name and email)
+    if (clientFilters?.search) {
+      const searchLower = clientFilters.search.toLowerCase();
+      filtered = filtered.filter((booking) => {
+        const examinee = booking.examinee as { firstName?: string; lastName?: string; email?: string } | undefined;
+        const firstName = examinee?.firstName?.toLowerCase() || "";
+        const lastName = examinee?.lastName?.toLowerCase() || "";
+        const email = examinee?.email?.toLowerCase() || "";
+
+        return (
+          firstName.includes(searchLower) ||
+          lastName.includes(searchLower) ||
+          email.includes(searchLower)
+        );
+      });
+    }
+
+    return filtered;
+  }, [data, clientFilters?.status, clientFilters?.specialistIds, clientFilters?.search]);
+
+  return {
+    bookings: filteredBookings,
+    isLoading,
+    error,
+  };
 }
 
 // Hook to update booking status (for future use - route not implemented yet)

@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import type { BookingWithSpecialist } from "@/types/booking";
@@ -33,12 +34,13 @@ import { BookingDetailsPopover } from "./booking-details-popover";
 interface BookingCalendarProps {
   bookings: BookingWithSpecialist[];
   onEventSelect?: (booking: BookingWithSpecialist) => void;
+  onMonthChange?: (date: Date) => void;
   isLoading?: boolean;
 }
 
 type ViewType = "month" | "week" | "day" | "agenda";
 
-export function BookingCalendar({ bookings, onEventSelect, isLoading = false }: BookingCalendarProps) {
+export function BookingCalendar({ bookings, onEventSelect, onMonthChange, isLoading = false }: BookingCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>("month");
   const [selectedBooking, setSelectedBooking] = useState<BookingWithSpecialist | null>(null);
@@ -58,12 +60,13 @@ export function BookingCalendar({ bookings, onEventSelect, isLoading = false }: 
     }
   }, []);
 
-  // Save currentDate to localStorage when it changes
+  // Save currentDate to localStorage when it changes and notify parent
   useEffect(() => {
     if (isClient) {
       localStorage.setItem("booking-calendar-date", currentDate.toISOString());
+      onMonthChange?.(currentDate);
     }
-  }, [currentDate, isClient]);
+  }, [currentDate, isClient, onMonthChange]);
 
   // Save viewType to localStorage when it changes
   useEffect(() => {
@@ -349,16 +352,11 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = fa
                     {format(day, "d")}
                   </span>
                 )}
-                {!isLoading && dayBookings.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    {dayBookings.length}
-                  </Badge>
-                )}
               </div>
 
               {/* Booking Items */}
-              <div className="space-y-1">
-                <div className="hidden sm:block">
+              <div>
+                <div className="hidden sm:block space-y-1">
                   {dayBookings.slice(0, 3).map((booking) => (
                     <BookingItem
                       key={booking.id}
@@ -368,9 +366,28 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = fa
                     />
                   ))}
                   {dayBookings.length > 3 && (
-                    <p className="text-xs text-center text-muted-foreground">
-                      +{dayBookings.length - 3} more
-                    </p>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="w-full text-xs text-center text-muted-foreground hover:text-foreground hover:underline cursor-pointer transition-colors">
+                          +{dayBookings.length - 3} more
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 max-h-96 overflow-y-auto p-2">
+                        <div className="space-y-1">
+                          <div className="px-2 py-1 text-sm font-medium border-b mb-2">
+                            {format(day, "MMMM d, yyyy")} - {dayBookings.length} bookings
+                          </div>
+                          {dayBookings.map((booking) => (
+                            <BookingItem
+                              key={booking.id}
+                              booking={booking}
+                              view="month"
+                              onClick={onBookingClick}
+                            />
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </div>
                 <div className="sm:hidden">
@@ -383,9 +400,28 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = fa
                     />
                   ))}
                   {dayBookings.length > 1 && (
-                    <p className="text-xs text-center text-muted-foreground">
-                      +{dayBookings.length - 1}
-                    </p>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="w-full text-xs text-center text-muted-foreground hover:text-foreground hover:underline cursor-pointer transition-colors">
+                          +{dayBookings.length - 1}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 max-h-80 overflow-y-auto p-2">
+                        <div className="space-y-1">
+                          <div className="px-2 py-1 text-sm font-medium border-b mb-2">
+                            {format(day, "MMM d")} - {dayBookings.length} bookings
+                          </div>
+                          {dayBookings.map((booking) => (
+                            <BookingItem
+                              key={booking.id}
+                              booking={booking}
+                              view="month"
+                              onClick={onBookingClick}
+                            />
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </div>
               </div>

@@ -101,6 +101,7 @@ export const bookings = pgTable(
     referrerIdIdx: index("bookings_referrer_id_idx").on(table.referrerId),
     specialistIdIdx: index("bookings_specialist_id_idx").on(table.specialistId),
     statusIdx: index("bookings_status_idx").on(table.status),
+    dateTimeIdx: index("bookings_date_time_idx").on(table.dateTime),
     acuityAppointmentIdIdx: index("bookings_acuity_appointment_id_idx").on(
       table.acuityAppointmentId
     ),
