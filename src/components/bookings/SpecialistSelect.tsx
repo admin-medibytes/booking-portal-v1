@@ -315,7 +315,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
               <div className="flex-1">
                 <p className="text-sm font-medium text-slate-900">Email</p>
                 <a
-                  href="mailto:appointments@medibytes.com"
+                  href="mailto:admin@medibytes.com.au"
                   className="text-sm text-primary hover:underline"
                 >
                   admin@medibytes.com.au
