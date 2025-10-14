@@ -16,9 +16,13 @@ export const bookingKeys = {
 };
 
 // Hook to fetch bookings list with filters
-export function useBookings(filters?: BookingFilters) {
+export function useBookings(
+  filters?: BookingFilters,
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: bookingKeys.list(filters),
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       // Filter out any "all" status before sending to backend
       const cleanedFilters = filters
@@ -124,14 +128,15 @@ export function useBooking(id: string) {
   });
 }
 
-// Hook to fetch bookings for calendar view (month-based, client-side filtering)
+// Hook to fetch bookings for calendar view (month-based, with server-side filtering)
 export function useBookingsCalendar(
   currentMonth: Date,
   clientFilters?: {
     search?: string;
     specialistIds?: string[];
     status?: string;
-  }
+  },
+  options?: { enabled?: boolean }
 ) {
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -139,18 +144,27 @@ export function useBookingsCalendar(
   // Fetch all bookings for the month
   const { data, isLoading, error } = useQuery({
     queryKey: bookingKeys.calendarMonth(year, month),
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       // Get first and last day of the month
       const startDate = new Date(year, month, 1);
       const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
 
-      const queryFilters = {
+      const queryFilters: Record<string, string> = {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        limit: "1000", // Set a high limit to get all bookings for the month
-        // Don't apply other filters server-side for calendar
-        // We'll filter client-side for better caching
+        limit: "500", // Reduced from 1000 for better performance
       };
+
+      // Apply status filter server-side if present
+      if (clientFilters?.status && clientFilters.status !== "all" && clientFilters.status !== "") {
+        queryFilters.status = clientFilters.status;
+      }
+
+      // Apply specialist filter server-side if present
+      if (clientFilters?.specialistIds && clientFilters.specialistIds.length > 0) {
+        queryFilters.specialistIds = clientFilters.specialistIds.join(",");
+      }
 
       const res = await bookingsClient.$get({
         query: queryFilters,
@@ -198,29 +212,13 @@ export function useBookingsCalendar(
     gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
 
-  // Apply client-side filtering
+  // Apply client-side filtering (only search, as status/specialist are now server-side)
   const filteredBookings = useMemo(() => {
     if (!data) return [];
 
     let filtered = [...data];
 
-    // Apply status filter (default to 'active' if not specified)
-    const statusFilter = clientFilters?.status === undefined || clientFilters?.status === ""
-      ? "active"
-      : clientFilters?.status;
-
-    if (statusFilter && statusFilter !== "all") {
-      filtered = filtered.filter((booking) => booking.status === statusFilter);
-    }
-
-    // Apply specialist filter
-    if (clientFilters?.specialistIds && clientFilters.specialistIds.length > 0) {
-      filtered = filtered.filter((booking) =>
-        clientFilters.specialistIds!.includes(booking.specialistId as string)
-      );
-    }
-
-    // Apply search filter (search in examinee name and email)
+    // Apply search filter client-side (search in examinee name and email)
     if (clientFilters?.search) {
       const searchLower = clientFilters.search.toLowerCase();
       filtered = filtered.filter((booking) => {
@@ -238,7 +236,7 @@ export function useBookingsCalendar(
     }
 
     return filtered;
-  }, [data, clientFilters?.status, clientFilters?.specialistIds, clientFilters?.search]);
+  }, [data, clientFilters?.search]);
 
   return {
     bookings: filteredBookings,

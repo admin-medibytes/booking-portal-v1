@@ -48,9 +48,10 @@ export class BookingRepository {
     const offset = (page - 1) * limit;
 
     // If searching, we need to use the query builder with explicit joins
+    // Optimize: only select booking IDs in the first query
     if (filters?.search) {
       const results = await db
-        .select()
+        .select({ id: bookings.id })
         .from(bookings)
         .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -59,7 +60,7 @@ export class BookingRepository {
         .offset(offset);
 
       // Get the booking IDs from the results
-      const bookingIds = results.map((r) => r.bookings.id);
+      const bookingIds = results.map((r) => r.id);
 
       // Fetch optimized booking details with only essential fields
       const fullResults = await db.query.bookings.findMany({

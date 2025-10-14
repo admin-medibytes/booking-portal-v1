@@ -59,15 +59,19 @@ export default function BookingsPage() {
     router.push(`?${params.toString()}`);
   };
 
-  // Fetch bookings data - use different hooks based on view
-  const { data: listData, isLoading: listLoading, error: listError } = useBookings(filters);
+  // Fetch bookings data - only fetch for the active view
+  const { data: listData, isLoading: listLoading, error: listError } = useBookings(
+    filters,
+    { enabled: view === "list" }
+  );
   const { bookings: calendarBookings, isLoading: calendarLoading, error: calendarError } = useBookingsCalendar(
     currentMonth,
     {
       search: filters.search,
       specialistIds: filters.specialistIds,
       status: filters.status,
-    }
+    },
+    { enabled: view === "calendar" }
   );
   const { data: specialists } = useSpecialists();
 
