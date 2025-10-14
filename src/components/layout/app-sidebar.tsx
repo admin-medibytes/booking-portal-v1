@@ -48,16 +48,16 @@ export function AppSidebar({ user }: AppUserProps) {
       label: "Bookings",
       icon: Calendar,
     },
-    {
-      href: "/documents",
-      label: "Documents",
-      icon: FileText,
-    },
-    {
-      href: "/settings",
-      label: "Settings",
-      icon: Settings,
-    },
+    // {
+    //   href: "/documents",
+    //   label: "Documents",
+    //   icon: FileText,
+    // },
+    // {
+    //   href: "/settings",
+    //   label: "Settings",
+    //   icon: Settings,
+    // },
   ];
 
   // Admin-only navigation items
@@ -72,11 +72,11 @@ export function AppSidebar({ user }: AppUserProps) {
       label: "User Management",
       icon: Users,
     },
-    {
-      href: "/admin/audit",
-      label: "Audit Logs",
-      icon: Shield,
-    },
+    // {
+    //   href: "/admin/audit",
+    //   label: "Audit Logs",
+    //   icon: Shield,
+    // },
     {
       href: "/admin/integrations",
       label: "Integrations",

@@ -675,8 +675,11 @@ function BookingItem({ booking, view, onClick }: BookingItemProps) {
   const appointmentDate = booking.dateTime ? new Date(booking.dateTime) : null;
   const timeString = appointmentDate ? format(appointmentDate, "h:mm a") : "";
 
-  // For now, we'll use a default status since currentProgress isn't available
-  const statusColor = "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+  // Set color based on booking type: blue for telehealth, violet for in-person
+  const statusColor =
+    booking.type === "telehealth"
+      ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+      : "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200";
 
   if (view === "month") {
     return (
