@@ -106,7 +106,7 @@ interface OldBooking {
   specialist_id: string;
   examinee_id: string;
   status: string;
-  type: string;
+  appointment_type: string;
   duration: number;
   location: string;
   datetime?: Date | string;
@@ -142,10 +142,39 @@ const oldToNewSpecialistMap = new Map<string, string>();
 // ============================================================================
 
 // Convert string or Date to Date object
+// Preserves the local Philippine time by treating it as UTC
 function toDate(value: Date | string | null | undefined): Date | null {
   if (!value) return null;
-  if (value instanceof Date) return value;
-  return new Date(value);
+
+  let date: Date;
+  if (value instanceof Date) {
+    date = value;
+  } else {
+    date = new Date(value);
+  }
+
+  // The old database stores times in Philippine Standard Time (GMT+8)
+  // Example: "May 14 2024 08:00:00 GMT+0800" (8am Philippine time)
+  //
+  // We want the NEW database to store it so that when the app displays it,
+  // it shows "8:00 AM" (the same wall-clock time).
+  //
+  // The solution: Extract the LOCAL time components (year, month, day, hour, min, sec)
+  // and create a NEW UTC date with those values.
+  //
+  // This way, when stored in Postgres as UTC and displayed without timezone conversion,
+  // it will show the correct time.
+
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const seconds = date.getSeconds();
+  const milliseconds = date.getMilliseconds();
+
+  // Create a new Date using UTC methods with the local time components
+  return new Date(Date.UTC(year, month, day, hours, minutes, seconds, milliseconds));
 }
 
 // Convert any value to string (handles arrays, objects, etc.)
@@ -508,7 +537,7 @@ async function migrateBookings(bookingIds?: Set<string>) {
     }
 
     try {
-      const bookingType = oldBooking.type?.toLowerCase() === "telehealth" ? "telehealth" : "in-person";
+      const bookingType = oldBooking.appointment_type?.toLowerCase() === "telehealth" ? "telehealth" : "in-person";
 
       // Skip bookings with missing required Acuity fields
       if (!oldBooking.acuity_appointment_id) {
