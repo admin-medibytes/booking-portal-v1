@@ -3,10 +3,7 @@
 import * as React from "react";
 import {
   Calendar,
-  FileText,
-  Settings,
   Users,
-  Shield,
   Home,
   CalendarCheck,
   Plug,
