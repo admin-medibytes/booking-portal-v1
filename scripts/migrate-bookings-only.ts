@@ -35,6 +35,8 @@ const OLD_DB_URL = process.env.OLD_DATABASE_URL;
 const NEW_DB_URL = process.env.DATABASE_URL;
 const DEFAULT_ORGANIZATION_ID = process.env.DEFAULT_ORGANIZATION_ID;
 const SYSTEM_USER_ID = process.env.SYSTEM_USER_ID;
+const ACUITY_USER_ID = process.env.ACUITY_USER_ID;
+const ACUITY_API_KEY = process.env.ACUITY_API_KEY;
 
 // Test mode: only migrate one booking for testing
 const TEST_MODE = process.env.TEST_MODE === "true";
@@ -52,6 +54,12 @@ if (!DEFAULT_ORGANIZATION_ID) {
 }
 if (!SYSTEM_USER_ID) {
   throw new Error("❌ SYSTEM_USER_ID environment variable is required");
+}
+if (!ACUITY_USER_ID) {
+  throw new Error("❌ ACUITY_USER_ID environment variable is required");
+}
+if (!ACUITY_API_KEY) {
+  throw new Error("❌ ACUITY_API_KEY environment variable is required");
 }
 
 if (TEST_MODE) {
@@ -105,13 +113,14 @@ interface OldBooking {
   referrer_id: string;
   specialist_id: string;
   examinee_id: string;
-  status: string;
   appointment_type: string;
   duration: number;
   location: string;
   datetime?: Date | string;
   acuity_appointment_id: number;
   acuity_calendar_id: number;
+  canceled: boolean;
+  no_show: boolean;
   scheduled_at?: Date | string;
   completed_at?: Date | string;
   cancelled_at?: Date | string;
@@ -128,6 +137,13 @@ interface OldProgress {
   created_at: Date | string;
 }
 
+interface AcuityAppointment {
+  id: number;
+  appointmentTypeID: number;
+  canceled: boolean;
+  // Add other fields as needed
+}
+
 // ============================================================================
 // ID MAPPING STORAGE
 // ============================================================================
@@ -136,6 +152,73 @@ const oldToNewReferrerMap = new Map<string, string>();
 const oldToNewExamineeMap = new Map<string, string>();
 const oldToNewBookingMap = new Map<string, string>();
 const oldToNewSpecialistMap = new Map<string, string>();
+
+// Cache for Acuity API responses to avoid duplicate requests
+const acuityAppointmentCache = new Map<number, AcuityAppointment>();
+
+// API statistics
+let acuityApiCalls = 0;
+let acuityApiCacheHits = 0;
+let acuityApiErrors = 0;
+
+// ============================================================================
+// ACUITY API FUNCTIONS
+// ============================================================================
+
+/**
+ * Simple rate limiter - delays execution to respect API rate limits
+ * Acuity allows ~10 requests per second
+ */
+async function rateLimitDelay() {
+  await new Promise(resolve => setTimeout(resolve, 120)); // 120ms = ~8 requests/second (safe margin)
+}
+
+/**
+ * Fetches appointment details from Acuity API
+ * Returns cached result if available
+ */
+async function fetchAcuityAppointment(appointmentId: number): Promise<AcuityAppointment | null> {
+  // Check cache first
+  if (acuityAppointmentCache.has(appointmentId)) {
+    acuityApiCacheHits++;
+    return acuityAppointmentCache.get(appointmentId)!;
+  }
+
+  try {
+    // Rate limiting
+    await rateLimitDelay();
+
+    acuityApiCalls++;
+
+    const authString = Buffer.from(`${ACUITY_USER_ID}:${ACUITY_API_KEY}`).toString('base64');
+    const response = await fetch(
+      `https://acuityscheduling.com/api/v1/appointments/${appointmentId}`,
+      {
+        headers: {
+          'Authorization': `Basic ${authString}`,
+          'Accept': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      acuityApiErrors++;
+      console.warn(`   ⚠️  Failed to fetch Acuity appointment ${appointmentId}: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const data = await response.json() as AcuityAppointment;
+
+    // Cache the result
+    acuityAppointmentCache.set(appointmentId, data);
+
+    return data;
+  } catch (error) {
+    acuityApiErrors++;
+    console.error(`   ❌ Error fetching Acuity appointment ${appointmentId}:`, error);
+    return null;
+  }
+}
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -190,17 +273,28 @@ function toString(value: unknown): string {
 // STATUS MAPPING FUNCTIONS
 // ============================================================================
 
-function mapBookingStatus(oldStatus: string): "active" | "closed" | "archived" {
-  const normalized = oldStatus?.toLowerCase().trim();
-  const statusMap: Record<string, "active" | "closed" | "archived"> = {
-    active: "active",
-    closed: "closed",
-    archived: "archived",
-    pending: "active",
-    confirmed: "active",
-    scheduled: "active",
-  };
-  return statusMap[normalized] || "active";
+/**
+ * Maps old booking flags to new status enum
+ * Old DB uses: canceled (boolean), no_show (boolean), completed_at (timestamp)
+ * New DB uses: status enum ("active" | "closed" | "archived")
+ */
+function mapBookingStatus(
+  canceled: boolean,
+  noShow: boolean,
+  completedAt: Date | string | null | undefined
+): "active" | "closed" | "archived" {
+  // If canceled or no-show, it's closed
+  if (canceled || noShow) {
+    return "closed";
+  }
+
+  // If completed, it's closed
+  if (completedAt) {
+    return "closed";
+  }
+
+  // Otherwise, it's active
+  return "active";
 }
 
 function mapBookingProgressStatus(
@@ -549,6 +643,18 @@ async function migrateBookings(bookingIds?: Set<string>) {
         continue;
       }
 
+      // Fetch appointment type ID from Acuity API
+      const acuityAppointment = await fetchAcuityAppointment(oldBooking.acuity_appointment_id);
+
+      if (!acuityAppointment || !acuityAppointment.appointmentTypeID) {
+        console.warn(
+          `   ⚠️  Skipping booking ${oldBooking.id} - could not fetch appointmentTypeID from Acuity API`
+        );
+        skipReasons.otherError++;
+        skipped++;
+        continue;
+      }
+
       await newDb.insert(newSchema.bookings).values({
         id: oldBooking.id, // Keep the same ID from old database
         organizationId: DEFAULT_ORGANIZATION_ID_STR,
@@ -557,13 +663,13 @@ async function migrateBookings(bookingIds?: Set<string>) {
         referrerId: newReferrerId,
         specialistId: newSpecialistId,
         examineeId: newExamineeId,
-        status: mapBookingStatus(oldBooking.status),
+        status: mapBookingStatus(oldBooking.canceled, oldBooking.no_show, oldBooking.completed_at),
         type: bookingType,
         duration: oldBooking.duration,
         location: oldBooking.location,
         dateTime: toDate(oldBooking.datetime),
         acuityAppointmentId: oldBooking.acuity_appointment_id,
-        acuityAppointmentTypeId: oldBooking.acuity_appointment_id,
+        acuityAppointmentTypeId: acuityAppointment.appointmentTypeID, // ✅ Now fetched from Acuity API
         acuityCalendarId: oldBooking.acuity_calendar_id,
         scheduledAt: toDate(oldBooking.scheduled_at),
         completedAt: toDate(oldBooking.completed_at),
@@ -764,6 +870,11 @@ async function runMigration() {
     console.log(`   - Examinees: ${oldToNewExamineeMap.size} migrated`);
     console.log(`   - Bookings: ${oldToNewBookingMap.size} migrated`);
     console.log(`   - Duration: ${duration} seconds`);
+    console.log();
+    console.log("🔌 Acuity API Stats:");
+    console.log(`   - API Calls Made: ${acuityApiCalls}`);
+    console.log(`   - Cache Hits: ${acuityApiCacheHits}`);
+    console.log(`   - Errors: ${acuityApiErrors}`);
     console.log();
   } catch (error) {
     console.error("\n❌ Migration failed:", error);

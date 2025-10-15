@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
+import { addMinutes, format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -41,7 +41,7 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
         <DialogHeader>
           {appointmentDate &&
             
-            <span className="text-sm text-muted-foreground">{format(appointmentDate, "h:mm a")}, 06:00 AM - 07:00 AM</span>
+            <span className="text-sm text-muted-foreground">{format(appointmentDate, "PPPp")} to {format(addMinutes(appointmentDate, booking.duration), "h:mm a")}</span>
           }
           <DialogTitle>{booking.examinee.firstName} {booking.examinee.lastName}</DialogTitle>
         </DialogHeader>
