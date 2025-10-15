@@ -824,6 +824,7 @@ export class UserService {
             lastName: input.lastName,
             jobTitle: input.jobTitle,
             emailVerified: true,
+            image: "initialized", // Mark onboarding as complete
             updatedAt: new Date(),
           })
           .where(eq(users.id, userId));

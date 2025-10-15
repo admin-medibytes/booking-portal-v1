@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/server/db";
-import { invitations, organizations } from "@/server/db/schema";
+import { invitations, organizations, users } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { AcceptInvitationForm } from "@/components/auth/accept-invitation-form";
 import { Metadata } from "next";
@@ -79,6 +79,25 @@ export default async function AcceptInvitationPage({ params }: AcceptInvitationP
     );
   }
 
+
+  // Check if user already exists (for pre-filling form data)
+  const existingUser = await db.query.users.findFirst({
+    where: eq(users.email, invite.email),
+  });
+
+  // Prepare user data for form - use existing data or empty defaults
+  const userData = existingUser
+    ? {
+        firstName: existingUser.firstName,
+        lastName: existingUser.lastName,
+        jobTitle: existingUser.jobTitle || "",
+      }
+    : {
+        firstName: "",
+        lastName: "",
+        jobTitle: "",
+      };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -90,7 +109,7 @@ export default async function AcceptInvitationPage({ params }: AcceptInvitationP
         </div>
 
         <div className="mt-8 bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <AcceptInvitationForm invitation={invite} />
+          <AcceptInvitationForm invitation={invite} user={userData} />
         </div>
       </div>
     </div>

@@ -25,7 +25,13 @@ interface AcceptInvitationFormProps {
     organizationName: string | null;
     role: string | null;
     teamId: string | null;
-  };
+  },
+  user: {
+    firstName: string;
+    lastName: string;
+    jobTitle: string;
+  }
+  
 }
 
 // Password strength calculation
@@ -75,7 +81,7 @@ const getStrengthColor = (strength: number): string => {
   }
 };
 
-export function AcceptInvitationForm({ invitation }: AcceptInvitationFormProps) {
+export function AcceptInvitationForm({ invitation, user }: AcceptInvitationFormProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -86,9 +92,9 @@ export function AcceptInvitationForm({ invitation }: AcceptInvitationFormProps) 
     defaultValues: {
       password: "",
       confirmPassword: "",
-      firstName: "",
-      lastName: "",
-      jobTitle: "",
+      firstName: user.firstName,
+      lastName: user.lastName,
+      jobTitle: user.jobTitle,
     } as AcceptInvitationFormData,
     onSubmit: async ({ value }) => {
       try {
