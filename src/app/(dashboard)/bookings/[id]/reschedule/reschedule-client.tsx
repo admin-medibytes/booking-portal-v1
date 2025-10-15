@@ -95,7 +95,7 @@ export function RescheduleClient({ booking }: RescheduleClientProps) {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">Reschedule Appointment</h1>
+          <h1 className="text-3xl font-bold">Reschedule Appointment</h1>
           <p className="text-muted-foreground">
             Select a new date and time for your appointment
           </p>

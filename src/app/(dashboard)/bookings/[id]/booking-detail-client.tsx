@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { BookingDetailCard } from "@/components/bookings/booking-detail-card";
 import { BookingProgressUpdate } from "@/components/bookings/booking-progress-update";
 import { useBookingWithDetails } from "@/hooks/use-booking";
 import type { BookingWithDetails } from "@/hooks/use-booking";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 interface BookingDetailClientProps {
   booking: BookingWithDetails;
@@ -27,6 +29,8 @@ interface BookingDetailClientProps {
 }
 
 export function BookingDetailClient({ booking: initialBooking }: BookingDetailClientProps) {
+  const router = useRouter();
+  
   const [isProgressUpdateOpen, setIsProgressUpdateOpen] = useState(false);
 
   // Use client-side query for real-time updates
@@ -53,10 +57,13 @@ export function BookingDetailClient({ booking: initialBooking }: BookingDetailCl
       {/* Header */}
       <div className="flex items-center justify-start mb-8">
         <div className="flex items-center gap-4">
-          {/* <Button variant="ghost" size="sm" onClick={() => router.push("/bookings")}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button> */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Booking Details</h1>
             <p className="text-sm text-gray-500 mt-1">

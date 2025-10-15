@@ -1,5 +1,5 @@
 import { db } from "@/server/db";
-import { bookings, examinees, specialists } from "@/server/db/schema";
+import { bookings, examinees, specialists, referrers } from "@/server/db/schema";
 import { users } from "@/server/db/schema/auth";
 import { eq, and, gte, lte, desc, sql, SQL, or, ilike, inArray } from "drizzle-orm";
 import type { BookingFilters } from "@/types/booking";
@@ -42,6 +42,11 @@ export class BookingRepository {
         userId: users.id,
         userJobTitle: users.jobTitle,
 
+        // Referrer fields (flattened)
+        referrerId_: referrers.id,
+        referrerFirstName: referrers.firstName,
+        referrerLastName: referrers.lastName,
+
         // Examinee fields (flattened)
         examineeId_: examinees.id,
         examineeFirstName: examinees.firstName,
@@ -51,6 +56,7 @@ export class BookingRepository {
       .from(bookings)
       .leftJoin(specialists, eq(bookings.specialistId, specialists.id))
       .leftJoin(users, eq(specialists.userId, users.id))
+      .leftJoin(referrers, eq(bookings.referrerId, referrers.id))
       .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(bookings.dateTime))
@@ -86,6 +92,11 @@ export class BookingRepository {
           jobTitle: row.userJobTitle,
         } : undefined,
       },
+      referrer: row.referrerId_ && row.referrerFirstName && row.referrerLastName ? {
+        id: row.referrerId_,
+        firstName: row.referrerFirstName,
+        lastName: row.referrerLastName,
+      } : null,
       examinee: {
         id: row.examineeId_,
         firstName: row.examineeFirstName,

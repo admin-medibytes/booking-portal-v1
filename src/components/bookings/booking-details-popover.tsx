@@ -63,13 +63,17 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
             </div>
           )}
 
-          {/* Specialist Info */}
+          {/* Referrer Info */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <UserIcon className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Referrer</span>
             </div>
-            <p className="text-sm ml-6 capitalize">{booking.referrer?.firstName} {booking.referrer?.lastName || "Unassigned"}</p>
+            <p className="text-sm ml-6 capitalize">
+              {booking.referrer?.firstName && booking.referrer?.lastName
+                ? `${booking.referrer.firstName} ${booking.referrer.lastName}`
+                : "Unassigned"}
+            </p>
           </div>
 
           {/* Specialist Info */}
