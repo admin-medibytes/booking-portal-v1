@@ -103,7 +103,9 @@ function buildArktypeSchema(fields: AppFormField[]) {
     } else if (field.acuityField?.type === "checkboxlist") {
       fieldType = "string[]";
     } else if (field.acuityField?.type === "yesno") {
-      fieldType = "'yes'|'no'";
+      // For yes/no fields, allow empty string initially even if required
+      // The field validator will show error if required and empty
+      fieldType = "'yes'|'no'|''";
     } else if (field.validationRules.minLength) {
       fieldType = `string>${field.validationRules.minLength - 1}`;
     } else if (field.isRequired) {
@@ -118,7 +120,8 @@ function buildArktypeSchema(fields: AppFormField[]) {
         schemaObj[`${fieldName}?`] = "boolean";
       } else if (fieldType === "string[]") {
         schemaObj[`${fieldName}?`] = "string[]";
-      } else if (fieldType === "'yes'|'no'") {
+      } else if (fieldType === "'yes'|'no'|''") {
+        // Yes/no fields already allow empty string
         schemaObj[`${fieldName}?`] = "'yes'|'no'|''";
       } else if (fieldType === "string.email") {
         // For optional email fields, allow valid email, empty string, null, or undefined

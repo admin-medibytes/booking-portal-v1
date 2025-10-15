@@ -12,17 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PhoneNumberInput } from "@/components/ui/phone-input";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   FileText,
   AlertCircle,
@@ -32,8 +21,6 @@ import {
   MapPin,
   Video,
   Globe,
-  Shield,
-  Info,
 } from "lucide-react";
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
@@ -41,7 +28,6 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Specialist } from "@/types/specialist";
 import { getInitials } from "@/lib/utils/initials";
-import { Separator } from "../ui/separator";
 
 // Minimal shape of the form configuration used for rendering
 interface AppointmentFormConfiguration {
@@ -177,9 +163,6 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
     },
     ref
   ) => {
-    const [showTermsModal, setShowTermsModal] = useState(false);
-    const [modalTermsAccepted, setModalTermsAccepted] = useState(false);
-    const [pendingSubmitData, setPendingSubmitData] = useState<SubmitData | null>(null);
     // Check if dynamic form has no required fields (all optional), then it's valid by default
     const [isDynamicFormValid, setIsDynamicFormValid] = useState(false);
     const appFormRef = useRef<{ submit: () => void } | null>(null);
@@ -322,7 +305,7 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
         }
       });
 
-      // Structure the data according to the new format
+      // Structure the data according to the new format and submit directly
       const structuredData: SubmitData = {
         referrerInfo: {
           firstName: referrerData.referrerFirstName,
@@ -331,156 +314,11 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
           phone: referrerData.referrerPhone,
         },
         fieldsInfo,
-        termsAccepted: false,
+        termsAccepted: true,
       };
 
-      // Always show terms modal for confirmation
-      setPendingSubmitData(structuredData);
-      setShowTermsModal(true);
+      onSubmit(structuredData);
     };
-
-    const handleTermsAccept = () => {
-      if (!pendingSubmitData) return;
-
-      onSubmit({ ...pendingSubmitData, termsAccepted: true });
-    };
-
-    // Terms and Conditions Modal
-    const TermsModal = () => (
-      <Dialog open={showTermsModal} onOpenChange={setShowTermsModal}>
-        <DialogContent
-          className="max-w-2xl max-h-[80vh]"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-amber-600" />
-              Terms and Conditions
-            </DialogTitle>
-            <DialogDescription>
-              Please read and accept our terms and conditions to proceed with your booking.
-            </DialogDescription>
-          </DialogHeader>
-
-          <ScrollArea className="h-[400px] pr-4">
-            <div className="space-y-4">
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <div className="flex items-start gap-2">
-                  <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <p className="font-medium text-foreground">
-                    By proceeding with this booking, you acknowledge and agree to the following
-                    terms:
-                  </p>
-                </div>
-
-                <ul className="space-y-3 ml-6">
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-600 font-bold">•</span>
-                    <span>
-                      The examination will be conducted in accordance with professional medical
-                      standards and ethics.
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-600 font-bold">•</span>
-                    <span>
-                      A comprehensive report will be provided within 10 business days of the
-                      examination.
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-600 font-bold">•</span>
-                    <span>
-                      Cancellations must be made at least 48 hours in advance to avoid cancellation
-                      fees.
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-600 font-bold">•</span>
-                    <span>Payment is due within 14 days of the report being issued.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-600 font-bold">•</span>
-                    <span>
-                      All personal and medical information will be handled in strict confidence in
-                      accordance with privacy laws.
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-600 font-bold">•</span>
-                    <span>
-                      The specialist maintains independence and objectivity in all assessments.
-                    </span>
-                  </li>
-                </ul>
-              </div>
-
-              <Separator className="my-4" />
-
-              <Alert className="border-amber-300 bg-amber-100">
-                <AlertCircle className="h-4 w-4 text-amber-700" />
-                <AlertDescription className="text-sm text-amber-900">
-                  <strong>Important:</strong> Failure to attend the appointment without proper
-                  notice may result in charges as per our cancellation policy. By accepting these
-                  terms, you confirm that all information provided is accurate and complete.
-                </AlertDescription>
-              </Alert>
-
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <h4 className="font-semibold text-sm mb-2">Privacy & Data Protection</h4>
-                <p className="text-sm text-muted-foreground">
-                  Your personal information will be processed in accordance with applicable privacy
-                  laws. We implement appropriate technical and organizational measures to protect
-                  your data against unauthorized access, alteration, disclosure, or destruction.
-                </p>
-              </div>
-
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <h4 className="font-semibold text-sm mb-2">Cancellation Policy</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• More than 48 hours notice: No charge</li>
-                  <li>• 24-48 hours notice: 50% of consultation fee</li>
-                  <li>• Less than 24 hours notice: 100% of consultation fee</li>
-                </ul>
-              </div>
-            </div>
-          </ScrollArea>
-
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="accept-terms"
-                checked={modalTermsAccepted}
-                onCheckedChange={(checked) => setModalTermsAccepted(checked as boolean)}
-              />
-              <Label
-                htmlFor="accept-terms"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 select-none cursor-pointer"
-              >
-                I have read and accept the terms and conditions
-              </Label>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowTermsModal(false);
-                  setModalTermsAccepted(false);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleTermsAccept} disabled={!modalTermsAccepted}>
-                Accept & Continue
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
 
     // Render booking summary card
     const BookingSummaryCard = () => (
@@ -813,7 +651,6 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
             />
           </CardContent>
         </Card>
-        <TermsModal />
       </div>
     );
   }
