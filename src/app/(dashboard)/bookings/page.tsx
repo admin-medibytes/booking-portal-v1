@@ -46,6 +46,11 @@ export default function BookingsPage() {
     };
   });
 
+  // Track timezone separately (not part of filters that trigger refetch)
+  const [timezone, setTimezone] = useState<string>(
+    searchParams.get("timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone
+  );
+
   // Track current month for calendar view
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -94,6 +99,7 @@ export default function BookingsPage() {
     const limit = parseInt(searchParams.get("limit") || "5");
     const specialistIds = searchParams.get("specialists")?.split(",").filter(Boolean);
     const search = searchParams.get("search") || undefined;
+    const urlTimezone = searchParams.get("timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     setFilters({
       page,
@@ -102,6 +108,7 @@ export default function BookingsPage() {
       specialistIds,
       search,
     });
+    setTimezone(urlTimezone);
   }, [searchParams]);
 
   const handleFiltersChange = (filterState: FilterState) => {
@@ -115,6 +122,9 @@ export default function BookingsPage() {
     };
 
     setFilters(newFilters);
+
+    // Update timezone separately (doesn't trigger refetch)
+    setTimezone(filterState.timezone);
   };
 
   // Handle pagination changes
@@ -198,6 +208,7 @@ export default function BookingsPage() {
             pageSize={filters.limit || 10}
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
+            timezone={timezone}
           />
         )
       ) : (
@@ -205,6 +216,7 @@ export default function BookingsPage() {
           bookings={data?.bookings || []}
           isLoading={isLoading}
           onMonthChange={setCurrentMonth}
+          timezone={timezone}
         />
       )}
     </div>

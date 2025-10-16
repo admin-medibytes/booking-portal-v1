@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import {
   ArrowUpDown,
   Eye,
@@ -27,6 +27,7 @@ import {
   XCircle,
   Video,
 } from "lucide-react";
+import { CancelBookingModal } from "./cancel-booking-modal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -95,6 +96,7 @@ interface BookingListTableProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
+  timezone?: string;
 }
 
 export const BookingListTable = memo(function BookingListTable({
@@ -104,10 +106,19 @@ export const BookingListTable = memo(function BookingListTable({
   pageSize,
   onPageChange,
   onPageSizeChange,
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone,
 }: BookingListTableProps) {
   const router = useRouter();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [bookingToCancel, setBookingToCancel] = useState<BookingWithSpecialist | null>(null);
+
+  const handleCancelSuccess = () => {
+    // Refresh the page to show updated booking list
+    router.refresh();
+  };
+
+  const isClosed = (status: string) => status === "closed" || status === "archived";
 
   const columns: ColumnDef<BookingWithSpecialist>[] = [
     {
@@ -199,13 +210,13 @@ export const BookingListTable = memo(function BookingListTable({
               <Calendar className="h-3 w-3" />
               <span>
                 {booking.dateTime
-                  ? format(new Date(booking.dateTime), "MMM dd, yyyy")
+                  ? formatInTimeZone(new Date(booking.dateTime), timezone, "MMM dd, yyyy")
                   : "Not scheduled"}
               </span>
             </div>
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span>{booking.dateTime ? format(new Date(booking.dateTime), "h:mm a") : "--"}</span>
+              <span>{booking.dateTime ? formatInTimeZone(new Date(booking.dateTime), timezone, "h:mm a") : "--"}</span>
             </div>
           </div>
         );
@@ -311,10 +322,8 @@ export const BookingListTable = memo(function BookingListTable({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
-                onClick={() => {
-                  // TODO: Implement cancel logic
-                  console.log("Cancel", booking.id);
-                }}
+                onClick={() => setBookingToCancel(booking)}
+                disabled={isClosed(booking.status)}
               >
                 <XCircle className="mr-2 h-4 w-4" />
                 Cancel
@@ -466,6 +475,27 @@ export const BookingListTable = memo(function BookingListTable({
           </div>
         </div>
       </div>
+
+      {/* Cancel Booking Modal */}
+      {bookingToCancel && (
+        <CancelBookingModal
+          open={!!bookingToCancel}
+          onOpenChange={(open) => {
+            if (!open) setBookingToCancel(null);
+          }}
+          bookingId={bookingToCancel.id}
+          bookingDetails={{
+            examineeName: `${bookingToCancel.examinee.firstName} ${bookingToCancel.examinee.lastName}`,
+            appointmentDate: bookingToCancel.dateTime
+              ? formatInTimeZone(new Date(bookingToCancel.dateTime), timezone, "EEEE, MMMM d, yyyy")
+              : "Not scheduled",
+            appointmentTime: bookingToCancel.dateTime
+              ? formatInTimeZone(new Date(bookingToCancel.dateTime), timezone, "h:mm a")
+              : "Not scheduled",
+          }}
+          onCancelSuccess={handleCancelSuccess}
+        />
+      )}
     </div>
   );
 });

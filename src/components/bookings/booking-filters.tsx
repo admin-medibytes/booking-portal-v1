@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, X } from "lucide-react";
+import { Search, X, Globe, ChevronDown } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -22,10 +22,15 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { debounce } from "@/lib/debounce";
+import { timeZones } from "@/lib/utils/timezones";
 import type { Specialist } from "@/types/specialist";
+
+// Filter for Australian timezones only
+const australianTimezones = timeZones.filter((tz) => tz.label.includes("Australia"));
 
 interface BookingFiltersProps {
   specialists?: Specialist[];
@@ -36,6 +41,7 @@ export interface FilterState {
   status: "active" | "closed" | null;
   specialistIds: string[];
   search: string;
+  timezone: string;
 }
 
 export function BookingFilters({ specialists = [], onFiltersChange }: BookingFiltersProps) {
@@ -54,11 +60,13 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
           : "active"; // Default to "active" instead of null
     const specialistIds = searchParams.get("specialists")?.split(",").filter(Boolean) || [];
     const search = searchParams.get("search") || "";
+    const timezone = searchParams.get("timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     return {
       status,
       specialistIds,
       search,
+      timezone,
     };
   });
 
@@ -107,6 +115,13 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
         params.delete("search");
       }
 
+      // Timezone filter
+      if (newFilters.timezone) {
+        params.set("timezone", newFilters.timezone);
+      } else {
+        params.delete("timezone");
+      }
+
       // Reset to page 1 when filters change
       params.set("page", "1");
 
@@ -152,12 +167,21 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
     onFiltersChange?.(newFilters);
   };
 
+  // Handle timezone change
+  const handleTimezoneChange = (value: string) => {
+    const newFilters = { ...filters, timezone: value };
+    setFilters(newFilters);
+    updateUrl(newFilters);
+    onFiltersChange?.(newFilters);
+  };
+
   // Clear all filters
   const handleClearFilters = () => {
     const newFilters: FilterState = {
       status: null,
       specialistIds: [],
       search: "",
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
     setFilters(newFilters);
     setSearchInput("");
@@ -260,6 +284,38 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
                 </CommandGroup>
               </CommandList>
             </Command>
+          </PopoverContent>
+        </Popover>
+
+        {/* Timezone Selector */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="min-w-[200px] justify-between gap-2">
+              <Globe className="h-4 w-4" />
+              <span className="text-sm">
+                {timeZones.find((tz) => tz.tzCode === filters.timezone)?.tzCode || filters.timezone}
+              </span>
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[320px] p-2" align="end">
+            <ScrollArea className="h-[300px]">
+              <div className="space-y-1">
+                {australianTimezones.map((tz) => (
+                  <div
+                    key={tz.tzCode}
+                    className={cn(
+                      "flex items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                      filters.timezone === tz.tzCode && "bg-accent"
+                    )}
+                    onClick={() => handleTimezoneChange(tz.tzCode)}
+                  >
+                    <span>{tz.label}</span>
+                    {filters.timezone === tz.tzCode && <Check className="h-4 w-4" />}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           </PopoverContent>
         </Popover>
 

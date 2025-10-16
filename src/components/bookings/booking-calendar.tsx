@@ -21,6 +21,7 @@ import {
   setHours,
   eachDayOfInterval,
 } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,11 +37,18 @@ interface BookingCalendarProps {
   onEventSelect?: (booking: BookingWithSpecialist) => void;
   onMonthChange?: (date: Date) => void;
   isLoading?: boolean;
+  timezone?: string;
 }
 
 type ViewType = "month" | "week" | "day" | "agenda";
 
-export function BookingCalendar({ bookings, onEventSelect, onMonthChange, isLoading = false }: BookingCalendarProps) {
+export function BookingCalendar({
+  bookings,
+  onEventSelect,
+  onMonthChange,
+  isLoading = false,
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+}: BookingCalendarProps) {
   const [isClient, setIsClient] = useState(false);
 
   // Initialize state from localStorage on first render to prevent duplicate requests
@@ -258,6 +266,7 @@ export function BookingCalendar({ bookings, onEventSelect, onMonthChange, isLoad
           bookingsByDate={bookingsByDate}
           onBookingClick={handleBookingClick}
           isLoading={isLoading}
+          timezone={timezone}
         />
       )}
 
@@ -267,6 +276,7 @@ export function BookingCalendar({ bookings, onEventSelect, onMonthChange, isLoad
           bookingsByDate={bookingsByDate}
           onBookingClick={handleBookingClick}
           isLoading={isLoading}
+          timezone={timezone}
         />
       )}
 
@@ -275,6 +285,7 @@ export function BookingCalendar({ bookings, onEventSelect, onMonthChange, isLoad
           currentDate={currentDate}
           bookingsByDate={bookingsByDate}
           onBookingClick={handleBookingClick}
+          timezone={timezone}
         />
       )}
 
@@ -283,6 +294,7 @@ export function BookingCalendar({ bookings, onEventSelect, onMonthChange, isLoad
           currentDate={currentDate}
           bookings={bookings}
           onBookingClick={handleBookingClick}
+          timezone={timezone}
         />
       )}
 
@@ -300,9 +312,10 @@ interface MonthViewProps {
   bookingsByDate: Record<string, BookingWithSpecialist[]>;
   onBookingClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
   isLoading?: boolean;
+  timezone: string;
 }
 
-function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = false }: MonthViewProps) {
+function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = false, timezone }: MonthViewProps) {
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
@@ -369,6 +382,7 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = fa
                       booking={booking}
                       view="month"
                       onClick={onBookingClick}
+                      timezone={timezone}
                     />
                   ))}
                   {dayBookings.length > 3 && (
@@ -389,6 +403,7 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = fa
                               booking={booking}
                               view="month"
                               onClick={onBookingClick}
+                              timezone={timezone}
                             />
                           ))}
                         </div>
@@ -403,6 +418,7 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = fa
                       booking={booking}
                       view="month"
                       onClick={onBookingClick}
+                      timezone={timezone}
                     />
                   ))}
                   {dayBookings.length > 1 && (
@@ -423,6 +439,7 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = fa
                               booking={booking}
                               view="month"
                               onClick={onBookingClick}
+                              timezone={timezone}
                             />
                           ))}
                         </div>
@@ -445,9 +462,10 @@ interface WeekViewProps {
   bookingsByDate: Record<string, BookingWithSpecialist[]>;
   onBookingClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
   isLoading?: boolean;
+  timezone: string;
 }
 
-function WeekView({ currentDate, bookingsByDate, onBookingClick, isLoading: _isLoading = false }: WeekViewProps) {
+function WeekView({ currentDate, bookingsByDate, onBookingClick, isLoading: _isLoading = false, timezone }: WeekViewProps) {
   const weekDays = useMemo(() => {
     const start = startOfWeek(currentDate);
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
@@ -511,6 +529,7 @@ function WeekView({ currentDate, bookingsByDate, onBookingClick, isLoading: _isL
                       booking={booking}
                       view="week"
                       onClick={onBookingClick}
+                      timezone={timezone}
                     />
                   ))}
                 </div>
@@ -528,9 +547,10 @@ interface DayViewProps {
   currentDate: Date;
   bookingsByDate: Record<string, BookingWithSpecialist[]>;
   onBookingClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
+  timezone: string;
 }
 
-function DayView({ currentDate, bookingsByDate, onBookingClick }: DayViewProps) {
+function DayView({ currentDate, bookingsByDate, onBookingClick, timezone }: DayViewProps) {
   const dateKey = format(currentDate, "yyyy-MM-dd");
   const dayBookings = bookingsByDate[dateKey] || [];
   const allHours = Array.from({ length: 24 }, (_, i) => i); // 12am to 11pm (0-23)
@@ -569,6 +589,7 @@ function DayView({ currentDate, bookingsByDate, onBookingClick }: DayViewProps) 
                     booking={booking}
                     view="day"
                     onClick={onBookingClick}
+                    timezone={timezone}
                   />
                 ))}
               </div>
@@ -585,9 +606,10 @@ interface AgendaViewProps {
   currentDate: Date;
   bookings: BookingWithSpecialist[];
   onBookingClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
+  timezone: string;
 }
 
-function AgendaView({ currentDate, bookings, onBookingClick }: AgendaViewProps) {
+function AgendaView({ currentDate, bookings, onBookingClick, timezone }: AgendaViewProps) {
   const agendaBookings = useMemo(() => {
     const startDate = startOfDay(currentDate);
     const endDate = addDays(startDate, 30);
@@ -659,6 +681,7 @@ function AgendaView({ currentDate, bookings, onBookingClick }: AgendaViewProps) 
                     booking={booking}
                     view="agenda"
                     onClick={onBookingClick}
+                    timezone={timezone}
                   />
                 ))}
               </div>
@@ -675,11 +698,12 @@ interface BookingItemProps {
   booking: BookingWithSpecialist;
   view: ViewType;
   onClick: (booking: BookingWithSpecialist, e: React.MouseEvent) => void;
+  timezone: string;
 }
 
-const BookingItem = React.memo(function BookingItem({ booking, view, onClick }: BookingItemProps) {
+const BookingItem = React.memo(function BookingItem({ booking, view, onClick, timezone }: BookingItemProps) {
   const appointmentDate = booking.dateTime ? new Date(booking.dateTime) : null;
-  const timeString = appointmentDate ? format(appointmentDate, "h:mm a") : "";
+  const timeString = appointmentDate ? formatInTimeZone(appointmentDate, timezone, "h:mm a") : "";
 
   // Set color based on booking type: blue for telehealth, violet for in-person
   const statusColor =
