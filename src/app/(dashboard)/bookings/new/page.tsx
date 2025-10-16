@@ -191,6 +191,7 @@ export default function NewBookingPage() {
   };
 
   const handleIntakeFormValidation = (isValid: boolean) => {
+    console.log("page.tsx - handleIntakeFormValidation called with:", isValid);
     setIsIntakeFormValid(isValid);
   };
 
@@ -211,20 +212,28 @@ export default function NewBookingPage() {
   };
 
   const canProceed = () => {
+    let result = false;
     switch (currentStep) {
       case 1:
-        return selectedSpecialist !== null;
+        result = selectedSpecialist !== null;
+        break;
       case 2:
-        return selectedAppointmentType !== null;
+        result = selectedAppointmentType !== null;
+        break;
       case 3:
-        return selectedDateTime !== null;
+        result = selectedDateTime !== null;
+        break;
       case 4:
-        return isIntakeFormValid;
+        result = isIntakeFormValid;
+        console.log("page.tsx - canProceed() for step 4, isIntakeFormValid:", isIntakeFormValid, "result:", result);
+        break;
       case 5:
-        return bookingId !== null;
+        result = bookingId !== null;
+        break;
       default:
-        return false;
+        result = false;
     }
+    return result;
   };
 
   const renderStepContent = () => {

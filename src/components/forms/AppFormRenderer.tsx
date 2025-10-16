@@ -103,9 +103,13 @@ function buildArktypeSchema(fields: AppFormField[]) {
     } else if (field.acuityField?.type === "checkboxlist") {
       fieldType = "string[]";
     } else if (field.acuityField?.type === "yesno") {
-      // For yes/no fields, allow empty string initially even if required
-      // The field validator will show error if required and empty
-      fieldType = "'yes'|'no'|''";
+      // For yes/no fields, allow empty string only if NOT required
+      // Required yesno fields must be 'yes' or 'no'
+      if (field.isRequired) {
+        fieldType = "'yes'|'no'";
+      } else {
+        fieldType = "'yes'|'no'|''";
+      }
     } else if (field.validationRules.minLength) {
       fieldType = `string>${field.validationRules.minLength - 1}`;
     } else if (field.isRequired) {
@@ -177,10 +181,15 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
     };
     sortedFields.forEach((field) => {
       const fieldKey = `field_${field.acuityFieldId}`;
+
       // Set hidden field static values
       if (field.isHidden && field.staticValue) {
+        console.log(`Setting hidden field ${fieldKey} with static value:`, field.staticValue);
         defaultValues[fieldKey] = field.staticValue;
+      } else if (field.isHidden && !field.staticValue) {
+        console.log(`Hidden field ${fieldKey} has no static value (isRequired: ${field.isRequired})`);
       }
+
       // If no provided default value for this field, initialize it with appropriate type
       if (!(fieldKey in defaultValues)) {
         if (field.acuityField?.type === "checkbox") {
@@ -189,6 +198,9 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
           defaultValues[fieldKey] = [];
         } else if (field.acuityField?.type === "yesno") {
           defaultValues[fieldKey] = "";
+          if (field.isHidden && field.isRequired) {
+            console.warn(`WARNING: Hidden required yesno field ${fieldKey} has no static value! This will cause validation to fail.`);
+          }
         } else {
           defaultValues[fieldKey] = "";
         }
@@ -220,13 +232,8 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
 
       const checkValidation = () => {
         const values = formInstance.state.values;
-        console.log("Raw form values:", JSON.stringify(values, null, 2));
         const result = formSchema(values);
         const isValid = !(result instanceof type.errors);
-        console.log("AppFormRenderer validation check:", values, "isValid:", isValid);
-        if (result instanceof type.errors) {
-          console.log("AppFormRenderer validation errors:", result.summary);
-        }
         onValidationChange(isValid);
       };
 
@@ -239,7 +246,8 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
       });
 
       return () => unsubscribe();
-    }, [formInstance.store, formInstance.state.values, onValidationChange, formSchema]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [formInstance.store, formInstance.state.values, onValidationChange]);
 
     // Group fields into rows based on displayWidth
     const fieldRows: AppFormField[][] = [];
@@ -299,9 +307,14 @@ export const AppFormRenderer = forwardRef<AppFormRendererRef, AppFormRendererPro
           name={fieldName}
           validators={{
             onChange: ({ value }) => {
-              // Basic validation
-              if (field.isRequired && !value) {
-                return `${label} is required`;
+              // Basic validation - handle empty string explicitly for yes/no fields
+              if (field.isRequired) {
+                if (fieldType === "yesno" && (!value || value === "")) {
+                  return `${label} is required`;
+                }
+                if (!value) {
+                  return `${label} is required`;
+                }
               }
 
               // Email validation

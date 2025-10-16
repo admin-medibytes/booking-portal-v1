@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PhoneNumberInput } from "@/components/ui/phone-input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   FileText,
   AlertCircle,
@@ -28,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Specialist } from "@/types/specialist";
 import { getInitials } from "@/lib/utils/initials";
+import Link from "next/link";
 
 // Minimal shape of the form configuration used for rendering
 interface AppointmentFormConfiguration {
@@ -43,6 +45,7 @@ interface AppointmentFormConfiguration {
     customFieldType?: "text" | "email" | "phone" | "number" | "date" | "dob" | "time" | "url" | null;
     isHidden: boolean;
     displayWidth?: "full" | "half" | "third";
+    staticValue?: string | null;
     acuityField?: {
       id: number;
       name: string;
@@ -183,8 +186,17 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
     // Check if dynamic form has no required fields (all optional), then it's valid by default
     // If we have defaultValues with fieldsInfo, assume it's valid (it was previously validated)
     const hasDefaultFormData = Boolean(defaultValues?.fieldsInfo && defaultValues.fieldsInfo.length > 0);
+    // Check if we have referrer info (user is coming back from confirmation step)
+    const hasDefaultReferrerData = Boolean(
+      defaultValues?.referrerInfo?.firstName ||
+      defaultValues?.referrerFirstName
+    );
     const [isDynamicFormValid, setIsDynamicFormValid] = useState(hasDefaultFormData);
+    // If we have default data (user went back from confirmation), assume terms were accepted
+    const [termsAccepted, setTermsAccepted] = useState(hasDefaultFormData && hasDefaultReferrerData);
     const appFormRef = useRef<{ submit: () => void } | null>(null);
+
+    console.log("DynamicIntake mounted - hasDefaultFormData:", hasDefaultFormData, "hasDefaultReferrerData:", hasDefaultReferrerData, "termsAccepted initial:", hasDefaultFormData && hasDefaultReferrerData);
 
     console.log("DynamicIntake mounted with hasDefaultFormData:", hasDefaultFormData, "defaultValues:", defaultValues);
 
@@ -229,6 +241,21 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
       retry: 1,
     });
 
+    // Check if form has any required visible fields when formData loads
+    useEffect(() => {
+      if (formData && !hasDefaultFormData) {
+        const hasRequiredFields = formData.fields.some(
+          (f) => !f.isHidden && f.acuityField?.required
+        );
+        console.log("Form has required fields:", hasRequiredFields);
+        // If no required fields, the form is valid by default
+        if (!hasRequiredFields) {
+          console.log("No required fields found, setting dynamic form as valid");
+          setIsDynamicFormValid(true);
+        }
+      }
+    }, [formData, hasDefaultFormData]);
+
     // Pass form configuration to parent when loaded
     useEffect(() => {
       if (formData && onFormConfigurationLoaded) {
@@ -248,29 +275,28 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
 
       // Function to check and update validation
       const checkValidation = () => {
-        // Check both referrer form validation and dynamic form validation
-        if (formData) {
-          const referrerData = referrerForm.state.values;
-          console.log("Referrer form data:", referrerData);
-          const isReferrerValid = referrerFormSchema(referrerData);
-          const isReferrerFormValid = !(isReferrerValid instanceof type.errors);
+        const referrerData = referrerForm.state.values;
+        console.log("Referrer form data:", referrerData);
+        const isReferrerValid = referrerFormSchema(referrerData);
+        const isReferrerFormValid = !(isReferrerValid instanceof type.errors);
 
-          if (isReferrerValid instanceof type.errors) {
-            console.log("Referrer validation errors:", isReferrerValid.summary);
-          }
-
-          // Combined validation: both referrer form and dynamic form must be valid
-          const isCombinedValid = isReferrerFormValid && isDynamicFormValid;
-          console.log(
-            "Validation check - Referrer valid:",
-            isReferrerFormValid,
-            "Dynamic valid:",
-            isDynamicFormValid,
-            "Combined:",
-            isCombinedValid
-          );
-          onValidationChange(isCombinedValid);
+        if (isReferrerValid instanceof type.errors) {
+          console.log("Referrer validation errors:", isReferrerValid.summary);
         }
+
+        // Combined validation: referrer form, dynamic form, and terms must all be valid
+        const isCombinedValid = isReferrerFormValid && isDynamicFormValid && termsAccepted;
+        console.log(
+          "Validation check - Referrer valid:",
+          isReferrerFormValid,
+          "Dynamic valid:",
+          isDynamicFormValid,
+          "Terms accepted:",
+          termsAccepted,
+          "Combined:",
+          isCombinedValid
+        );
+        onValidationChange(isCombinedValid);
       };
 
       // Check validation immediately
@@ -286,7 +312,7 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
       referrerForm.store,
       referrerForm.state.values,
       isDynamicFormValid,
-      formData,
+      termsAccepted,
       onValidationChange,
     ]);
 
@@ -339,6 +365,12 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
         }
       });
 
+      // Validate terms are accepted
+      if (!termsAccepted) {
+        console.error("Terms and conditions must be accepted");
+        return;
+      }
+
       // Structure the data according to the new format and submit directly
       const structuredData: SubmitData = {
         referrerInfo: {
@@ -348,7 +380,7 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
           phone: referrerData.referrerPhone,
         },
         fieldsInfo,
-        termsAccepted: true,
+        termsAccepted: termsAccepted,
       };
 
       onSubmit(structuredData);
@@ -672,7 +704,7 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
                   isRequired: f.acuityField?.required ?? false,
                   validationRules: {},
                   isHidden: f.isHidden,
-                  staticValue: null,
+                  staticValue: f.staticValue ?? null,
                   displayOrder: index + 1,
                   displayWidth: f.displayWidth ?? "full",
                 })),
@@ -683,6 +715,38 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
               submitLabel="Next"
               hideSubmitButton={hideSubmitButton}
             />
+          </CardContent>
+        </Card>
+
+        {/* Terms and Conditions */}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="terms"
+                checked={termsAccepted}
+                onCheckedChange={(checked) => {
+                  console.log("Terms checkbox changed:", checked);
+                  setTermsAccepted(checked === true);
+                }}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <Label
+                  htmlFor="terms"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  I agree to the
+                    <Link href="https://drive.google.com/file/d/13z_jLizdh1lT-ISUoTyShQaOSG8SlDNW/view" className="text-sm text-blue-600 hover:text-blue-500" target="_blank">
+                      Terms and Conditions of Trade
+                    </Link>
+                  <span className="text-destructive">*</span>
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Please note: Invoice is due within 14 days of report release.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
