@@ -123,16 +123,33 @@ export interface DynamicIntakeRef {
 // Helper function to extract only dynamic form field values (excluding referrer fields)
 function extractDynamicFormValues(
   allValues?: Record<string, string> | { fieldsInfo?: Array<{ id: number; value: string }> }
-): Record<string, string> | undefined {
+): Record<string, string | boolean | string[]> | undefined {
   if (!allValues) return undefined;
 
-  const dynamicValues: Record<string, string> = {};
+  const dynamicValues: Record<string, string | boolean | string[]> = {};
 
   // Handle new format (fieldsInfo array)
   if (allValues.fieldsInfo && Array.isArray(allValues.fieldsInfo)) {
     // Convert fieldsInfo array back to field_id format for the form
     allValues.fieldsInfo.forEach((field: { id: number; value: string }) => {
-      dynamicValues[`field_${field.id}`] = field.value;
+      let parsedValue: string | boolean | string[] = field.value;
+
+      // Try to parse boolean strings
+      if (field.value === "true") {
+        parsedValue = true;
+      } else if (field.value === "false") {
+        parsedValue = false;
+      } else if (field.value.startsWith("[") && field.value.endsWith("]")) {
+        // Try to parse JSON arrays
+        try {
+          parsedValue = JSON.parse(field.value);
+        } catch {
+          // If parsing fails, keep as string
+          parsedValue = field.value;
+        }
+      }
+
+      dynamicValues[`field_${field.id}`] = parsedValue;
     });
   } else {
     // Handle old format with field_ prefix
@@ -164,8 +181,12 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
     ref
   ) => {
     // Check if dynamic form has no required fields (all optional), then it's valid by default
-    const [isDynamicFormValid, setIsDynamicFormValid] = useState(false);
+    // If we have defaultValues with fieldsInfo, assume it's valid (it was previously validated)
+    const hasDefaultFormData = Boolean(defaultValues?.fieldsInfo && defaultValues.fieldsInfo.length > 0);
+    const [isDynamicFormValid, setIsDynamicFormValid] = useState(hasDefaultFormData);
     const appFormRef = useRef<{ submit: () => void } | null>(null);
+
+    console.log("DynamicIntake mounted with hasDefaultFormData:", hasDefaultFormData, "defaultValues:", defaultValues);
 
     // Initialize referrer form
     const referrerForm = useForm({
@@ -297,9 +318,22 @@ export const DynamicIntake = forwardRef<DynamicIntakeRef, DynamicIntakeProps>(
         if (key.startsWith("field_")) {
           const fieldId = parseInt(key.replace("field_", ""), 10);
           if (!isNaN(fieldId)) {
+            // Convert value to string, preserving the original type information
+            let stringValue: string;
+            if (typeof value === "boolean") {
+              // Store booleans as "true" or "false" strings
+              stringValue = value.toString();
+            } else if (Array.isArray(value)) {
+              // Store arrays as JSON strings
+              stringValue = JSON.stringify(value);
+            } else {
+              // Everything else as string
+              stringValue = String(value);
+            }
+
             fieldsInfo.push({
               id: fieldId,
-              value: String(value),
+              value: stringValue,
             });
           }
         }

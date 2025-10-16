@@ -306,6 +306,7 @@ export default function NewBookingPage() {
             organizationSlug={selectedOrganizationSlug}
             intakeFormFields={intakeFormData}
             formConfiguration={formConfiguration ?? undefined}
+            onBack={handleBack}
             onConfirm={handleBookingConfirm}
             bookingId={bookingId}
           />
@@ -350,19 +351,19 @@ export default function NewBookingPage() {
           <div>{renderStepContent()}</div>
 
           {/* Navigation Buttons */}
-          <div className="flex justify-between pt-6">
-            <Button variant="outline" onClick={handleBack} disabled={currentStep === 1}>
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-
             {currentStep < 5 && (
+              <div className="flex justify-between pt-6">
+                <Button variant="outline" onClick={handleBack} disabled={currentStep === 1}>
+                  <ChevronLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+
               <Button onClick={handleNext} disabled={!canProceed()}>
                 Next
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 

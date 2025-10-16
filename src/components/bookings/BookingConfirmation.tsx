@@ -83,6 +83,7 @@ interface BookingConfirmationProps {
   organizationSlug: string;
   intakeFormFields: IntakeFormData;
   formConfiguration?: AppointmentFormConfiguration;
+  onBack: () => void;
   onConfirm: (bookingId: string) => void;
   bookingId: string | null;
 }
@@ -148,6 +149,7 @@ export function BookingConfirmation({
   intakeFormFields,
   formConfiguration,
   onConfirm,
+  onBack,
   bookingId,
 }: BookingConfirmationProps) {
   const router = useRouter();
@@ -410,6 +412,13 @@ export function BookingConfirmation({
       </Card>
 
       <div className="flex gap-2">
+        <Button
+          variant="outline"
+          onClick={onBack}
+          disabled={createBookingMutation.isPending}
+        >
+          Back
+        </Button>
         <Button
           onClick={handleConfirm}
           disabled={createBookingMutation.isPending}
