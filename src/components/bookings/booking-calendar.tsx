@@ -38,6 +38,7 @@ interface BookingCalendarProps {
   onMonthChange?: (date: Date) => void;
   isLoading?: boolean;
   timezone?: string;
+  externalMonth?: Date; // Allow parent to control the displayed month
 }
 
 type ViewType = "month" | "week" | "day" | "agenda";
@@ -47,7 +48,8 @@ export function BookingCalendar({
   onEventSelect,
   onMonthChange,
   isLoading = false,
-  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone,
+  externalMonth
 }: BookingCalendarProps) {
   const [isClient, setIsClient] = useState(false);
 
@@ -57,6 +59,16 @@ export function BookingCalendar({
     const savedDate = localStorage.getItem("booking-calendar-date");
     return savedDate ? new Date(savedDate) : new Date();
   });
+
+  // Sync with external month changes (e.g., from search auto-navigation)
+  useEffect(() => {
+    if (externalMonth && externalMonth.getTime() !== currentDate.getTime()) {
+      console.log('[Calendar] Syncing with external month:', externalMonth);
+      setCurrentDate(externalMonth);
+    }
+  }, 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [externalMonth]);
 
   const [viewType, setViewType] = useState<ViewType>(() => {
     if (typeof window === "undefined") return "month";

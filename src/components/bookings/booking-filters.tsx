@@ -44,7 +44,7 @@ export interface FilterState {
   timezone: string;
 }
 
-export function BookingFilters({ specialists = [], onFiltersChange }: BookingFiltersProps) {
+export function BookingFilters({ specialists = [] }: BookingFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -136,7 +136,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
       const newFilters = { ...filtersRef.current, search: value };
       setFilters(newFilters);
       updateUrl(newFilters);
-      onFiltersChange?.(newFilters);
+      // onFiltersChange removed - URL is source of truth
     }, 300)
   );
 
@@ -152,7 +152,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
     const newFilters = { ...filters, status: newStatus };
     setFilters(newFilters);
     updateUrl(newFilters);
-    onFiltersChange?.(newFilters);
+    // onFiltersChange removed - URL is source of truth
   };
 
   // Handle specialist selection
@@ -164,7 +164,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
     const newFilters = { ...filters, specialistIds: newSpecialistIds };
     setFilters(newFilters);
     updateUrl(newFilters);
-    onFiltersChange?.(newFilters);
+    // onFiltersChange removed - URL is source of truth
   };
 
   // Handle timezone change
@@ -172,7 +172,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
     const newFilters = { ...filters, timezone: value };
     setFilters(newFilters);
     updateUrl(newFilters);
-    onFiltersChange?.(newFilters);
+    // onFiltersChange removed - URL is source of truth
   };
 
   // Clear all filters
@@ -186,7 +186,7 @@ export function BookingFilters({ specialists = [], onFiltersChange }: BookingFil
     setFilters(newFilters);
     setSearchInput("");
     updateUrl(newFilters);
-    onFiltersChange?.(newFilters);
+    // onFiltersChange removed - URL is source of truth
   };
 
   // Check if any filters are active

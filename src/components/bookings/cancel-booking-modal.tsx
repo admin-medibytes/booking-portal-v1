@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,6 +16,7 @@ import {
 // Removed unused imports: Button, Label, Checkbox
 import { Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { bookingKeys } from "@/hooks/use-bookings";
 
 interface CancelBookingModalProps {
   open: boolean;
@@ -36,6 +39,8 @@ export function CancelBookingModal({
 }: CancelBookingModalProps) {
   const [isCancelling, setIsCancelling] = useState(false);
   const [isNoShow, setIsNoShow] = useState(false);
+  const queryClient = useQueryClient();
+  const router = useRouter();
 
   const handleCancel = async () => {
     setIsCancelling(true);
@@ -55,11 +60,23 @@ export function CancelBookingModal({
         throw new Error(error.message || "Failed to cancel appointment");
       }
 
+      console.log('[CancelModal] Cancellation successful, invalidating queries...');
+
       toast.success(
         isNoShow
           ? "Booking marked as no-show successfully"
           : "Appointment cancelled successfully"
       );
+
+      // Invalidate all booking queries to refresh the data
+      console.log('[CancelModal] Invalidating queries with key:', bookingKeys.all);
+      await queryClient.invalidateQueries({ queryKey: bookingKeys.all });
+      console.log('[CancelModal] Queries invalidated');
+
+      // Also refresh the Next.js cache for server components
+      console.log('[CancelModal] Refreshing Next.js router cache...');
+      router.refresh();
+      console.log('[CancelModal] Router cache refreshed');
 
       onOpenChange(false);
       setIsNoShow(false);

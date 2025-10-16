@@ -114,8 +114,8 @@ export const BookingListTable = memo(function BookingListTable({
   const [bookingToCancel, setBookingToCancel] = useState<BookingWithSpecialist | null>(null);
 
   const handleCancelSuccess = () => {
-    // Refresh the page to show updated booking list
-    router.refresh();
+    // Query cache is automatically invalidated by CancelBookingModal
+    // No need to manually refresh
   };
 
   const isClosed = (status: string) => status === "closed" || status === "archived";

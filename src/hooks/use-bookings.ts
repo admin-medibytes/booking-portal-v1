@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef } from "react";
 
 import { bookingsClient } from "@/lib/hono-client";
 import type { BookingListResponse, BookingWithSpecialist, BookingFilters } from "@/types/booking";
@@ -136,25 +136,28 @@ export function useBookingsCalendar(
     specialistIds?: string[];
     status?: string;
   },
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean; onSearchResultFound?: (date: Date) => void }
 ) {
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
 
-  // Fetch all bookings for the month
+  // Fetch all bookings for the month (or broader range when searching)
   const { data, isLoading, error } = useQuery({
     queryKey: [...bookingKeys.calendarMonth(year, month), clientFilters],
     enabled: options?.enabled ?? true,
     queryFn: async () => {
-      // Get first and last day of the month
-      const startDate = new Date(year, month, 1);
-      const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
-
       const queryFilters: Record<string, string> = {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
         limit: "500", // Reduced from 1000 for better performance
       };
+
+      // When searching, don't restrict by date to find all matching results
+      // Otherwise, only fetch bookings for the current month
+      if (!clientFilters?.search) {
+        const startDate = new Date(year, month, 1);
+        const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+        queryFilters.startDate = startDate.toISOString();
+        queryFilters.endDate = endDate.toISOString();
+      }
 
       // Apply status filter server-side if present
       if (clientFilters?.status && clientFilters.status !== "all" && clientFilters.status !== "") {
@@ -209,6 +212,88 @@ export function useBookingsCalendar(
 
     return filtered;
   }, [data, clientFilters?.search]);
+
+  // Track if we've already navigated for this search term
+  const hasNavigatedRef = useRef(false);
+  const lastSearchRef = useRef<string | undefined>(undefined);
+
+  // Reset navigation flag when search term changes
+  useEffect(() => {
+    if (clientFilters?.search !== lastSearchRef.current) {
+      hasNavigatedRef.current = false;
+      lastSearchRef.current = clientFilters?.search;
+    }
+  }, [clientFilters?.search]);
+
+  // Find nearest future booking from search results and navigate to its month
+  useEffect(() => {
+    console.log('[Calendar Auto-Nav] Effect triggered', {
+      hasSearch: !!clientFilters?.search,
+      searchTerm: clientFilters?.search,
+      bookingsCount: filteredBookings.length,
+      hasCallback: !!options?.onSearchResultFound,
+      hasNavigated: hasNavigatedRef.current,
+      currentMonth: `${year}-${month + 1}`,
+    });
+
+    if (
+      clientFilters?.search &&
+      filteredBookings.length > 0 &&
+      options?.onSearchResultFound &&
+      !hasNavigatedRef.current
+    ) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      console.log('[Calendar Auto-Nav] Processing bookings for navigation', {
+        today: today.toISOString(),
+        totalBookings: filteredBookings.length,
+      });
+
+      // Find all future bookings from search results
+      const futureBookings = filteredBookings.filter((booking) => {
+        if (!booking.dateTime) return false;
+        const bookingDate = new Date(booking.dateTime);
+        return bookingDate >= today;
+      });
+
+      console.log('[Calendar Auto-Nav] Future bookings found:', futureBookings.length);
+
+      if (futureBookings.length > 0) {
+        // Sort by date ascending to find the nearest future booking
+        futureBookings.sort((a, b) => {
+          const dateA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
+          const dateB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
+          return dateA - dateB;
+        });
+
+        const nearestBooking = futureBookings[0];
+        if (nearestBooking.dateTime) {
+          const bookingDate = new Date(nearestBooking.dateTime);
+          console.log('[Calendar Auto-Nav] Nearest future booking:', {
+            date: bookingDate.toISOString(),
+            examinee: `${nearestBooking.examinee?.firstName} ${nearestBooking.examinee?.lastName}`,
+            bookingYear: bookingDate.getFullYear(),
+            bookingMonth: bookingDate.getMonth(),
+            currentYear: year,
+            currentMonth: month,
+          });
+
+          // Only trigger navigation if the booking is in a different month than currently displayed
+          if (
+            bookingDate.getFullYear() !== year ||
+            bookingDate.getMonth() !== month
+          ) {
+            console.log('[Calendar Auto-Nav] Navigating to new month:', bookingDate);
+            options.onSearchResultFound(bookingDate);
+            hasNavigatedRef.current = true;
+          } else {
+            console.log('[Calendar Auto-Nav] Booking is in current month, no navigation needed');
+          }
+        }
+      }
+    }
+  }, [filteredBookings, clientFilters?.search, options, year, month]);
 
   return {
     bookings: filteredBookings,

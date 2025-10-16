@@ -1,7 +1,7 @@
 import { db } from "@/server/db";
 import { bookings, examinees, specialists, referrers } from "@/server/db/schema";
 import { users } from "@/server/db/schema/auth";
-import { eq, and, gte, lte, desc, sql, SQL, or, ilike, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, SQL, inArray } from "drizzle-orm";
 import type { BookingFilters } from "@/types/booking";
 
 export class BookingRepository {
@@ -135,115 +135,65 @@ export class BookingRepository {
     }
 
     // Handle search across examinee fields (name and email only)
-    if (filters?.search) {
-      const searchTerm = `%${filters.search}%`;
-      conditions.push(
-        or(
-          ilike(examinees.firstName, searchTerm),
-          ilike(examinees.lastName, searchTerm),
-          ilike(examinees.email, searchTerm)
-        )!
-      );
-    }
+    // Note: These fields are encrypted in the database, so we can't use SQL LIKE/ILIKE
+    // Search filtering must happen after Drizzle decrypts the data (client-side filtering)
+    // The search condition is removed here - filtering will happen in JavaScript after query
+    // if (filters?.search) {
+    //   const searchTerm = `%${filters.search.trim().toLowerCase()}%`;
+    //   conditions.push(
+    //     sql`(
+    //       ${examinees.email} ILIKE ${searchTerm} OR
+    //       ${examinees.firstName} ILIKE ${searchTerm} OR
+    //       ${examinees.lastName} ILIKE ${searchTerm}
+    //     )`
+    //   );
+    // }
 
     return conditions;
   }
 
   // Helper method to build paginated query with specialist join
   // Optimized for list view - only loads essential fields
+  // Note: Search filtering happens client-side due to encrypted fields
   private async getPaginatedBookings(conditions: SQL[], filters?: BookingFilters) {
     const page = filters?.page || 1;
     const limit = filters?.limit || 20;
     const offset = (page - 1) * limit;
 
-    // If searching, we need to use the query builder with explicit joins
-    // Optimize: only select booking IDs in the first query
-    if (filters?.search) {
-      const results = await db
-        .select({ id: bookings.id })
-        .from(bookings)
-        .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(bookings.createdAt))
-        .limit(limit)
-        .offset(offset);
+    // If search is provided, we need to fetch MORE records and filter client-side
+    const effectiveLimit = filters?.search ? 100 : limit;
+    const effectiveOffset = filters?.search ? 0 : offset;
 
-      // Get the booking IDs from the results
-      const bookingIds = results.map((r) => r.id);
+    // Fetch booking IDs with joins
+    const results = await db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(bookings.createdAt))
+      .limit(effectiveLimit)
+      .offset(effectiveOffset);
 
-      // Fetch optimized booking details with only essential fields
-      const fullResults = await db.query.bookings.findMany({
-        where: inArray(bookings.id, bookingIds),
-        orderBy: desc(bookings.createdAt),
-        with: {
-          specialist: {
-            columns: {
-              id: true,
-              name: true,
-            },
-            with: {
-              user: {
-                columns: {
-                  id: true,
-                  jobTitle: true,
-                },
-              },
-            },
-          },
-          referrer: {
-            columns: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-            with: {
-              organization: {
-                columns: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          examinee: {
-            columns: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phoneNumber: true,
-              condition: true,
-              caseType: true,
-            },
-          },
-        },
-      });
+    // Get the booking IDs from the results
+    const bookingIds = results.map((r) => r.id);
 
-      // Build count query with examinees join
-      const [{ count }] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(bookings)
-        .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
-
+    // If no results, return empty with pagination
+    if (bookingIds.length === 0) {
       return {
-        data: fullResults,
+        data: [],
         pagination: {
           page,
           limit,
-          total: count,
-          totalPages: Math.ceil(Number(count) / limit),
+          total: 0,
+          totalPages: 0,
         },
       };
     }
 
-    // No search - use optimized SQL join query for better performance
-    const results = await db.query.bookings.findMany({
-      where: conditions.length > 0 ? and(...conditions) : undefined,
+    // Fetch optimized booking details with only essential fields
+    let fullResults = await db.query.bookings.findMany({
+      where: inArray(bookings.id, bookingIds),
       orderBy: desc(bookings.createdAt),
-      limit,
-      offset,
       with: {
         specialist: {
           columns: {
@@ -289,13 +239,43 @@ export class BookingRepository {
       },
     });
 
+    // Client-side filtering for search (required because email/name fields are encrypted)
+    if (filters?.search) {
+      const searchLower = filters.search.trim().toLowerCase();
+      fullResults = fullResults.filter((booking) => {
+        const email = booking.examinee?.email?.toLowerCase() || '';
+        const firstName = booking.examinee?.firstName?.toLowerCase() || '';
+        const lastName = booking.examinee?.lastName?.toLowerCase() || '';
+
+        return (
+          email.includes(searchLower) ||
+          firstName.includes(searchLower) ||
+          lastName.includes(searchLower)
+        );
+      });
+
+      // Apply pagination to filtered results
+      const paginatedResults = fullResults.slice(offset, offset + limit);
+
+      return {
+        data: paginatedResults,
+        pagination: {
+          page,
+          limit,
+          total: fullResults.length,
+          totalPages: Math.ceil(fullResults.length / limit),
+        },
+      };
+    }
+
+    // Build count query (no search, use database count)
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)` })
       .from(bookings)
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     return {
-      data: results,
+      data: fullResults,
       pagination: {
         page,
         limit,

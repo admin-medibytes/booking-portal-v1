@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useBookings, useBookingsCalendar } from "@/hooks/use-bookings";
 import { BookingListTable } from "@/components/bookings/booking-list-table";
 import { BookingCalendar } from "@/components/bookings/booking-calendar";
-import { BookingFilters, type FilterState } from "@/components/bookings/booking-filters";
+import { BookingFilters } from "@/components/bookings/booking-filters";
 import { Button } from "@/components/ui/button";
 import { Calendar, List, Plus, Loader2 } from "lucide-react";
 import type { BookingFilters as BookingFiltersType } from "@/types/booking";
@@ -74,6 +74,12 @@ export default function BookingsPage() {
     [filters.search, filters.specialistIds, filters.status]
   );
 
+  // Callback to navigate calendar to search result's month
+  const handleSearchResultFound = useCallback((date: Date) => {
+    console.log('[Page] handleSearchResultFound called with date:', date);
+    setCurrentMonth(date);
+  }, []);
+
   // Fetch bookings data - only fetch for the active view
   const { data: listData, isLoading: listLoading, error: listError } = useBookings(
     filters,
@@ -82,7 +88,7 @@ export default function BookingsPage() {
   const { bookings: calendarBookings, isLoading: calendarLoading, error: calendarError } = useBookingsCalendar(
     currentMonth,
     calendarFilters,
-    { enabled: view === "calendar" }
+    { enabled: view === "calendar", onSearchResultFound: handleSearchResultFound }
   );
   const { data: specialists } = useSpecialists();
 
@@ -111,21 +117,23 @@ export default function BookingsPage() {
     setTimezone(urlTimezone);
   }, [searchParams]);
 
-  const handleFiltersChange = (filterState: FilterState) => {
-    // Map filter state to booking filters
-    const newFilters: BookingFiltersType = {
-      ...filters,
-      search: filterState.search || undefined,
-      status: filterState.status || undefined,
-      specialistIds: filterState.specialistIds.length > 0 ? filterState.specialistIds : undefined,
-      page: 1, // Reset to first page when filters change
-    };
-
-    setFilters(newFilters);
-
-    // Update timezone separately (doesn't trigger refetch)
-    setTimezone(filterState.timezone);
-  };
+  // This callback is no longer needed since URL is the source of truth
+  // The useEffect above will handle syncing filters from URL
+  // const handleFiltersChange = (filterState: FilterState) => {
+  //   // Map filter state to booking filters
+  //   const newFilters: BookingFiltersType = {
+  //     ...filters,
+  //     search: filterState.search || undefined,
+  //     status: filterState.status || undefined,
+  //     specialistIds: filterState.specialistIds.length > 0 ? filterState.specialistIds : undefined,
+  //     page: 1, // Reset to first page when filters change
+  //   };
+  //
+  //   setFilters(newFilters);
+  //
+  //   // Update timezone separately (doesn't trigger refetch)
+  //   setTimezone(filterState.timezone);
+  // };
 
   // Handle pagination changes
   const handlePageChange = (newPage: number) => {
@@ -168,7 +176,7 @@ export default function BookingsPage() {
       {/* Filters and View Toggle */}
       <div className="space-y-4 mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <BookingFilters specialists={specialists || []} onFiltersChange={handleFiltersChange} />
+          <BookingFilters specialists={specialists || []} />
 
           {/* View Toggle - Button Group Style */}
           <div className="flex gap-1 p-1 rounded-xl bg-muted w-fit border">
@@ -216,6 +224,7 @@ export default function BookingsPage() {
           bookings={data?.bookings || []}
           isLoading={isLoading}
           onMonthChange={setCurrentMonth}
+          externalMonth={currentMonth}
           timezone={timezone}
         />
       )}

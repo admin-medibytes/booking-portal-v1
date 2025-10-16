@@ -126,8 +126,7 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
   };
 
   const handleCancelSuccess = () => {
-    // Refresh the page to show updated booking status
-    router.refresh();
+    window.location.reload();
   };
 
   const isClosed = booking.status === "closed" || booking.status === "archived";
