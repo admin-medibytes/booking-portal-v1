@@ -67,13 +67,13 @@ export function UserMenu({ user }: UserMenuProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
+        {/* <DropdownMenuItem asChild>
           <a href="/settings" className="cursor-pointer">
             <Settings className="w-4 h-4 mr-2" />
             <span>Settings</span>
           </a>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator /> */}
         <DropdownMenuItem
           className="text-red-600 cursor-pointer focus:text-red-600"
           onClick={handleLogout}
