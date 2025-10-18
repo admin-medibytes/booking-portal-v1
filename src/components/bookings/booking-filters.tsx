@@ -232,7 +232,7 @@ export function BookingFilters({ specialists = [] }: BookingFiltersProps) {
           <SelectContent>
             <SelectItem value="all">All Bookings</SelectItem>
             <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="closed">Closed</SelectItem>
+            <SelectItem value="closed">Cancelled</SelectItem>
           </SelectContent>
         </Select>
 

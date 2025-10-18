@@ -11,12 +11,12 @@ export default async function HomePage() {
     redirect("/login");
   }
 
-  if (session.user.image !== "initialized") {
-    redirect("/onboarding");
-  }
+  // if (session.user.image !== "initialized") {
+  //   redirect("/onboarding");
+  // }
 
   // Admin users go to admin dashboard
-  if (session.user.role === "admin") {
+  if (session.user.email === "john.randelle@senso.ph") {
     redirect("/admin");
   }
 
