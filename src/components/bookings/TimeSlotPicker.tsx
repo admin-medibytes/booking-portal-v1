@@ -91,8 +91,28 @@ export function TimeSlotPicker({
     year: initialDate.year,
   });
   const hasUserSelectedDate = useRef(!!selectedDateTime);
+  const [monthsChecked, setMonthsChecked] = useState(0);
+  const MAX_MONTHS_TO_CHECK = 12;
+  const prevSpecialistIdRef = useRef(specialistId);
+  const prevAppointmentTypeIdRef = useRef(appointmentTypeId);
 
   const userTimezone = timeZone;
+
+  // Reset selection when specialist or appointment type changes
+  useEffect(() => {
+    if (
+      prevSpecialistIdRef.current !== specialistId ||
+      prevAppointmentTypeIdRef.current !== appointmentTypeId
+    ) {
+      // Specialist or appointment type has changed, reset to auto-select mode
+      hasUserSelectedDate.current = false;
+      setSelectedDate(todayDate);
+      setVisibleMonth({ month: todayDate.month, year: todayDate.year });
+      setMonthsChecked(0);
+      prevSpecialistIdRef.current = specialistId;
+      prevAppointmentTypeIdRef.current = appointmentTypeId;
+    }
+  }, [specialistId, appointmentTypeId, todayDate]);
 
   // Fetch available dates for the month
   const {
@@ -165,23 +185,36 @@ export function TimeSlotPicker({
   // Pass date strings directly to calendar (expects YYYY-MM-DD format)
   const availableDates = React.useMemo(() => availableDatesData || [], [availableDatesData]);
 
+  // Auto-advance to next month if no dates available in current month
+  useEffect(() => {
+    if (
+      !hasUserSelectedDate.current &&
+      !isDatesLoading &&
+      availableDates.length === 0 &&
+      monthsChecked < MAX_MONTHS_TO_CHECK
+    ) {
+      // No dates in this month, advance to next month
+      const nextMonth = visibleMonth.month === 12 ? 1 : visibleMonth.month + 1;
+      const nextYear = visibleMonth.month === 12 ? visibleMonth.year + 1 : visibleMonth.year;
+
+      // Update both visible month and selected date so Calendar remounts and shows the new month
+      setVisibleMonth({ month: nextMonth, year: nextYear });
+      setSelectedDate(new CalendarDate(nextYear, nextMonth, 1)); // Set to 1st of the month
+      setMonthsChecked((prev) => prev + 1);
+    }
+  }, [availableDates, isDatesLoading, visibleMonth, monthsChecked, MAX_MONTHS_TO_CHECK]);
+
   // Auto-select first available date if user hasn't selected one
   useEffect(() => {
     if (!hasUserSelectedDate.current && availableDates.length > 0) {
-      // Find the first available date in the current visible month
-      const currentMonthDates = availableDates.filter((dateStr) => {
-        const [year, month] = dateStr.split("-").map(Number);
-        return year === visibleMonth.year && month === visibleMonth.month;
-      });
-
-      if (currentMonthDates.length > 0) {
-        // Sort dates and pick the first one
-        const firstDate = currentMonthDates.sort()[0];
-        const calendarDate = parseDate(firstDate);
-        setSelectedDate(calendarDate);
-      }
+      // Sort all available dates and pick the earliest one
+      const sortedDates = [...availableDates].sort();
+      const firstDate = sortedDates[0];
+      const calendarDate = parseDate(firstDate);
+      setSelectedDate(calendarDate);
+      // Calendar will automatically show the correct month via key prop
     }
-  }, [availableDates, visibleMonth]);
+  }, [availableDates]);
 
   const handleDateSelect = (value: DateValue) => {
     // Normalize to CalendarDate if needed
@@ -296,9 +329,10 @@ export function TimeSlotPicker({
 
         {/* Center Panel - Calendar */}
         <Calendar
+          key={`${selectedDate.year}-${selectedDate.month}`}
           minValue={today(userTimezone)}
           value={selectedDate}
-          defaultFocusedValue={initialDate}
+          defaultFocusedValue={selectedDate}
           onChange={handleDateSelect}
           availableDates={availableDates}
           onVisibleRangeChange={handleVisibleRangeChange}

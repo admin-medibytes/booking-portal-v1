@@ -129,6 +129,12 @@ export default function NewBookingPage() {
     }
   }, [currentStep, hasConfirmedSettings]);
 
+  // Reset selected date/time when specialist or appointment type changes
+  useEffect(() => {
+    setSelectedDateTime(null);
+    setSelectedDatetimeString(null);
+  }, [selectedSpecialist?.id, selectedAppointmentType?.id]);
+
   const updateStep = (step: number) => {
     const params = new URLSearchParams(searchParams);
     params.set("step", step.toString());
