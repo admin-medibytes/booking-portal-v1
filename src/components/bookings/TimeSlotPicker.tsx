@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar as CalendarIcon, Clock, Video, MapPin } from "lucide-react";
+import { Clock, Video, MapPin } from "lucide-react";
 import { specialistsClient } from "@/lib/hono-client";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/calendar";

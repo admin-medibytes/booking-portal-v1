@@ -29,7 +29,7 @@ interface BookingDetailClientProps {
   canUpdateProgress: boolean;
 }
 
-export function BookingDetailClient({ booking: initialBooking, session, userRole }: BookingDetailClientProps) {
+export function BookingDetailClient({ booking: initialBooking, userRole }: BookingDetailClientProps) {
   const router = useRouter();
   const [isProgressUpdateOpen, setIsProgressUpdateOpen] = useState(false);
 

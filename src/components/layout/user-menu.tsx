@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import type { User as UserType } from "@/types/user";
 

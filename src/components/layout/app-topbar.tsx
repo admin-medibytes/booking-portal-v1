@@ -1,14 +1,14 @@
 "use client";
 
 import { UserMenu } from "@/components/layout/user-menu";
-import { GlobalSearch, SearchResult } from "@/components/layout/global-search";
+// import { GlobalSearch, SearchResult } from "@/components/layout/global-search";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { AppUserProps } from "./type";
 
 export function AppTopbar({ user }: AppUserProps) {
-  const handleSearchResult = (result: SearchResult) => {
+  // const handleSearchResult = (result: SearchResult) => {
     // Handle navigation based on result type
-    console.log("Search result clicked:", result);
+    // console.log("Search result clicked:", result);
 
     // You can implement navigation logic here
     // For example:
@@ -18,7 +18,7 @@ export function AppTopbar({ user }: AppUserProps) {
     //   router.push(`/organizations/${result.id}`)
     // }
     // etc.
-  };
+  // };
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-[cubic-bezier(0.22,1,0.36,1)] group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 border-b bg-sidebar">

@@ -16,7 +16,7 @@ type ViewType = "calendar" | "list";
 export default function BookingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userRole, _setUserRole] = useState<string | null>(null);
 
   // Initialize view from URL or localStorage
   const [view, setView] = useState<ViewType>(() => {
