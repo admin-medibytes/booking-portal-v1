@@ -92,6 +92,7 @@ export default async function BookingDetailPage({ params }: BookingDetailPagePro
         },
         session: session.session,
       }}
+      userRole={userOrgRole || null}
       canUpdateProgress={canUpdateProgress}
     />
   );

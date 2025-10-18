@@ -25,7 +25,7 @@ export function AppTopbar({ user }: AppUserProps) {
       <div className="flex items-center gap-2 px-4">
         <SidebarTrigger className="-ml-1" />
       </div>
-      <GlobalSearch onResultClick={handleSearchResult} />
+      {/* <GlobalSearch onResultClick={handleSearchResult} /> */}
       <div className="ml-auto px-4">
         <UserMenu user={user} />
       </div>

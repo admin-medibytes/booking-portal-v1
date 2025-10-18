@@ -17,6 +17,25 @@ export const auth = betterAuth({
     usePlural: true,
   }),
 
+  databaseHooks: {
+    session: {
+      create: {
+        before: async (session) => {
+          const member = await db.query.members.findFirst({
+            where: (members, { eq }) => eq(members.userId, session.userId),
+          });
+
+          return {
+            data: {
+              ...session,
+              activeOrganizationId: member?.organizationId,
+            },
+          };
+        },
+      },
+    },
+  },
+
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
 

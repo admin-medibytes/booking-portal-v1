@@ -45,12 +45,13 @@ import Link from "next/link";
 
 interface BookingDetailCardProps {
   booking: BookingWithDetails;
+  userRole?: string | null;
 }
 
 // Filter for Australian timezones only
 const australianTimezones = timeZones.filter((tz) => tz.label.includes("Australia"));
 
-export function BookingDetailCard({ booking }: BookingDetailCardProps) {
+export function BookingDetailCard({ booking, userRole }: BookingDetailCardProps) {
   const [loadingAction, _setLoadingAction] = useState<string | null>(null);
   const router = useRouter();
 
@@ -448,55 +449,80 @@ export function BookingDetailCard({ booking }: BookingDetailCardProps) {
         </Card>
 
         {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {booking.type === "telehealth" && (
+        {userRole === "specialist" ? (
+          // Specialists only see "Join Video Call" for telehealth, nothing for in-person
+          booking.type === "telehealth" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button
+                  className="w-full bg-transparent"
+                  variant="outline"
+                  disabled={loadingAction === "join" || isClosed}
+                  asChild
+                >
+                  <Link href={booking.location} target="_blank">
+                    <VideoIcon className="h-4 w-4 mr-2" />
+                    Join Video Call
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )
+        ) : (
+          // Non-specialists see all actions
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {booking.type === "telehealth" && (
+                <Button
+                  className="w-full bg-transparent"
+                  variant="outline"
+                  disabled={loadingAction === "join" || isClosed}
+                  asChild
+                >
+                  <Link href={booking.location} target="_blank">
+                    <VideoIcon className="h-4 w-4 mr-2" />
+                    Join Video Call
+                  </Link>
+                </Button>
+              )}
               <Button
                 className="w-full bg-transparent"
                 variant="outline"
-                disabled={loadingAction === "join" || isClosed}
-                asChild
+                onClick={handleReschedule}
+                disabled={loadingAction === "reschedule" || isClosed}
               >
-                <Link href={booking.location} target="_blank">
-                  <VideoIcon className="h-4 w-4 mr-2" />
-                  Join Video Call
-                </Link>
+                <Clock4 className="h-4 w-4 mr-2" />
+                Reschedule Appointment
               </Button>
-            )}
-            <Button
-              className="w-full bg-transparent"
-              variant="outline"
-              onClick={handleReschedule}
-              disabled={loadingAction === "reschedule" || isClosed}
-            >
-              <Clock4 className="h-4 w-4 mr-2" />
-              Reschedule Appointment
-            </Button>
 
-            {/* <Button
-              className="w-full bg-transparent"
-              variant="outline"
-              onClick={handleSendReminder}
-              disabled={loadingAction === "reminder"}
-            >
-              <Mail className="h-4 w-4 mr-2" />
-              Send Reminder
-            </Button> */}
+              {/* <Button
+                className="w-full bg-transparent"
+                variant="outline"
+                onClick={handleSendReminder}
+                disabled={loadingAction === "reminder"}
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Send Reminder
+              </Button> */}
 
-            <Button
-              className="w-full"
-              variant="destructive"
-              onClick={() => setShowCancelModal(true)}
-              disabled={isClosed}
-            >
-              <XCircle className="h-4 w-4 mr-2" />
-              Cancel Booking
-            </Button>
-          </CardContent>
-        </Card>
+              <Button
+                className="w-full"
+                variant="destructive"
+                onClick={() => setShowCancelModal(true)}
+                disabled={isClosed}
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Cancel Booking
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Contact Support */}
         <Card>

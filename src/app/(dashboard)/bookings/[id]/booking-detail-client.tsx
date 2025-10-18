@@ -25,12 +25,12 @@ interface BookingDetailClientProps {
       activeOrganizationId?: string | null;
     };
   };
+  userRole: string | null;
   canUpdateProgress: boolean;
 }
 
-export function BookingDetailClient({ booking: initialBooking }: BookingDetailClientProps) {
+export function BookingDetailClient({ booking: initialBooking, session, userRole }: BookingDetailClientProps) {
   const router = useRouter();
-  
   const [isProgressUpdateOpen, setIsProgressUpdateOpen] = useState(false);
 
   // Use client-side query for real-time updates
@@ -81,7 +81,7 @@ export function BookingDetailClient({ booking: initialBooking }: BookingDetailCl
           canUpdateProgress={canUpdateProgress}
           onUpdateClick={() => setIsProgressUpdateOpen(true)}
         /> */}
-        <BookingDetailCard booking={currentBooking} />
+        <BookingDetailCard booking={currentBooking} userRole={userRole} />
       </div>
 
       {/* Progress Update Dialog */}

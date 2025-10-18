@@ -369,18 +369,7 @@ export function TimeSlotPicker({
         </div>
       </div>
 
-      {/* Bottom - Selected DateTime Display */}
-      {selectedDateTime && (
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <div className="flex items-center gap-2 text-sm text-gray-700">
-            <CalendarIcon className="w-4 h-4" />
-            <span>
-              Selected:{" "}
-              {formatInTimeZone(selectedDateTime, timeZone, "EEEE, MMMM d, yyyy 'at' h:mm a")}
-            </span>
-          </div>
-        </div>
-      )}
+     
     </div>
   );
 }

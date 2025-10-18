@@ -25,8 +25,16 @@
     "db:seed": "tsx src/server/db/seed.ts",
     "seed:user": "tsx scripts/seed-user.ts",
     "test:s3": "tsx scripts/test-s3.ts",
-    "migrate:bookings": "MIGRATION_MODE=true tsx scripts/migrate-bookings-only.ts",
-    "migrate:bookings:test": "MIGRATION_MODE=true TEST_MODE=true tsx scripts/migrate-bookings-only.ts"
+    "migrate:bookings": "MIGRATION_MODE=true tsx scripts/migrate-bookings-only-dtd.ts",
+    "migrate:bookings:test": "MIGRATION_MODE=true TEST_MODE=true tsx scripts/migrate-bookings-only-dtd.ts",
+    "import:orgs": "MIGRATION_MODE=true tsx scripts/import-organizations-csv.ts",
+    "import:orgs:test": "MIGRATION_MODE=true TEST_MODE=true tsx scripts/import-organizations-csv.ts",
+    "import:bookings": "MIGRATION_MODE=true tsx scripts/migrate-bookings-csv.ts",
+    "import:bookings:test": "MIGRATION_MODE=true TEST_MODE=true tsx scripts/migrate-bookings-csv.ts",
+    "import:bookings:validate": "MIGRATION_MODE=true VALIDATE_ONLY=true tsx scripts/migrate-bookings-csv.ts",
+    "import:bookings:split": "MIGRATION_MODE=true tsx scripts/validate-split-bookings-csv.ts",
+    "update:booking-orgs": "MIGRATION_MODE=true tsx scripts/update-booking-organizations.ts",
+    "update:booking-orgs:test": "MIGRATION_MODE=true TEST_MODE=true tsx scripts/update-booking-organizations.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",
@@ -110,6 +118,8 @@
     "@vitejs/plugin-react": "^5.0.0",
     "@vitest/ui": "^3.2.4",
     "chalk": "^5.5.0",
+    "csv-parse": "^6.1.0",
+    "csv-stringify": "^6.6.0",
     "dotenv": "^17.2.1",
     "drizzle-kit": "^0.31.4",
     "eslint": "^9",

@@ -16,6 +16,7 @@ type ViewType = "calendar" | "list";
 export default function BookingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Initialize view from URL or localStorage
   const [view, setView] = useState<ViewType>(() => {
@@ -53,6 +54,8 @@ export default function BookingsPage() {
 
   // Track current month for calendar view
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+
 
   // Update URL when view changes
   const handleViewChange = (newView: ViewType) => {
@@ -167,10 +170,12 @@ export default function BookingsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
           <p className="mt-2 text-gray-600">Manage examinee appointments and referrals</p>
         </div>
-        <Button className="inline-flex items-center" onClick={() => router.push("/bookings/new")}>
-          <Plus className="w-4 h-4 mr-2" />
-          New Booking
-        </Button>
+        {userRole !== "specialist" && (
+          <Button className="inline-flex items-center" onClick={() => router.push("/bookings/new")}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Booking
+          </Button>
+        )}
       </div>
 
       {/* Filters and View Toggle */}

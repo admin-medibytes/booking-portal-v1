@@ -17,6 +17,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // Determine the user's functional role
   let functionalRole: "admin" | "specialist" | "referrer" = "referrer";
+
   
   if (session.user.role === "admin") {
     functionalRole = "admin";
@@ -49,5 +50,5 @@ export default async function DashboardLayout({ children }: { children: React.Re
     image: session.user.image ?? null,
   };
 
-  return <DashboardClientWrapper user={user}>{children}</DashboardClientWrapper>;
+  return <DashboardClientWrapper user={user}>{children}</DashboardClientWrapper>
 }
