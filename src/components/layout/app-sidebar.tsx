@@ -7,6 +7,7 @@ import {
   Home,
   CalendarCheck,
   Plug,
+  Building2,
 } from "lucide-react";
 
 import {
@@ -42,7 +43,7 @@ export function AppSidebar({ user }: AppUserProps) {
   const commonNavItems: NavItem[] = [
     {
       href: "/bookings",
-      label: "Bookings",
+      label: "Manage Cases",
       icon: Calendar,
     },
     // {
@@ -60,14 +61,14 @@ export function AppSidebar({ user }: AppUserProps) {
   // Admin-only navigation items
   const adminNavItems: NavItem[] = [
     {
-      href: "/admin",
-      label: "Admin Dashboard",
-      icon: Home,
-    },
-    {
       href: "/admin/users",
       label: "User Management",
       icon: Users,
+    },
+    {
+      href: "/admin/organizations",
+      label: "Organizations",
+      icon: Building2,
     },
     // {
     //   href: "/admin/audit",
@@ -133,7 +134,7 @@ export function AppSidebar({ user }: AppUserProps) {
           </SidebarGroup>
         )}
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>Bookings</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {commonNavItems.map((item) => (
@@ -159,12 +160,12 @@ export function AppSidebar({ user }: AppUserProps) {
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-2">
                         <CalendarCheck className="size-5 text-primary" />
-                        <h3 className="font-semibold text-sm">Need Medical Legal Services?</h3>
+                        <h3 className="font-semibold text-sm">Need Psychiatrist IME?</h3>
                       </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
+                      {/* <p className="text-xs text-muted-foreground leading-relaxed">
                         Book an appointment with our specialists for expert medical legal
                         consultations.
-                      </p>
+                      </p> */}
                     </div>
                   </CardContent>
                   <CardFooter>
