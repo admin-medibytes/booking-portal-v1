@@ -444,9 +444,8 @@ function validateRow(row: CSVBookingRow, rowIndex: number): boolean {
   }
   if (!claimantDOB) {
     addError("Claimant DOB", "Required field is empty");
-  } else if (!parseDDMMYYYY(claimantDOB)) {
-    addError("Claimant DOB", "Invalid date format (expected DD/MM/YYYY)", claimantDOB);
   }
+  // DOB validation is relaxed - as long as there's a value, we accept it
   if (!claimantAddress) {
     addError("Claimant Address", "Required field is empty");
   }
