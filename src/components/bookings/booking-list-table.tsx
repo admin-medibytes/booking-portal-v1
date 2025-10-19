@@ -56,6 +56,7 @@ import {
 import type { BookingWithSpecialist } from "@/types/booking";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useAuth } from "@/hooks/use-auth";
 
 // Memoized cell components for performance
 const SpecialistCell = memo(
@@ -109,6 +110,7 @@ export const BookingListTable = memo(function BookingListTable({
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone,
 }: BookingListTableProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [bookingToCancel, setBookingToCancel] = useState<BookingWithSpecialist | null>(null);
@@ -311,23 +313,27 @@ export const BookingListTable = memo(function BookingListTable({
                 <Eye className="mr-2 h-4 w-4" />
                 See Details
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  router.push(`/bookings/${booking.id}/reschedule`);
-                }}
-              >
-                <Clock4 className="mr-2 h-4 w-4" />
-                Reschedule
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => setBookingToCancel(booking)}
-                disabled={isClosed(booking.status)}
-              >
-                <XCircle className="mr-2 h-4 w-4" />
-                Cancel
-              </DropdownMenuItem>
+              {user?.memberRole !== "specialist" && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      router.push(`/bookings/${booking.id}/reschedule`);
+                    }}
+                  >
+                    <Clock4 className="mr-2 h-4 w-4" />
+                    Reschedule
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => setBookingToCancel(booking)}
+                    disabled={isClosed(booking.status)}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Cancel
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );

@@ -10,13 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Calendar, List, Plus, Loader2 } from "lucide-react";
 import type { BookingFilters as BookingFiltersType } from "@/types/booking";
 import { useSpecialists } from "@/hooks/use-specialists";
+import { useAuth } from "@/hooks/use-auth";
 
 type ViewType = "calendar" | "list";
 
 export default function BookingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [userRole, _setUserRole] = useState<string | null>(null);
+  const { user } = useAuth();
 
   // Initialize view from URL or localStorage
   const [view, setView] = useState<ViewType>(() => {
@@ -120,24 +121,6 @@ export default function BookingsPage() {
     setTimezone(urlTimezone);
   }, [searchParams]);
 
-  // This callback is no longer needed since URL is the source of truth
-  // The useEffect above will handle syncing filters from URL
-  // const handleFiltersChange = (filterState: FilterState) => {
-  //   // Map filter state to booking filters
-  //   const newFilters: BookingFiltersType = {
-  //     ...filters,
-  //     search: filterState.search || undefined,
-  //     status: filterState.status || undefined,
-  //     specialistIds: filterState.specialistIds.length > 0 ? filterState.specialistIds : undefined,
-  //     page: 1, // Reset to first page when filters change
-  //   };
-  //
-  //   setFilters(newFilters);
-  //
-  //   // Update timezone separately (doesn't trigger refetch)
-  //   setTimezone(filterState.timezone);
-  // };
-
   // Handle pagination changes
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -170,7 +153,7 @@ export default function BookingsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
           <p className="mt-2 text-gray-600">Manage examinee appointments and referrals</p>
         </div>
-        {userRole !== "specialist" && (
+        {user?.memberRole !== "specialist" && (
           <Button className="inline-flex items-center" onClick={() => router.push("/bookings/new")}>
             <Plus className="w-4 h-4 mr-2" />
             New Booking

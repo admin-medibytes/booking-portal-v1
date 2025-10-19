@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import type { BookingWithSpecialist } from "@/types/booking";
 import { UserIcon, MapPin, Video, Calendar } from "lucide-react";
 import { Separator } from "../ui/separator";
+import { useAuth } from "@/hooks/use-auth";
 
 interface BookingDetailsPopoverProps {
   booking: BookingWithSpecialist;
@@ -21,6 +22,7 @@ interface BookingDetailsPopoverProps {
 
 export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopoverProps) {
   const router = useRouter();
+  const { user } = useAuth();
 
   const handleViewDetails = () => {
     router.push(`/bookings/${booking.id}`);
@@ -105,10 +107,12 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
                     <Video className="h-4 w-4 mr-1" />
                     Join Meeting
                   </Button>
-                  <Button variant="outline" onClick={handleReschedule} className="flex-1">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    Reschedule
-                  </Button>
+                  {user?.memberRole !== "specialist" && (
+                    <Button variant="outline" onClick={handleReschedule} className="flex-1">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      Reschedule
+                    </Button>
+                  )}
                 </div>
                 <Button onClick={handleViewDetails} className="w-full">
                   View Details
@@ -117,10 +121,12 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
             </DialogFooter>
         ) : (
           <DialogFooter className="flex-row gap-2">
-            <Button variant="outline" onClick={handleReschedule} className="flex-1">
-              <Calendar className="h-4 w-4 mr-1" />
-              Reschedule
-            </Button>
+            {user?.memberRole !== "specialist" && (
+              <Button variant="outline" onClick={handleReschedule} className="flex-1">
+                <Calendar className="h-4 w-4 mr-1" />
+                Reschedule
+              </Button>
+            )}
             <Button onClick={handleViewDetails} className="flex-1">
               View Details
             </Button>
