@@ -28,6 +28,7 @@ interface DocumentUploadFieldProps {
   category: DocumentCategory;
   maxSizeMB?: number;
   accept?: string;
+  disableUpload?: boolean;
 }
 
 export function DocumentUploadField({
@@ -37,6 +38,7 @@ export function DocumentUploadField({
   category,
   maxSizeMB = 512,
   accept = ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  disableUpload = false,
 }: DocumentUploadFieldProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<Document | null>(null);
@@ -97,14 +99,16 @@ export function DocumentUploadField({
     <div>
       <div className="flex items-center justify-between mb-2">
         <p className="font-medium text-sm">{label}</p>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8"
-          onClick={() => setIsModalOpen(true)}
-        >
-          Upload
-        </Button>
+        {!disableUpload && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8"
+            onClick={() => setIsModalOpen(true)}
+          >
+            Upload
+          </Button>
+        )}
       </div>
       <div className="space-y-2">
         {documents.length > 0 ? (

@@ -4,12 +4,15 @@ import { FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentUploadField } from "./document-upload-field";
+import { useAuth } from "@/hooks/use-auth";
 
 interface BookingDocumentsSectionProps {
   bookingId: string;
 }
 
 export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionProps) {
+  const { user } = useAuth();
+  const isSpecialist = user?.memberRole === "specialist";
   return (
     <Card>
       <CardHeader>
@@ -31,12 +34,14 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="ime_documents"
               category="consent_form"
+              disableUpload={isSpecialist}
             />
             <DocumentUploadField
               label="Brief Documents"
               bookingId={bookingId}
               section="ime_documents"
               category="document_brief"
+              disableUpload={isSpecialist}
             />
             <DocumentUploadField
               label="Dictation"
@@ -64,6 +69,7 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="supplementary_documents"
               category="document_brief"
+              disableUpload={isSpecialist}
             />
             <DocumentUploadField
               label="Supplementary Dictation"
