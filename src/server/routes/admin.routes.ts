@@ -74,7 +74,72 @@ const updateTeamSchema = type({
   name: "string>=2",
 });
 
-const app = new Hono()
+// Organizations route - accessible by all authenticated users
+const organizationsRoute = new Hono()
+  .use("*", authMiddleware)
+  .get(
+    "/organizations",
+    arktypeValidator(
+      "query",
+      type({
+        "page?": "string.integer>=1",
+        "limit?": "1<string.integer<=100",
+        "search?": "string",
+        "status?": "'active'|'inactive'",
+      })
+    ),
+    async (c) => {
+      const params = c.req.valid("query");
+      const auth = c.get("auth");
+
+      // Check if user is authenticated
+      if (!auth?.user) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+
+      // Check if user is an admin
+      const userRoles = auth.user.role?.split(",").map((r) => r.trim()) || [];
+      const isAdmin = userRoles.includes("admin");
+
+      let result;
+
+      if (isAdmin) {
+        // Admin: fetch all organizations
+        result = await organizationService.listAllOrganizations({
+          ...params,
+          page: Number(params.page) || 1,
+          limit: Number(params.limit) || 20,
+        });
+
+        logger.info("Admin listed all organizations", {
+          requestedBy: auth.user?.id,
+          page: result.pagination.page,
+          total: result.pagination.total,
+        });
+      } else {
+        // Non-admin: fetch only organizations the user has access to
+        result = await organizationService.listOrganizations(
+          {
+            ...params,
+            page: Number(params.page) || 1,
+            limit: Number(params.limit) || 20,
+          },
+          c.req.raw.headers
+        );
+
+        logger.info("User listed their organizations", {
+          requestedBy: auth.user?.id,
+          page: result.pagination.page,
+          total: result.pagination.total,
+        });
+      }
+
+      return c.json(result);
+    }
+  );
+
+// Admin-only routes
+const adminOnlyRoutes = new Hono()
   .use("*", authMiddleware)
   .use("*", requireAdmin)
   .post(
@@ -299,40 +364,6 @@ const app = new Hono()
       });
 
       return c.json({ organization }, 201);
-    }
-  )
-
-  .get(
-    "/organizations",
-    arktypeValidator(
-      "query",
-      type({
-        "page?": "string.integer>=1",
-        "limit?": "1<string.integer<=100",
-        "search?": "string",
-        "status?": "'active'|'inactive'",
-      })
-    ),
-    async (c) => {
-      const params = c.req.valid("query");
-      const auth = c.get("auth");
-
-      const result = await organizationService.listOrganizations(
-        {
-          ...params,
-          page: Number(params.page) || 1,
-          limit: Number(params.limit) || 20,
-        },
-        c.req.raw.headers
-      );
-
-      logger.info("Admin listed organizations", {
-        requestedBy: auth.user?.id,
-        page: result.pagination.page,
-        total: result.pagination.total,
-      });
-
-      return c.json(result);
     }
   )
 
@@ -1764,5 +1795,10 @@ const app = new Hono()
       );
     }
   });
+
+// Merge routes: organizations route (auth only) + admin-only routes
+const app = new Hono()
+  .route("/", organizationsRoute)
+  .route("/", adminOnlyRoutes);
 
 export default app;

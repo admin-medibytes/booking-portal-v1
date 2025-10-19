@@ -2,6 +2,8 @@ import { auth } from "@/lib/auth";
 import { auditService } from "./audit.service";
 import { logger } from "@/server/utils/logger";
 import { HTTPException } from "hono/http-exception";
+import { db } from "@/server/db";
+import { organizations, members, teams } from "@/server/db/schema";
 
 interface CreateOrganizationDto {
   name: string;
@@ -169,6 +171,87 @@ export class OrganizationService {
     } catch (error) {
       logger.error("Failed to list organizations", error as Error);
       throw new HTTPException(500, { message: "Failed to list organizations" });
+    }
+  }
+
+  async listAllOrganizations(params: ListOrganizationsParams) {
+    try {
+      const { page = 1, limit = 20, search, status } = params;
+      const offset = (page - 1) * limit;
+
+      // Query all organizations from database (admin access)
+      const { eq, ilike, or, sql } = await import("drizzle-orm");
+
+      let query = db.select().from(organizations);
+
+      // Apply search filter
+      if (search) {
+        const searchLower = `%${search.toLowerCase()}%`;
+        query = query.where(
+          or(
+            ilike(organizations.name, searchLower),
+            ilike(organizations.slug, searchLower)
+          )
+        ) as typeof query;
+      }
+
+      // Apply status filter if provided
+      if (status === "inactive") {
+        query = query.where(sql`${organizations.metadata}->>'isActive' = 'false'`) as typeof query;
+      } else if (status === "active") {
+        query = query.where(
+          or(
+            sql`${organizations.metadata}->>'isActive' = 'true'`,
+            sql`${organizations.metadata}->>'isActive' IS NULL`
+          )
+        ) as typeof query;
+      }
+
+      // Get total count for pagination
+      const allOrgs = await query;
+      const total = allOrgs.length;
+
+      // Apply pagination
+      const organizationsList = allOrgs.slice(offset, offset + limit);
+
+      // Enrich with member and team counts
+      const enrichedOrgs = await Promise.all(
+        organizationsList.map(async (org) => {
+          const memberCount = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(members)
+            .where(eq(members.organizationId, org.id));
+
+          const teamCount = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(teams)
+            .where(eq(teams.organizationId, org.id));
+
+          return {
+            id: org.id,
+            name: org.name,
+            slug: org.slug,
+            logo: org.logo,
+            metadata: org.metadata,
+            createdAt: org.createdAt,
+            memberCount: memberCount[0]?.count || 0,
+            teamCount: teamCount[0]?.count || 0,
+          };
+        })
+      );
+
+      return {
+        organizations: enrichedOrgs,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      logger.error("Failed to list all organizations (admin)", error as Error);
+      throw new HTTPException(500, { message: "Failed to list all organizations" });
     }
   }
 
