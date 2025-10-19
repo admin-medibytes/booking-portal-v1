@@ -161,7 +161,8 @@ export class BookingRepository {
     const offset = (page - 1) * limit;
 
     // If search is provided, we need to fetch MORE records and filter client-side
-    const effectiveLimit = filters?.search ? 100 : limit;
+    // Using 1000 to cover larger datasets (since fields are encrypted, we can't use SQL search)
+    const effectiveLimit = filters?.search ? 1000 : limit;
     const effectiveOffset = filters?.search ? 0 : offset;
 
     // Fetch booking IDs with joins
@@ -246,11 +247,13 @@ export class BookingRepository {
         const email = booking.examinee?.email?.toLowerCase() || '';
         const firstName = booking.examinee?.firstName?.toLowerCase() || '';
         const lastName = booking.examinee?.lastName?.toLowerCase() || '';
+        const fullName = `${firstName} ${lastName}`.trim();
 
         return (
-          email.includes(searchLower) ||
           firstName.includes(searchLower) ||
-          lastName.includes(searchLower)
+          lastName.includes(searchLower) ||
+          fullName.includes(searchLower) ||
+          email.includes(searchLower)
         );
       });
 

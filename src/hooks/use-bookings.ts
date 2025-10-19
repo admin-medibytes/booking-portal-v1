@@ -195,16 +195,18 @@ export function useBookingsCalendar(
 
     // Apply search filter client-side (search in examinee name and email)
     if (clientFilters?.search) {
-      const searchLower = clientFilters.search.toLowerCase();
+      const searchLower = clientFilters.search.toLowerCase().trim();
       filtered = filtered.filter((booking) => {
         const examinee = booking.examinee as { firstName?: string; lastName?: string; email?: string } | undefined;
         const firstName = examinee?.firstName?.toLowerCase() || "";
         const lastName = examinee?.lastName?.toLowerCase() || "";
         const email = examinee?.email?.toLowerCase() || "";
+        const fullName = `${firstName} ${lastName}`.trim();
 
         return (
           firstName.includes(searchLower) ||
           lastName.includes(searchLower) ||
+          fullName.includes(searchLower) ||
           email.includes(searchLower)
         );
       });
