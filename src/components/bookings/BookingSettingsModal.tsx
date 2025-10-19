@@ -17,13 +17,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Globe, Building2, AlertCircle } from "lucide-react";
+import { Globe, Building2, AlertCircle, Check, ChevronsUpDown } from "lucide-react";
 import { adminClient } from "@/lib/hono-client";
 import { timeZones } from "@/lib/utils/timezones";
+import { cn } from "@/lib/utils";
 
 interface BookingSettingsModalProps {
   isOpen: boolean;
@@ -50,6 +64,7 @@ export function BookingSettingsModal({
   const [selectedTimezone, setSelectedTimezone] = useState(defaultTimezone);
   const [selectedOrganization, setSelectedOrganization] = useState(defaultOrganizationId || "");
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [orgComboboxOpen, setOrgComboboxOpen] = useState(false);
 
   // Fetch organizations
   const {
@@ -115,7 +130,11 @@ export function BookingSettingsModal({
               Timezone
             </Label>
             <Select value={selectedTimezone} onValueChange={setSelectedTimezone}>
-              <SelectTrigger id="timezone">
+              <SelectTrigger
+                id="timezone"
+                className="w-full justify-between hover:cursor-pointer bg-background transition-colors duration-100 delay-50 hover:bg-accent"
+                style={{ transitionProperty: 'background-color' }}
+              >
                 <SelectValue placeholder="Select timezone">
                   {timeZones.find((tz) => tz.tzCode === selectedTimezone)?.tzCode ||
                     selectedTimezone}
@@ -150,18 +169,50 @@ export function BookingSettingsModal({
                 </AlertDescription>
               </Alert>
             ) : (
-              <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
-                <SelectTrigger id="organization">
-                  <SelectValue placeholder="Select organization" />
-                </SelectTrigger>
-                <SelectContent>
-                  {organizationsData?.map((org) => (
-                    <SelectItem key={org.id} value={org.id}>
-                      {org.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={orgComboboxOpen} onOpenChange={setOrgComboboxOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="organization"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={orgComboboxOpen}
+                    className="w-full justify-between"
+                  >
+                    {selectedOrganization
+                      ? organizationsData?.find((org) => org.id === selectedOrganization)?.name
+                      : "Select organization..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search organizations..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No organization found.</CommandEmpty>
+                      <CommandGroup>
+                        {organizationsData?.map((org) => (
+                          <CommandItem
+                            key={org.id}
+                            value={org.name}
+                            onSelect={() => {
+                              setSelectedOrganization(org.id);
+                              setOrgComboboxOpen(false);
+                            }}
+                          >
+                            {org.name}
+                            <Check
+                              className={cn(
+                                "ml-auto h-4 w-4",
+                                selectedOrganization === org.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             )}
             <p className="text-sm text-muted-foreground">
               Bookings will be created under this organization
