@@ -203,6 +203,8 @@ export default function NewBookingPage() {
 
   const handleBookingConfirm = (id: string) => {
     setBookingId(id);
+
+    setIntakeFormData(null);
   };
 
   const handleSettingsConfirm = (
