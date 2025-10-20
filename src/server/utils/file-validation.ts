@@ -75,6 +75,7 @@ export const ALLOWED_MIME_TYPES = {
     'audio/ogg',
     'audio/x-m4a',
     'application/pdf', // Transcripts
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
   ],
   draft_report: [
     'application/pdf',
