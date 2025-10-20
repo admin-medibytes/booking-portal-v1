@@ -29,7 +29,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres, { type Sql } from "postgres";
 import { v4 as uuidv4 } from "uuid";
 import * as newSchema from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import { parse } from "csv-parse/sync";
@@ -201,6 +201,7 @@ const stats = {
   bookingsCreated: 0,
   progressCreated: 0,
   rowsSkipped: 0,
+  bookingsAlreadyExist: 0,
   errors: [] as Array<{ row: number; reason: string; data?: any }>,
 };
 
@@ -994,6 +995,20 @@ async function processRow(row: CSVBookingRow, rowIndex: number): Promise<boolean
   try {
     console.log(`\n📝 Processing row ${rowIndex + 1}...`);
 
+    // Step 0: Check if booking already exists (by AAID)
+    const aaid = parseInteger(row["AAID"]);
+    if (aaid) {
+      const existingBooking = await dbClient<{ id: string }[]>`
+        SELECT id FROM bookings WHERE acuity_appointment_id = ${aaid} LIMIT 1
+      `;
+
+      if (existingBooking.length > 0) {
+        stats.bookingsAlreadyExist++;
+        console.log(`   ⊙ Skipped: Booking with AAID ${aaid} already exists (ID: ${existingBooking[0].id})`);
+        return true; // Return true so it's not counted as an error
+      }
+    }
+
     // Step 1: Get or create referrer
     const referrerId = await getOrCreateReferrer(row);
     if (!referrerId) {
@@ -1127,6 +1142,7 @@ async function runMigration() {
     console.log(`   - Referrers reused: ${stats.referrersReused}`);
     console.log(`   - Examinees created: ${stats.examineesCreated}`);
     console.log(`   - Bookings created: ${stats.bookingsCreated}`);
+    console.log(`   - Bookings already exist (skipped): ${stats.bookingsAlreadyExist}`);
     console.log(`   - Progress records created: ${stats.progressCreated}`);
     console.log(`   - Rows skipped: ${stats.rowsSkipped}`);
     console.log(`   - Duration: ${duration} seconds`);
