@@ -194,7 +194,7 @@ export function AppointmentTypeSelect({
                     </div>
                     {appointmentType.appointmentMode === "in-person" && (
                       <Badge className="text-xs px-3 py-1 font-medium border bg-violet-50 text-violet-700 border-violet-200">
-                        {appointmentType.appointmentMode}
+                        In-person
                       </Badge>
                     )}
                     {appointmentType.appointmentMode === "telehealth" && (
@@ -202,7 +202,7 @@ export function AppointmentTypeSelect({
                         className="text-xs px-3 py-1 font-medium border bg-blue-50 text-blue-700 border-blue-200"
                         variant="secondary"
                       >
-                        {appointmentType.appointmentMode}
+                        Telehealth
                       </Badge>
                     )}
                   </div>
