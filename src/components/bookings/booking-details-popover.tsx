@@ -1,7 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { addMinutes, format } from "date-fns";
+import { useRouter, useSearchParams } from "next/navigation";
+import { addMinutes } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,11 @@ interface BookingDetailsPopoverProps {
 
 export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopoverProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
+
+  // Get timezone from URL params, default to user's timezone
+  const timezone = searchParams.get("timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const handleViewDetails = () => {
     router.push(`/bookings/${booking.id}`);
@@ -42,8 +47,10 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           {appointmentDate &&
-            
-            <span className="text-sm text-muted-foreground">{format(appointmentDate, "PPPp")} to {format(addMinutes(appointmentDate, booking.duration), "h:mm a")}</span>
+
+            <span className="text-sm text-muted-foreground">
+              {formatInTimeZone(appointmentDate, timezone, "PPPp")} to {formatInTimeZone(addMinutes(appointmentDate, booking.duration), timezone, "h:mm a")}
+            </span>
           }
           <DialogTitle>{booking.examinee.firstName} {booking.examinee.lastName}</DialogTitle>
         </DialogHeader>
