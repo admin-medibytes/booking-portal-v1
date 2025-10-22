@@ -33,9 +33,8 @@ interface RescheduleClientProps {
 
 export function RescheduleClient({ booking }: RescheduleClientProps) {
   const router = useRouter();
-  const [selectedDateTime, setSelectedDateTime] = useState<Date | null>(
-    booking.dateTime ? new Date(booking.dateTime) : null
-  );
+  // Don't pre-select current date - let TimeSlotPicker auto-select next available date
+  const [selectedDateTime, setSelectedDateTime] = useState<Date | null>(null);
   const [selectedTimezone, setSelectedTimezone] = useState(
     Intl.DateTimeFormat().resolvedOptions().timeZone
   );
@@ -203,6 +202,7 @@ export function RescheduleClient({ booking }: RescheduleClientProps) {
               duration: booking.duration,
               appointmentMode: booking.type,
             }}
+            minDate={new Date(booking.dateTime)}
           />
         </CardContent>
       </Card>

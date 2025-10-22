@@ -46,6 +46,7 @@ interface TimeSlotPickerProps {
     duration: number;
     appointmentMode?: "in-person" | "telehealth";
   };
+  minDate?: Date; // Minimum date to consider for auto-selection (for rescheduling)
 }
 
 // // Australian timezone options
@@ -71,8 +72,18 @@ export function TimeSlotPicker({
   selectedTimezone,
   specialist,
   appointmentType,
+  minDate,
 }: TimeSlotPickerProps) {
   const todayDate = today("Australia/Sydney");
+
+  // Initialize with minDate if provided (for rescheduling), otherwise today
+  const startDate = minDate
+    ? new CalendarDate(
+        minDate.getFullYear(),
+        minDate.getMonth() + 1, // JS months are 0-indexed
+        minDate.getDate()
+      )
+    : todayDate;
 
   // Initialize with selected date if returning to this step
   const initialDate = selectedDateTime
@@ -81,7 +92,7 @@ export function TimeSlotPicker({
         selectedDateTime.getMonth() + 1, // JS months are 0-indexed
         selectedDateTime.getDate()
       )
-    : todayDate;
+    : startDate;
 
   const [selectedDate, setSelectedDate] = useState<CalendarDate>(initialDate);
   const [timeZone, setTimeZone] = useState(selectedTimezone || "Australia/Sydney");
@@ -106,13 +117,13 @@ export function TimeSlotPicker({
     ) {
       // Specialist or appointment type has changed, reset to auto-select mode
       hasUserSelectedDate.current = false;
-      setSelectedDate(todayDate);
-      setVisibleMonth({ month: todayDate.month, year: todayDate.year });
+      setSelectedDate(startDate);
+      setVisibleMonth({ month: startDate.month, year: startDate.year });
       setMonthsChecked(0);
       prevSpecialistIdRef.current = specialistId;
       prevAppointmentTypeIdRef.current = appointmentTypeId;
     }
-  }, [specialistId, appointmentTypeId, todayDate]);
+  }, [specialistId, appointmentTypeId, startDate]);
 
   // Fetch available dates for the month
   const {
@@ -207,14 +218,23 @@ export function TimeSlotPicker({
   // Auto-select first available date if user hasn't selected one
   useEffect(() => {
     if (!hasUserSelectedDate.current && availableDates.length > 0) {
+      // Filter dates that are after minDate (if provided)
+      let filteredDates = [...availableDates];
+      if (minDate) {
+        const minDateStr = `${minDate.getFullYear()}-${String(minDate.getMonth() + 1).padStart(2, "0")}-${String(minDate.getDate()).padStart(2, "0")}`;
+        filteredDates = filteredDates.filter((date) => date > minDateStr);
+      }
+
       // Sort all available dates and pick the earliest one
-      const sortedDates = [...availableDates].sort();
-      const firstDate = sortedDates[0];
-      const calendarDate = parseDate(firstDate);
-      setSelectedDate(calendarDate);
-      // Calendar will automatically show the correct month via key prop
+      const sortedDates = filteredDates.sort();
+      if (sortedDates.length > 0) {
+        const firstDate = sortedDates[0];
+        const calendarDate = parseDate(firstDate);
+        setSelectedDate(calendarDate);
+        // Calendar will automatically show the correct month via key prop
+      }
     }
-  }, [availableDates]);
+  }, [availableDates, minDate]);
 
   const handleDateSelect = (value: DateValue) => {
     // Normalize to CalendarDate if needed
