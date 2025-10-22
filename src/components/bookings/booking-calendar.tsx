@@ -533,7 +533,7 @@ function WeekView({ currentDate, bookingsByDate, onBookingClick, isLoading: _isL
               return (
                 <div
                   key={`${day.toISOString()}-${hour}`}
-                  className="p-1 border-r border-b last:border-r-0 relative min-h-[60px]"
+                  className="p-1 border-r border-b last:border-r-0 relative min-h-[60px] space-y-1"
                 >
                   {hourBookings.map((booking) => (
                     <BookingItem
@@ -594,7 +594,7 @@ function DayView({ currentDate, bookingsByDate, onBookingClick, timezone }: DayV
               </div>
 
               {/* Booking slot */}
-              <div className="col-span-10 p-2 min-h-[80px]">
+              <div className="col-span-10 p-2 min-h-[80px] space-y-1">
                 {hourBookings.map((booking) => (
                   <BookingItem
                     key={booking.id}
@@ -686,7 +686,7 @@ function AgendaView({ currentDate, bookings, onBookingClick, timezone }: AgendaV
               <h4 className="sticky top-0 mb-3 text-sm font-medium text-muted-foreground bg-background">
                 {format(date, "EEEE, MMMM d, yyyy")}
               </h4>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {dayBookings.map((booking) => (
                   <BookingItem
                     key={booking.id}
@@ -766,7 +766,7 @@ const BookingItem = React.memo(function BookingItem({ booking, view, onClick, ti
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <span className="font-medium">{timeString}</span>
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs shadow bg-gray-100 text-gray-800">
                 {booking.location}
               </Badge>
             </div>
