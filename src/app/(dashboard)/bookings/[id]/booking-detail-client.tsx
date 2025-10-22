@@ -65,7 +65,7 @@ export function BookingDetailClient({ booking: initialBooking, userRole }: Booki
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Booking Details</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{currentBooking.examinee.firstName} {currentBooking.examinee.lastName}</h1>
             <p className="text-sm text-gray-500 mt-1">
               View and manage the details for this booking.
             </p>
