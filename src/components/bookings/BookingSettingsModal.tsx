@@ -95,7 +95,10 @@ export function BookingSettingsModal({
   useEffect(() => {
     if (organizationsData && organizationsData.length > 0 && !hasLoaded) {
       if (!defaultOrganizationId) {
-        setSelectedOrganization(organizationsData[0].id);
+        // Try to find organization with slug "medibytes-legal"
+        const medibytesLegal = organizationsData.find((org) => org.slug === "medibytes-legal");
+        // Use medibytes-legal if found, otherwise use first organization
+        setSelectedOrganization(medibytesLegal?.id || organizationsData[0].id);
       }
       setHasLoaded(true);
     }
