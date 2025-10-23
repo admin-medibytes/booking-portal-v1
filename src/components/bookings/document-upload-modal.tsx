@@ -33,6 +33,50 @@ interface DocumentUploadModalProps {
   onUploadComplete?: () => void;
 }
 
+// Helper function to parse accept string and generate user-friendly file types text
+function getAcceptedFileTypesText(accept: string): string {
+  const extensions = new Set<string>();
+
+  // Extract file extensions from the accept string
+  const parts = accept.split(',').map(part => part.trim());
+
+  parts.forEach(part => {
+    if (part.startsWith('.')) {
+      // Direct extension like .pdf
+      extensions.add(part.substring(1).toUpperCase());
+    } else if (part === 'audio/*') {
+      // Generic audio type
+      extensions.add('AUDIO');
+    } else if (part.startsWith('audio/')) {
+      // Specific audio MIME types - extract common ones
+      if (part.includes('mpeg')) extensions.add('MP3');
+      if (part.includes('wav')) extensions.add('WAV');
+      if (part.includes('mp4') || part.includes('m4a')) extensions.add('M4A');
+      if (part.includes('ogg')) extensions.add('OGG');
+      if (part.includes('webm')) extensions.add('WEBM');
+    } else if (part === 'application/pdf') {
+      extensions.add('PDF');
+    } else if (part.includes('msword') || part.includes('wordprocessingml')) {
+      extensions.add('DOC');
+      extensions.add('DOCX');
+    }
+  });
+
+  // Convert to array and sort
+  const extensionsArray = Array.from(extensions).sort();
+
+  // If we have AUDIO as a generic type, simplify the display
+  if (extensionsArray.includes('AUDIO')) {
+    const nonAudio = extensionsArray.filter(ext => !['MP3', 'WAV', 'M4A', 'OGG', 'WEBM', 'OPUS', 'FLAC', 'AAC', 'WMA'].includes(ext));
+    if (nonAudio.length > 0 && nonAudio[0] !== 'AUDIO') {
+      return [...nonAudio, 'Audio files'].join(', ');
+    }
+    return nonAudio.join(', ');
+  }
+
+  return extensionsArray.join(', ');
+}
+
 export function DocumentUploadModal({
   open,
   onOpenChange,
@@ -47,6 +91,7 @@ export function DocumentUploadModal({
   const maxSize = maxSizeMB * 1024 * 1024;
   const [uploading, setUploading] = useState(false);
   const directUpload = useDirectUpload();
+  const acceptedFileTypesText = getAcceptedFileTypesText(accept);
 
   const handleUpload = async () => {
     setUploading(true);
@@ -122,7 +167,7 @@ export function DocumentUploadModal({
         <DialogHeader>
           <DialogTitle>Upload {label}</DialogTitle>
           <DialogDescription>
-            Upload your documents (PDF, DOC, DOCX - max {maxSizeMB}MB)
+            Upload your documents ({acceptedFileTypesText} - max {maxSizeMB}MB)
           </DialogDescription>
         </DialogHeader>
 
@@ -152,7 +197,7 @@ export function DocumentUploadModal({
                 Drop your files here or click to browse
               </p>
               <p className="text-muted-foreground text-xs">
-                PDF, DOC, DOCX (max. {maxSizeMB}MB per file)
+                {acceptedFileTypesText} (max. {maxSizeMB}MB per file)
               </p>
               <Button
                 variant="outline"
