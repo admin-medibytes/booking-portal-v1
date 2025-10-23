@@ -81,7 +81,7 @@ export class SpecialistRepository {
   }
 
   // Update an existing specialist
-  async update(id: string, data: UpdateSpecialistInputType) {
+  async update(id: string, data: Partial<UpdateSpecialistInputType>) {
     const validated = UpdateSpecialistInput(data);
     if (validated instanceof type.errors) {
       throw new Error(`Invalid update data: ${validated[0]?.message}`);
