@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import { bookingsClient } from "@/lib/hono-client";
 import type { BookingListResponse, BookingWithSpecialist, BookingFilters } from "@/types/booking";
