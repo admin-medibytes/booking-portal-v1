@@ -3,7 +3,6 @@ import { pgTable, text, timestamp, integer, pgEnum, index, boolean } from "drizz
 import { relations } from "drizzle-orm";
 import { users, organizations, teams } from "./auth";
 import { specialists } from "./specialists";
-import { encryptedText, encryptedTextNullable } from "./encrypted-column";
 
 export const bookingTypeEnum = pgEnum("booking_type", ["in-person", "telehealth"]);
 export const bookingStatusEnum = pgEnum("booking_status", ["active", "closed", "archived"]);
@@ -25,11 +24,11 @@ export const referrers = pgTable("referrers", {
     .notNull()
     .references(() => organizations.id),
   userId: text("user_id").references(() => users.id), // empty if external referrer
-  firstName: encryptedText("first_name").notNull(),
-  lastName: encryptedText("last_name").notNull(),
-  email: encryptedText("email"),
-  phone: encryptedText("phone"),
-  jobTitle: encryptedTextNullable("job_title"),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  jobTitle: text("job_title"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -41,15 +40,15 @@ export const examinees = pgTable("examinees", {
   referrerId: text("referrer_id")
     .notNull()
     .references(() => referrers.id),
-  firstName: encryptedText("first_name").notNull(),
-  lastName: encryptedText("last_name").notNull(),
-  dateOfBirth: encryptedText("date_of_birth").notNull(),
-  address: encryptedText("address").notNull(),
-  email: encryptedText("email").notNull(),
-  phoneNumber: encryptedText("phone_number"),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  dateOfBirth: text("date_of_birth").notNull(),
+  address: text("address").notNull(),
+  email: text("email").notNull(),
+  phoneNumber: text("phone_number"),
   authorizedContact: boolean("authorized_contact").notNull(),
-  condition: encryptedText("condition").notNull(),
-  caseType: encryptedText("case_type").notNull(),
+  condition: text("condition").notNull(),
+  caseType: text("case_type").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
