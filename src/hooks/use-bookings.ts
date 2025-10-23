@@ -169,6 +169,11 @@ export function useBookingsCalendar(
         queryFilters.specialistIds = clientFilters.specialistIds.join(",");
       }
 
+      // Apply search filter server-side (SQL ILIKE search now that fields are not encrypted)
+      if (clientFilters?.search) {
+        queryFilters.search = clientFilters.search;
+      }
+
       const res = await bookingsClient.$get({
         query: queryFilters,
       });
@@ -180,40 +185,15 @@ export function useBookingsCalendar(
 
       const data = await res.json();
 
-      // Return bookings as-is - minimal transformation for performance
+      // Return bookings as-is - server already filtered by search
       return (data.bookings || []) as unknown as BookingWithSpecialist[];
     },
     staleTime: 2 * 60 * 1000, // 2 minutes - calendar data can be cached longer
     gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
 
-  // Apply client-side filtering (only search, as status/specialist are now server-side)
-  const filteredBookings = useMemo(() => {
-    if (!data) return [];
-
-    let filtered = [...data];
-
-    // Apply search filter client-side (search in examinee name and email)
-    if (clientFilters?.search) {
-      const searchLower = clientFilters.search.toLowerCase().trim();
-      filtered = filtered.filter((booking) => {
-        const examinee = booking.examinee as { firstName?: string; lastName?: string; email?: string } | undefined;
-        const firstName = examinee?.firstName?.toLowerCase() || "";
-        const lastName = examinee?.lastName?.toLowerCase() || "";
-        const email = examinee?.email?.toLowerCase() || "";
-        const fullName = `${firstName} ${lastName}`.trim();
-
-        return (
-          firstName.includes(searchLower) ||
-          lastName.includes(searchLower) ||
-          fullName.includes(searchLower) ||
-          email.includes(searchLower)
-        );
-      });
-    }
-
-    return filtered;
-  }, [data, clientFilters?.search]);
+  // No need for client-side filtering - server handles search via SQL ILIKE
+  const filteredBookings = data || [];
 
   // Track if we've already navigated for this search term
   const hasNavigatedRef = useRef(false);
