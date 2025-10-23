@@ -426,13 +426,13 @@ const specialistsRoutes = new Hono()
           );
         }
 
-        // Update specialist - updateData now matches UpdateSpecialistInputType
+        // Update specialist - only pass fields that were provided
         const updated = await specialistRepository.update(id, {
           name: updateData.name,
-          slug: updateData.slug ?? null,
+          slug: updateData.slug !== undefined ? updateData.slug : undefined,
           image: updateData.image,
           isActive: updateData.isActive,
-          location: updateData.location ?? null,
+          location: updateData.location !== undefined ? updateData.location : undefined,
         });
 
         // Audit log the update

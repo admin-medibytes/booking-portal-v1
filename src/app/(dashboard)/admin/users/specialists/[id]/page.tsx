@@ -339,10 +339,10 @@ export default function SpecialistDetailPage() {
 
   // Mutations
   const updateSpecialistMutation = useMutation({
-    mutationFn: async (values: UpdateSpecialistInputType) => {
+    mutationFn: async (values: Partial<UpdateSpecialistInputType>) => {
       const response = await specialistsClient[":id"].$put({
         param: { id: specialistId },
-        json: values,
+        json: values as UpdateSpecialistInputType,
       });
 
       if (!response.ok) {
@@ -399,8 +399,6 @@ export default function SpecialistDetailPage() {
       {
         name: profileForm.name,
         slug: profileForm.slug ?? null,
-        image: undefined,
-        location: null,
         isActive: profileForm.isActive,
       },
       {
@@ -442,10 +440,6 @@ export default function SpecialistDetailPage() {
 
     updateSpecialistMutation.mutate(
       {
-        name: undefined,
-        slug: undefined,
-        image: undefined,
-        isActive: undefined,
         location: showLocationFields
           ? practiceForm.location
             ? {
@@ -479,10 +473,6 @@ export default function SpecialistDetailPage() {
       }
 
       await updateSpecialistMutation.mutateAsync({
-        name: undefined,
-        slug: undefined,
-        location: null,
-        isActive: undefined,
         image: imageUrl,
       });
       toast.success(imageUrl ? "Image uploaded successfully" : "Image removed successfully");
