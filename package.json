@@ -35,7 +35,9 @@
     "import:bookings:split": "MIGRATION_MODE=true tsx scripts/validate-split-bookings-csv.ts",
     "update:booking-orgs": "MIGRATION_MODE=true tsx scripts/update-booking-organizations.ts",
     "update:booking-orgs:test": "MIGRATION_MODE=true TEST_MODE=true tsx scripts/update-booking-organizations.ts",
-    "check:missing-appointments": "tsx scripts/check-missing-appointments.ts"
+    "check:missing-appointments": "tsx scripts/check-missing-appointments.ts",
+    "sync:canceled": "MIGRATION_MODE=true tsx scripts/sync-canceled-bookings.ts",
+    "sync:canceled:dry": "MIGRATION_MODE=true DRY_RUN=true tsx scripts/sync-canceled-bookings.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",

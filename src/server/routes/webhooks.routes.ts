@@ -4,6 +4,7 @@ import { arktypeValidator } from "@/server/middleware/validate.middleware";
 import { db } from "@/server/db";
 import {
   bookings,
+  bookingProgress,
   specialists,
   examinees,
   referrers,
@@ -46,6 +47,12 @@ const AppointmentWebhookSchema = type({
 // Appointment cancellation webhook schema
 const AppointmentCancellationSchema = type({
   acuityAppointmentId: "string",
+});
+
+// Appointment reschedule webhook schema
+const AppointmentRescheduleSchema = type({
+  acuityAppointmentId: "string",
+  datetime: "string",
 });
 
 // Helper function to extract examinee data from Acuity fields using form configuration
@@ -379,6 +386,119 @@ const webhooksRoutes = new Hono()
 
     } catch (error) {
       logger.error("Appointment cancellation webhook error", undefined, {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      return c.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : "Internal server error",
+        },
+        500
+      );
+    }
+  })
+
+  // PUT /webhooks/appointment - Handle appointment reschedule from Acuity
+  .put("/appointment", arktypeValidator("json", AppointmentRescheduleSchema), async (c) => {
+    try {
+      const data = c.req.valid("json");
+      const acuityAppointmentId = Number(data.acuityAppointmentId);
+      const newDateTime = new Date(data.datetime);
+
+      logger.info("Appointment reschedule webhook received", {
+        acuityAppointmentId,
+        newDateTime: data.datetime,
+      });
+
+      // Validate datetime
+      if (isNaN(newDateTime.getTime())) {
+        logger.warn("Invalid datetime format in reschedule webhook", {
+          acuityAppointmentId,
+          datetime: data.datetime,
+        });
+
+        return c.json(
+          {
+            success: false,
+            error: "Invalid datetime format",
+          },
+          400
+        );
+      }
+
+      // Find booking by Acuity appointment ID
+      const existingBooking = await db.query.bookings.findFirst({
+        where: eq(bookings.acuityAppointmentId, acuityAppointmentId),
+        columns: {
+          id: true,
+          dateTime: true,
+          status: true,
+        },
+        with: {
+          progress: {
+            orderBy: (progress, { desc }) => [desc(progress.createdAt)],
+            limit: 1,
+          },
+        },
+      });
+
+      if (!existingBooking) {
+        logger.warn("Booking not found for reschedule", {
+          acuityAppointmentId,
+        });
+
+        return c.json(
+          {
+            success: false,
+            error: "Booking not found",
+          },
+          404
+        );
+      }
+
+      // Get system user ID for creator
+      const systemUserId = process.env.SYSTEM_USER_ID || "system";
+
+      // Get current progress status
+      const currentProgress = existingBooking.progress[0]?.toStatus || "scheduled";
+
+      // Update booking datetime and create progress entry in a transaction
+      await db.transaction(async (tx) => {
+        // Update booking datetime
+        await tx
+          .update(bookings)
+          .set({
+            dateTime: newDateTime,
+            updatedAt: new Date(),
+          })
+          .where(eq(bookings.id, existingBooking.id));
+
+        // Create progress entry for reschedule
+        await tx.insert(bookingProgress).values({
+          bookingId: existingBooking.id,
+          fromStatus: currentProgress,
+          toStatus: "rescheduled",
+          changedById: systemUserId,
+        });
+      });
+
+      logger.info("Booking rescheduled successfully", {
+        bookingId: existingBooking.id,
+        acuityAppointmentId,
+        previousDateTime: existingBooking.dateTime,
+        newDateTime: data.datetime,
+      });
+
+      return c.json({
+        success: true,
+        message: "Booking rescheduled successfully",
+        bookingId: existingBooking.id,
+      });
+
+    } catch (error) {
+      logger.error("Appointment reschedule webhook error", undefined, {
         error: error instanceof Error ? error.message : "Unknown error",
         stack: error instanceof Error ? error.stack : undefined,
       });
