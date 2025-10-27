@@ -246,6 +246,7 @@ export function SpecialistSelect({ onSelect, selectedSpecialist }: SpecialistSel
                       size="sm"
                       className="rounded gap-2 border-slate-300 text-slate-600 hover:bg-slate-50"
                       asChild
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <Link
                         href={`https://medibytes.com.au/our-panel/${specialist.slug}`}
