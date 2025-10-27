@@ -1,7 +1,7 @@
 import { db } from "@/server/db";
 import { bookings, examinees, specialists, referrers } from "@/server/db/schema";
 import { users } from "@/server/db/schema/auth";
-import { eq, and, gte, lte, desc, sql, SQL, inArray, or, ilike } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, SQL, inArray } from "drizzle-orm";
 import type { BookingFilters } from "@/types/booking";
 
 export class BookingRepository {
