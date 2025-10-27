@@ -139,12 +139,7 @@ export class BookingRepository {
     if (filters?.search) {
       const searchTerm = `%${filters.search.trim()}%`;
       conditions.push(
-        or(
-          ilike(examinees.email, searchTerm),
-          ilike(examinees.firstName, searchTerm),
-          ilike(examinees.lastName, searchTerm),
-          sql`CONCAT(${examinees.firstName}, ' ', ${examinees.lastName}) ILIKE ${searchTerm}`
-        )!
+        sql`CONCAT(${examinees.firstName}, ' ', ${examinees.lastName}) ILIKE ${searchTerm}`
       );
     }
 

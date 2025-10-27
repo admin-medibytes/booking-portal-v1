@@ -155,8 +155,8 @@ export function BookingCalendar({
       case "month":
         return format(currentDate, "MMMM yyyy");
       case "week":
-        const weekStart = startOfWeek(currentDate);
-        const weekEnd = endOfWeek(currentDate);
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
         if (isSameMonth(weekStart, weekEnd)) {
           return format(weekStart, "MMMM d") + " - " + format(weekEnd, "d, yyyy");
         }
@@ -331,8 +331,8 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = fa
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
-    const startDate = startOfWeek(monthStart);
-    const endDate = endOfWeek(monthEnd);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
     return eachDayOfInterval({ start: startDate, end: endDate });
   }, [currentDate]);
@@ -341,7 +341,7 @@ function MonthView({ currentDate, bookingsByDate, onBookingClick, isLoading = fa
     <div className="overflow-hidden border rounded-lg shadow">
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 bg-muted">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
           <div
             key={day}
             className="p-1 text-xs font-medium text-center border-r sm:p-2 sm:text-sm text-muted-foreground last:border-r-0"
@@ -479,7 +479,7 @@ interface WeekViewProps {
 
 function WeekView({ currentDate, bookingsByDate, onBookingClick, isLoading: _isLoading = false, timezone }: WeekViewProps) {
   const weekDays = useMemo(() => {
-    const start = startOfWeek(currentDate);
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [currentDate]);
 

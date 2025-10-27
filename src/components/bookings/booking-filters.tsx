@@ -203,7 +203,7 @@ export function BookingFilters({ specialists = [] }: BookingFiltersProps) {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search by examinee name or email"
+            placeholder="Search by examinee name"
             value={searchInput}
             onChange={(e) => {
               setSearchInput(e.target.value);
