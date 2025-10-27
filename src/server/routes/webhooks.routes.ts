@@ -43,6 +43,11 @@ const AppointmentWebhookSchema = type({
   }).array(),
 });
 
+// Appointment cancellation webhook schema
+const AppointmentCancellationSchema = type({
+  acuityAppointmentId: "string",
+});
+
 // Helper function to extract examinee data from Acuity fields using form configuration
 async function extractExamineeDataFromFields(
   appointmentTypeId: number,
@@ -308,6 +313,72 @@ const webhooksRoutes = new Hono()
 
     } catch (error) {
       logger.error("Appointment webhook error", undefined, {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      return c.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : "Internal server error",
+        },
+        500
+      );
+    }
+  })
+
+  // DELETE /webhooks/appointment - Handle appointment cancellation from Acuity
+  .delete("/appointment", arktypeValidator("json", AppointmentCancellationSchema), async (c) => {
+    try {
+      const data = c.req.valid("json");
+      const acuityAppointmentId = Number(data.acuityAppointmentId);
+
+      logger.info("Appointment cancellation webhook received", {
+        acuityAppointmentId,
+      });
+
+      // Find booking by Acuity appointment ID
+      const existingBooking = await db.query.bookings.findFirst({
+        where: eq(bookings.acuityAppointmentId, acuityAppointmentId),
+      });
+
+      if (!existingBooking) {
+        logger.warn("Booking not found for cancellation", {
+          acuityAppointmentId,
+        });
+
+        return c.json(
+          {
+            success: false,
+            error: "Booking not found",
+          },
+          404
+        );
+      }
+
+      // Update booking status to closed and set cancelledAt timestamp
+      await db
+        .update(bookings)
+        .set({
+          status: "closed",
+          cancelledAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(bookings.id, existingBooking.id));
+
+      logger.info("Booking marked as closed due to cancellation", {
+        bookingId: existingBooking.id,
+        acuityAppointmentId,
+      });
+
+      return c.json({
+        success: true,
+        message: "Booking cancelled successfully",
+        bookingId: existingBooking.id,
+      });
+
+    } catch (error) {
+      logger.error("Appointment cancellation webhook error", undefined, {
         error: error instanceof Error ? error.message : "Unknown error",
         stack: error instanceof Error ? error.stack : undefined,
       });
