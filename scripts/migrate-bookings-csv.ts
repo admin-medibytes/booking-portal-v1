@@ -36,9 +36,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres, { type Sql } from "postgres";
 import { v4 as uuidv4 } from "uuid";
 import * as newSchema from "@/server/db/schema";
-import { eq, sql } from "drizzle-orm";
 import * as fs from "fs";
-import * as path from "path";
 import { parse } from "csv-parse/sync";
 import * as readline from "readline";
 
