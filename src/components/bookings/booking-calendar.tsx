@@ -127,27 +127,27 @@ export function BookingCalendar({
   }, []);
 
   // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "m":
-          setViewType("month");
-          break;
-        case "w":
-          setViewType("week");
-          break;
-        case "d":
-          setViewType("day");
-          break;
-        case "a":
-          setViewType("agenda");
-          break;
-      }
-    };
+  // useEffect(() => {
+  //   const handleKeyPress = (e: KeyboardEvent) => {
+  //     switch (e.key) {
+  //       case "m":
+  //         setViewType("month");
+  //         break;
+  //       case "w":
+  //         setViewType("week");
+  //         break;
+  //       case "d":
+  //         setViewType("day");
+  //         break;
+  //       case "a":
+  //         setViewType("agenda");
+  //         break;
+  //     }
+  //   };
 
-    window.addEventListener("keypress", handleKeyPress);
-    return () => window.removeEventListener("keypress", handleKeyPress);
-  }, []);
+  //   window.addEventListener("keypress", handleKeyPress);
+  //   return () => window.removeEventListener("keypress", handleKeyPress);
+  // }, []);
 
   // Get header title based on view
   const headerTitle = useMemo(() => {
