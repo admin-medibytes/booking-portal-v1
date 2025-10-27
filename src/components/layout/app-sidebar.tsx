@@ -112,6 +112,7 @@ export function AppSidebar({ user }: AppUserProps) {
           </div>
         </div>
       </SidebarHeader>
+      
       <SidebarContent>
         {user.role === "admin" && (
           <SidebarGroup>
@@ -151,7 +152,7 @@ export function AppSidebar({ user }: AppUserProps) {
         </SidebarGroup>
         {user.role !== "specialist" && (
           <>
-            <SidebarSeparator />
+            <SidebarSeparator className="mx-0"/>
             <SidebarGroup>
               <div className="px-3 pb-3">
                 <Card className="rounded-[.5rem] border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20">
