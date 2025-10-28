@@ -253,18 +253,43 @@ const webhooksRoutes = new Hono()
         logger.info("Created anonymous referrer", { referrerId });
       }
 
+      // Validate examinee data has required fields
+      const missingFields: string[] = [];
+      if (!examineeData.firstName) missingFields.push("firstName");
+      if (!examineeData.lastName) missingFields.push("lastName");
+      if (!examineeData.dateOfBirth) missingFields.push("dateOfBirth");
+      if (!examineeData.address) missingFields.push("address");
+      if (!examineeData.condition) missingFields.push("condition");
+      if (!examineeData.caseType) missingFields.push("caseType");
+
+      if (missingFields.length > 0) {
+        logger.error("Missing required examinee fields from form data", undefined, {
+          acuityAppointmentId,
+          missingFields,
+          extractedFields: Object.keys(examineeData),
+          appointmentTypeId: data.acuityAppointmentTypeId,
+        });
+
+        return c.json(
+          {
+            success: false,
+            error: `Missing required examinee fields: ${missingFields.join(", ")}. Please check form field mappings.`,
+          },
+          400
+        );
+      }
+
       // Create examinee with extracted data
       const [examinee] = await db
         .insert(examinees)
         .values({
           referrerId,
-
           firstName: examineeData.firstName,
           lastName: examineeData.lastName,
           dateOfBirth: examineeData.dateOfBirth,
           address: examineeData.address,
-          email: examineeData.email,
-          phoneNumber: examineeData.phoneNumber,
+          email: examineeData.email || "n/a",
+          phoneNumber: examineeData.phoneNumber || "",
           authorizedContact: examineeData.authorizedContact === "yes",
           condition: examineeData.condition,
           caseType: examineeData.caseType,
