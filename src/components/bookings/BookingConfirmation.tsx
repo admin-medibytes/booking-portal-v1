@@ -9,6 +9,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2 } from "lucide-react";
+import {
   CheckCircle,
   User,
   Calendar,
@@ -191,6 +199,8 @@ export function BookingConfirmation({
     onSuccess: (data) => {
       onConfirm(data.id);
       toast.success("Booking created successfully!");
+      // Redirect to the booking detail page
+      router.push(`/bookings/${data.id}`);
     },
     onError: (err: Error) => {
       const message = err.message || "Failed to create booking. Please try again.";
@@ -434,6 +444,21 @@ export function BookingConfirmation({
           Cancel
         </Button>
       </div>
+
+      {/* Loading Dialog */}
+      <AlertDialog open={createBookingMutation.isPending}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Creating Booking
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Please wait while we process your booking request. This may take a few moments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
