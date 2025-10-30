@@ -48,7 +48,7 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="ime_documents"
               category="dictation"
-              accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.docx,.doc"
+              accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.docx,.doc,.pdf"
             />
             <DocumentUploadField
               label="Draft Reports"
@@ -77,7 +77,7 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="supplementary_documents"
               category="dictation"
-              accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.docx,.doc"
+              accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.docx,.doc,.pdf"
             />
             <DocumentUploadField
               label="Supplementary Draft Reports"
