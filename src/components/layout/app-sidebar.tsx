@@ -101,6 +101,9 @@ export function AppSidebar({ user }: AppUserProps) {
     []
   );
 
+
+  const authorized = user.email.includes("@medibytes.com.au") || user.email.includes("@senso.ph");
+  
   return (
     <Sidebar>
       <SidebarHeader>
@@ -114,7 +117,7 @@ export function AppSidebar({ user }: AppUserProps) {
       </SidebarHeader>
       
       <SidebarContent>
-        {user.role === "admin" && (
+        {user.role === "admin" && authorized && (
           <SidebarGroup>
             <SidebarGroupLabel>Administration</SidebarGroupLabel>
             <SidebarGroupContent>

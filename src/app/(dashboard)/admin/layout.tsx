@@ -11,7 +11,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login");
   }
 
-  if (session.user.role !== "admin") {
+
+  const user = session.user;
+  
+  const authorized = user.email.includes("@medibytes.com.au") || user.email.includes("@senso.ph");
+
+  if (user.role !== "admin" || !authorized) {
     redirect("/");
   }
 
