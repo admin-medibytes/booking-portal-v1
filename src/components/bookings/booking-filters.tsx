@@ -178,7 +178,7 @@ export function BookingFilters({ specialists = [] }: BookingFiltersProps) {
   // Clear all filters
   const handleClearFilters = () => {
     const newFilters: FilterState = {
-      status: null,
+      status: "active",
       specialistIds: [],
       search: "",
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -189,8 +189,8 @@ export function BookingFilters({ specialists = [] }: BookingFiltersProps) {
     // onFiltersChange removed - URL is source of truth
   };
 
-  // Check if any filters are active
-  const hasActiveFilters = filters.status || filters.specialistIds.length > 0 || filters.search;
+  // Check if any filters are active (different from defaults)
+  const hasActiveFilters = filters.status !== "active" || filters.specialistIds.length > 0 || filters.search;
 
   // Get selected specialists' names for display
   const selectedSpecialists = specialists.filter((s) => filters.specialistIds.includes(s.id));
