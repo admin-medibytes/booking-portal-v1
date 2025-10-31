@@ -64,18 +64,20 @@ export function getLocationDisplay(
     return "Availability on Request";
   }
 
-  if (!acceptsInPerson && acceptsTelehealth) {
-    return "Online";
-  }
-
-  if (acceptsInPerson && !location) {
-    return "Location TBD";
-  }
-
-  if (acceptsInPerson && location) {
+  // Check if there's a valid address first
+  if (location && location.city && location.state) {
     const formatted =
       format === "full" ? formatLocationFull(location) : formatLocationShort(location);
     return formatted || "Location incomplete";
+  }
+
+  // No address, so check appointment types
+  if (acceptsTelehealth) {
+    return "Online";
+  }
+
+  if (acceptsInPerson) {
+    return "In-Person";
   }
 
   return "Not specified";
