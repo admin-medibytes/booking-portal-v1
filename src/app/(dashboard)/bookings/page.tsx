@@ -164,7 +164,7 @@ export default function BookingsPage() {
       {/* Filters and View Toggle */}
       <div className="space-y-4 mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <BookingFilters specialists={specialists || []} />
+          <BookingFilters specialists={specialists || []} userRole={user?.memberRole} />
 
           {/* View Toggle - Button Group Style */}
           <div className="flex gap-1 p-1 rounded-xl bg-muted w-fit border">

@@ -35,6 +35,7 @@ const australianTimezones = timeZones.filter((tz) => tz.label.includes("Australi
 interface BookingFiltersProps {
   specialists?: Specialist[];
   onFiltersChange?: (filters: FilterState) => void;
+  userRole?: string;
 }
 
 export interface FilterState {
@@ -44,7 +45,7 @@ export interface FilterState {
   timezone: string;
 }
 
-export function BookingFilters({ specialists = [] }: BookingFiltersProps) {
+export function BookingFilters({ specialists = [], userRole }: BookingFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -236,56 +237,58 @@ export function BookingFilters({ specialists = [] }: BookingFiltersProps) {
           </SelectContent>
         </Select>
 
-        {/* Specialist Multi-Select */}
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="min-w-[200px] justify-between"
-            >
-              {selectedSpecialists.length === 0
-                ? "Select specialists..."
-                : selectedSpecialists.length === 1
-                  ? selectedSpecialists[0].name
-                  : `${selectedSpecialists.length} specialists`}
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[300px] p-0">
-            <Command>
-              <CommandInput placeholder="Search specialists..." />
-              <CommandList>
-                <CommandEmpty>No specialist found.</CommandEmpty>
-                <CommandGroup>
-                  {specialists.map((specialist) => (
-                    <CommandItem
-                      key={specialist.id}
-                      value={specialist.name}
-                      onSelect={() => handleSpecialistToggle(specialist.id)}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          filters.specialistIds.includes(specialist.id)
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium">{specialist.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {specialist.user?.jobTitle || "Specialist"}
+        {/* Specialist Multi-Select - Hidden for specialists */}
+        {userRole !== "specialist" && (
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="min-w-[200px] justify-between"
+              >
+                {selectedSpecialists.length === 0
+                  ? "Select specialists..."
+                  : selectedSpecialists.length === 1
+                    ? selectedSpecialists[0].name
+                    : `${selectedSpecialists.length} specialists`}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[300px] p-0">
+              <Command>
+                <CommandInput placeholder="Search specialists..." />
+                <CommandList>
+                  <CommandEmpty>No specialist found.</CommandEmpty>
+                  <CommandGroup>
+                    {specialists.map((specialist) => (
+                      <CommandItem
+                        key={specialist.id}
+                        value={specialist.name}
+                        onSelect={() => handleSpecialistToggle(specialist.id)}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            filters.specialistIds.includes(specialist.id)
+                              ? "opacity-100"
+                              : "opacity-0"
+                          )}
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium">{specialist.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {specialist.user?.jobTitle || "Specialist"}
+                          </div>
                         </div>
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        )}
 
         {/* Timezone Selector */}
         <Popover>
