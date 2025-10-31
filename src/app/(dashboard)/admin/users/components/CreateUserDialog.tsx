@@ -26,8 +26,17 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Loader2, Plus, User, Building, Shield, Phone, Mail, Briefcase } from "lucide-react";
-
+import { Loader2, Plus, User, Building, Shield, Phone, Mail, Briefcase, ChevronsUpDown, Check } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 
 interface CreateUserDialogProps {
@@ -39,6 +48,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
   const [selectedOrgId, setSelectedOrgId] = useState<string>("");
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [checkingSlug, setCheckingSlug] = useState(false);
+  const [orgPopoverOpen, setOrgPopoverOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch organizations
@@ -194,6 +204,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       setSlugAvailable(null);
       setCheckingSlug(false);
       setSelectedOrgId("");
+      setOrgPopoverOpen(false);
     }
   }, [open, form]);
 
@@ -366,35 +377,74 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <form.Field name="organizationId">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="organizationId" className="text-sm font-medium">
-                        Organization <span className="text-destructive">*</span>
-                      </Label>
-                      <div className="relative">
-                        <Building className="absolute z-10 w-4 h-4 -translate-y-1/2 pointer-events-none left-3 top-1/2 text-muted-foreground" />
-                        <Select
-                          value={field.state.value}
-                          onValueChange={(value) => {
-                            field.handleChange(value);
-                            setSelectedOrgId(value);
-                            form.setFieldValue("teamId", "");
-                          }}
-                        >
-                          <SelectTrigger className="h-10 pl-10 w-full">
-                            <SelectValue placeholder="Select an organization" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {orgsData?.organizations?.map((org: { id: string; name: string }) => (
-                              <SelectItem key={org.id} value={org.id}>
-                                {org.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                  {(field) => {
+                    const selectedOrg = orgsData?.organizations?.find(
+                      (org: { id: string; name: string; slug: string | null }) => org.id === field.state.value
+                    );
+
+                    return (
+                      <div className="space-y-2">
+                        <Label htmlFor="organizationId" className="text-sm font-medium">
+                          Organization <span className="text-destructive">*</span>
+                        </Label>
+                        <Popover open={orgPopoverOpen} onOpenChange={setOrgPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={orgPopoverOpen}
+                              className="h-10 w-full justify-between"
+                            >
+                              <div className="flex items-center">
+                                <Building className="w-4 h-4 mr-2 text-muted-foreground" />
+                                <span className={cn(!selectedOrg && "text-muted-foreground")}>
+                                  {selectedOrg ? selectedOrg.name : "Select an organization"}
+                                </span>
+                              </div>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[400px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search organizations..." />
+                              <CommandList>
+                                <CommandEmpty>No organization found.</CommandEmpty>
+                                <CommandGroup>
+                                  {orgsData?.organizations?.map((org: { id: string; name: string; slug: string | null }) => (
+                                    <CommandItem
+                                      key={org.id}
+                                      value={org.name}
+                                      onSelect={() => {
+                                        field.handleChange(org.id);
+                                        setSelectedOrgId(org.id);
+                                        form.setFieldValue("teamId", "");
+                                        setOrgPopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          field.state.value === org.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <div className="flex-1">
+                                        <div className="font-medium">{org.name}</div>
+                                        {org.slug && (
+                                          <div className="text-sm text-muted-foreground">
+                                            {org.slug}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
-                    </div>
-                  )}
+                    );
+                  }}
                 </form.Field>
 
                 <form.Field name="teamId">
