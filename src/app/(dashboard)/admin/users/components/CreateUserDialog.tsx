@@ -53,9 +53,13 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
 
   // Fetch organizations
   const { data: orgsData } = useQuery({
-    queryKey: ["organizations"],
+    queryKey: ["organizations", "all"],
     queryFn: async () => {
-      const response = await adminClient.organizations.$get({ query: {} });
+      const response = await adminClient.organizations.$get({
+        query: {
+          limit: "100", // Fetch up to 100 organizations (max allowed by API)
+        },
+      });
       if (!response.ok) throw new Error("Failed to fetch organizations");
       const data = await response.json();
       return data;
@@ -429,11 +433,6 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                                       />
                                       <div className="flex-1">
                                         <div className="font-medium">{org.name}</div>
-                                        {org.slug && (
-                                          <div className="text-sm text-muted-foreground">
-                                            {org.slug}
-                                          </div>
-                                        )}
                                       </div>
                                     </CommandItem>
                                   ))}
