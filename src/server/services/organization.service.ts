@@ -268,6 +268,40 @@ export class OrganizationService {
     return response;
   }
 
+  async getOrganizationBySlugForAdmin(slug: string) {
+    try {
+      const { eq } = await import("drizzle-orm");
+
+      // Query organization directly from database (bypasses membership check)
+      const organization = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.slug, slug))
+        .limit(1);
+
+      if (!organization[0]) {
+        throw new HTTPException(404, { message: "Organization not found" });
+      }
+
+      // Get teams for this organization
+      const orgTeams = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.organizationId, organization[0].id));
+
+      return {
+        ...organization[0],
+        teams: orgTeams,
+      };
+    } catch (error) {
+      logger.error("Failed to get organization by slug (admin)", error as Error, {
+        slug,
+      });
+      if (error instanceof HTTPException) throw error;
+      throw new HTTPException(500, { message: "Failed to get organization" });
+    }
+  }
+
   async getOrganizationWithStats(organizationId: string, headers: HeadersInit) {
     try {
       const response = await auth.api.getFullOrganization({

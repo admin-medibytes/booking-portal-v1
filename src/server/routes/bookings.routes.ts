@@ -130,10 +130,17 @@ const bookingsRoutes = new Hono()
       const { organizationSlug, ...input } = c.req.valid("json");
 
       // Get organization ID from slug
-      const organization = await organizationService.getOrganizationBySlug(
-        organizationSlug,
-        c.req.raw.headers
-      );
+      // Admin users can create bookings for any organization (bypass membership check)
+      // Non-admin users must be members of the organization
+      let organization;
+      if (user.role === "admin") {
+        organization = await organizationService.getOrganizationBySlugForAdmin(organizationSlug);
+      } else {
+        organization = await organizationService.getOrganizationBySlug(
+          organizationSlug,
+          c.req.raw.headers
+        );
+      }
 
       if (!organization) {
         return c.json({ error: "Organization not found" }, 404);
