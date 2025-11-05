@@ -29,6 +29,7 @@ interface DocumentUploadFieldProps {
   maxSizeMB?: number;
   accept?: string;
   disableUpload?: boolean;
+  disableDelete?: boolean;
 }
 
 export function DocumentUploadField({
@@ -39,6 +40,7 @@ export function DocumentUploadField({
   maxSizeMB = 512,
   accept = ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   disableUpload = false,
+  disableDelete = false,
 }: DocumentUploadFieldProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<Document | null>(null);
@@ -154,19 +156,21 @@ export function DocumentUploadField({
                   >
                     <DownloadIcon className="w-4 h-4" />
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-red-600 hover:text-red-700"
-                    onClick={() => openDeleteDialog(doc)}
-                    disabled={isDeleting && fileToDelete?.id === doc.id}
-                  >
-                    {isDeleting && fileToDelete?.id === doc.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2Icon className="w-4 h-4" />
-                    )}
-                  </Button>
+                  {!disableDelete && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => openDeleteDialog(doc)}
+                      disabled={isDeleting && fileToDelete?.id === doc.id}
+                    >
+                      {isDeleting && fileToDelete?.id === doc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2Icon className="w-4 h-4" />
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

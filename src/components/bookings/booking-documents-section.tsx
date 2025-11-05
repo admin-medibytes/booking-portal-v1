@@ -11,8 +11,10 @@ interface BookingDocumentsSectionProps {
 }
 
 export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionProps) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const isSpecialist = user?.memberRole === "specialist";
+  const shouldDisableUpload = isLoading || isSpecialist;
+  const shouldDisableDelete = isLoading || isSpecialist;
   return (
     <Card>
       <CardHeader>
@@ -34,14 +36,16 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="ime_documents"
               category="consent_form"
-              disableUpload={isSpecialist}
+              disableUpload={shouldDisableUpload}
+              disableDelete={shouldDisableDelete}
             />
             <DocumentUploadField
               label="Brief Documents"
               bookingId={bookingId}
               section="ime_documents"
               category="document_brief"
-              disableUpload={isSpecialist}
+              disableUpload={shouldDisableUpload}
+              disableDelete={shouldDisableDelete}
             />
             <DocumentUploadField
               label="Dictation"
@@ -70,7 +74,8 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="supplementary_documents"
               category="document_brief"
-              disableUpload={isSpecialist}
+              disableUpload={shouldDisableUpload}
+              disableDelete={shouldDisableDelete}
             />
             <DocumentUploadField
               label="Supplementary Dictation"
