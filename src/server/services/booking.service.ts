@@ -133,6 +133,7 @@ export class BookingService {
 
   private async userHasAccessToBooking(
     user: Pick<User, "id" | "role">,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     booking: any // Type includes relations from findByIdWithDetails
   ): Promise<boolean> {
     if (user.role === "admin") {
