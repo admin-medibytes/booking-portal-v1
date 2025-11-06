@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,18 +23,30 @@ interface UserMenuProps {
 
 export function UserMenu({ user }: UserMenuProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
+
+      // 1. Sign out from Better Auth (clears cookies)
       await authClient.signOut();
-      // Clear any local storage items
+
+      // 2. Clear all React Query caches (fixes auth state persistence bug)
+      queryClient.clear();
+
+      // 3. Clear browser storage
       localStorage.clear();
-      // Redirect to login page
-      router.push("/login");
+      sessionStorage.clear();
+
+      // 4. Force hard navigation to login (clears all React state)
+      window.location.href = "/login";
+
     } catch (error) {
       console.error("Error logging out:", error);
+      // Even on error, force logout to prevent auth state issues
+      window.location.href = "/login";
     } finally {
       setIsLoggingOut(false);
     }

@@ -149,16 +149,23 @@ export class BookingRepository {
   // Helper method to build paginated query with specialist join
   // Optimized for list view - only loads essential fields
   // Search filtering now happens in SQL via buildFilterConditions (ILIKE)
-  private async getPaginatedBookings(conditions: SQL[], filters?: BookingFilters) {
+  private async getPaginatedBookings(conditions: SQL[], filters?: BookingFilters, includeReferrerJoin = false) {
     const page = filters?.page || 1;
     const limit = filters?.limit || 20;
     const offset = (page - 1) * limit;
 
     // Fetch booking IDs with joins
-    const results = await db
+    const resultsQuery = db
       .select({ id: bookings.id })
       .from(bookings)
-      .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
+      .leftJoin(examinees, eq(bookings.examineeId, examinees.id));
+
+    // Add referrer join if needed (for referrer filtering)
+    if (includeReferrerJoin) {
+      resultsQuery.leftJoin(referrers, eq(bookings.referrerId, referrers.id));
+    }
+
+    const results = await resultsQuery
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(bookings.createdAt))
       .limit(limit)
@@ -168,10 +175,17 @@ export class BookingRepository {
     const bookingIds = results.map((r) => r.id);
 
     // Build count query for pagination
-    const [{ count }] = await db
+    const countQuery = db
       .select({ count: sql<number>`count(*)` })
       .from(bookings)
-      .leftJoin(examinees, eq(bookings.examineeId, examinees.id))
+      .leftJoin(examinees, eq(bookings.examineeId, examinees.id));
+
+    // Add referrer join if needed (for referrer filtering)
+    if (includeReferrerJoin) {
+      countQuery.leftJoin(referrers, eq(bookings.referrerId, referrers.id));
+    }
+
+    const [{ count }] = await countQuery
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     // If no results, return empty with pagination
@@ -272,9 +286,11 @@ export class BookingRepository {
   }
 
   async findForReferrer(userId: string, filters?: BookingFilters) {
-    const baseConditions = [eq(bookings.referrerId, userId)];
+    // Fixed: Filter by referrers.userId instead of bookings.referrerId
+    // bookings.referrerId points to referrers.id, but we need to match referrers.userId
+    const baseConditions = [eq(referrers.userId, userId)];
     const conditions = this.buildFilterConditions(filters, baseConditions);
-    return this.getPaginatedBookings(conditions, filters);
+    return this.getPaginatedBookings(conditions, filters, true); // Pass true to include referrer join
   }
 
   async findForSpecialist(specialistId: string, filters?: BookingFilters) {
@@ -306,7 +322,9 @@ export class BookingRepository {
   }
 
   async findForReferrerCalendar(userId: string, filters?: BookingFilters) {
-    const baseConditions = [eq(bookings.referrerId, userId)];
+    // Fixed: Filter by referrers.userId instead of bookings.referrerId
+    // The findForCalendar method already joins the referrers table, so we can filter on referrers.userId
+    const baseConditions = [eq(referrers.userId, userId)];
     const conditions = this.buildFilterConditions(filters, baseConditions);
     return this.findForCalendar(conditions, filters);
   }

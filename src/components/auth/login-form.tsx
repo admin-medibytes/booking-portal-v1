@@ -71,6 +71,7 @@ export function LoginForm() {
           }
 
           router.push("/");
+          router.refresh(); // Force server components to fetch fresh session
         } else {
           setError("Login successful but no user data received");
         }

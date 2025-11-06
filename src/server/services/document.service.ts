@@ -585,7 +585,9 @@ export class DocumentService {
     }
 
     // 1. Referrers see all documents for their own bookings
-    if (booking.referrerId === userId) {
+    // Fixed: Check referrer.userId instead of referrerId
+    // booking.referrerId points to referrers.id, but we need to match referrers.userId
+    if (booking.referrer?.userId === userId) {
       return true;
     }
 
@@ -605,9 +607,12 @@ export class DocumentService {
       // 4. Team leads see documents for their team members' bookings
       if (orgMembership.role === 'team_lead' && orgMembership.teamIds.length > 0) {
         // Check if the booking's referrer is in the team lead's teams
-        const isTeamMember = await bookingService.isUserInTeams(booking.referrerId, orgMembership.teamIds);
-        if (isTeamMember) {
-          return true;
+        // Fixed: Use referrer.userId instead of referrerId
+        if (booking.referrer?.userId) {
+          const isTeamMember = await bookingService.isUserInTeams(booking.referrer.userId, orgMembership.teamIds);
+          if (isTeamMember) {
+            return true;
+          }
         }
       }
     }

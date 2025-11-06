@@ -133,13 +133,15 @@ export class BookingService {
 
   private async userHasAccessToBooking(
     user: Pick<User, "id" | "role">,
-    booking: typeof bookings.$inferSelect
+    booking: any // Type includes relations from findByIdWithDetails
   ): Promise<boolean> {
     if (user.role === "admin") {
       return true;
     }
 
-    if (booking.referrerId === user.id) {
+    // Fixed: Check referrer.userId instead of referrerId
+    // booking.referrerId points to referrers.id, but we need to match referrers.userId
+    if (booking.referrer?.userId === user.id) {
       return true;
     }
 
@@ -190,9 +192,15 @@ export class BookingService {
 
   async getBookingForAccess(bookingId: string) {
     // Get booking without access checks for internal use
-    const result = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+    // Include referrer relation for access checks
+    const result = await db.query.bookings.findFirst({
+      where: eq(bookings.id, bookingId),
+      with: {
+        referrer: true,
+      },
+    });
 
-    return result[0];
+    return result;
   }
 
   async isUserInTeams(userId: string, teamIds: string[]): Promise<boolean> {
