@@ -196,6 +196,29 @@ export class UserService {
         return authResult.user;
       });
 
+      // Link any existing referrer records to this new user account
+      // This handles the case where bookings were created before the user had an account
+      // Only do this for referrer role users - specialists and admins should not have referrer records
+      if (input.role === "referrer") {
+        try {
+          const { bookingService } = await import("@/server/services/booking.service");
+          const linkedCount = await bookingService.linkReferrerRecordsToUser(result.id, input.email);
+          if (linkedCount > 0) {
+            logger.info(`Linked ${linkedCount} orphaned referrer records to new user`, {
+              userId: result.id,
+              email: input.email,
+              linkedCount,
+            });
+          }
+        } catch (linkError) {
+          // Log but don't fail user creation if linking fails
+          logger.error("Failed to link referrer records to new user", linkError as Error, {
+            userId: result.id,
+            email: input.email,
+          });
+        }
+      }
+
       // Return user with memberships
       return await this.getUserDetails(result.id);
     } catch (error) {

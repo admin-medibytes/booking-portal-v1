@@ -14,7 +14,7 @@ import {
   appFormFields,
   acuityAppointmentTypeForms,
 } from "@/server/db/schema";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import type { User } from "@/types/user";
 import type { BookingFilters } from "@/types/booking";
 import type { ExamineeFieldType } from "@/server/db/schema/appForms";
@@ -851,6 +851,47 @@ export class BookingService {
 
     // Return updated booking with details
     return this.getBookingById(bookingId, { id: data.userId, role: data.userRole });
+  }
+
+  /**
+   * Link orphaned referrer records to a user account
+   * Used when a user account is created for someone who already has referrer records
+   * from bookings created before they had an account
+   *
+   * @param userId - The ID of the newly created user
+   * @param email - The email address to match referrer records
+   * @returns Number of referrer records that were linked
+   */
+  async linkReferrerRecordsToUser(userId: string, email: string): Promise<number> {
+    try {
+      // Find all referrer records with matching email and NULL userId
+      const orphanedReferrers = await db
+        .select({ id: referrers.id })
+        .from(referrers)
+        .where(and(
+          eq(referrers.email, email),
+          sql`${referrers.userId} IS NULL`
+        ));
+
+      if (orphanedReferrers.length === 0) {
+        return 0;
+      }
+
+      // Update all orphaned referrer records to link them to the user
+      const referrerIds = orphanedReferrers.map(r => r.id);
+      await db
+        .update(referrers)
+        .set({
+          userId,
+          updatedAt: new Date(),
+        })
+        .where(inArray(referrers.id, referrerIds));
+
+      return orphanedReferrers.length;
+    } catch (error) {
+      console.error("Error linking referrer records to user:", error);
+      throw error;
+    }
   }
 }
 
