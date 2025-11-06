@@ -30,6 +30,7 @@ interface DocumentUploadFieldProps {
   accept?: string;
   disableUpload?: boolean;
   disableDelete?: boolean;
+  hidden?: boolean;
 }
 
 export function DocumentUploadField({
@@ -41,6 +42,7 @@ export function DocumentUploadField({
   accept = ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   disableUpload = false,
   disableDelete = false,
+  hidden = false,
 }: DocumentUploadFieldProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<Document | null>(null);
@@ -52,6 +54,11 @@ export function DocumentUploadField({
   const deleteDocument = useDeleteDocument();
   const downloadDocument = useDownloadDocument();
 
+  // Don't render anything if this field is hidden
+  if (hidden) {
+    return null;
+  }
+  
   const handleUploadComplete = () => {
     // Refetch documents after upload
     refetch();

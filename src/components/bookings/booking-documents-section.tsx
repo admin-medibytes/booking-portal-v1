@@ -13,8 +13,12 @@ interface BookingDocumentsSectionProps {
 export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionProps) {
   const { user, isLoading } = useAuth();
   const isSpecialist = user?.memberRole === "specialist";
-  const shouldDisableUpload = isLoading || isSpecialist;
-  const shouldDisableDelete = isLoading || isSpecialist;
+  const isReferrer = user?.memberRole === "referrer";
+  // const isAdminOrOwner = user?.role === "admin" || user?.memberRole === "owner";
+
+  // Specialists: can view consent form but not upload/delete
+  const shouldDisableUploadForSpecialist = isLoading || isSpecialist;
+  const shouldDisableDeleteForSpecialist = isLoading || isSpecialist;
   return (
     <Card>
       <CardHeader>
@@ -31,70 +35,85 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
           </TabsList>
 
           <TabsContent value="ime" className="space-y-4 mt-4">
+            {/* Consent Form - Referrer: upload/delete, Specialist: view only */}
             <DocumentUploadField
               label="Consent Form"
               bookingId={bookingId}
               section="ime_documents"
               category="consent_form"
-              disableUpload={shouldDisableUpload}
-              disableDelete={shouldDisableDelete}
+              disableUpload={shouldDisableUploadForSpecialist}
+              disableDelete={shouldDisableDeleteForSpecialist}
             />
+            {/* Brief Documents - Referrer: upload/delete, Specialist: hidden */}
             <DocumentUploadField
               label="Brief Documents"
               bookingId={bookingId}
               section="ime_documents"
               category="document_brief"
-              disableUpload={shouldDisableUpload}
-              disableDelete={shouldDisableDelete}
+              hidden={isSpecialist}
             />
+            {/* Dictation - Referrer: hidden, Specialist: upload/delete */}
             <DocumentUploadField
               label="Dictation"
               bookingId={bookingId}
               section="ime_documents"
               category="dictation"
               accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.docx,.doc,.pdf"
+              hidden={isReferrer}
             />
+            {/* Draft Reports - Referrer: hidden, Specialist: upload/delete */}
             <DocumentUploadField
               label="Draft Reports"
               bookingId={bookingId}
               section="ime_documents"
               category="draft_report"
+              hidden={isReferrer}
             />
+            {/* Final Report - Referrer: download only, Specialist: upload/delete */}
             <DocumentUploadField
               label="Final Report"
               bookingId={bookingId}
               section="ime_documents"
               category="final_report"
+              disableUpload={isReferrer}
+              disableDelete={isReferrer}
             />
           </TabsContent>
 
           <TabsContent value="supplementary" className="space-y-4 mt-4">
+            {/* Supplementary Brief Documents - Referrer: upload/delete, Specialist: hidden */}
             <DocumentUploadField
               label="Supplementary Brief Documents"
               bookingId={bookingId}
               section="supplementary_documents"
               category="document_brief"
-              disableUpload={shouldDisableUpload}
-              disableDelete={shouldDisableDelete}
+              hidden={isSpecialist}
             />
+            {/* Supplementary Dictation - Referrer: hidden, Specialist: upload/delete */}
             <DocumentUploadField
               label="Supplementary Dictation"
               bookingId={bookingId}
               section="supplementary_documents"
               category="dictation"
               accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.docx,.doc,.pdf"
+              hidden={isReferrer}
             />
+            {/* Supplementary Draft Reports - Referrer: hidden, Specialist: upload/delete */}
             <DocumentUploadField
               label="Supplementary Draft Reports"
               bookingId={bookingId}
               section="supplementary_documents"
               category="draft_report"
+              hidden={isReferrer}
             />
+            {/* Supplementary Final Report - Referrer: download only, Specialist: upload/delete */}
             <DocumentUploadField
               label="Supplementary Final Report"
               bookingId={bookingId}
               section="supplementary_documents"
               category="final_report"
+              disableUpload={isReferrer}
+              disableDelete={isReferrer}
             />
           </TabsContent>
         </Tabs>
