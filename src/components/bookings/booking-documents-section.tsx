@@ -12,13 +12,17 @@ interface BookingDocumentsSectionProps {
 
 export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionProps) {
   const { user, isLoading } = useAuth();
-  const isSpecialist = user?.memberRole === "specialist";
-  const isReferrer = user?.memberRole === "referrer";
+  const isSpecialist = !isLoading && user?.memberRole === "specialist";
+  const isReferrer = !isLoading && user?.memberRole === "referrer";
   // const isAdminOrOwner = user?.role === "admin" || user?.memberRole === "owner";
 
   // Specialists: can view consent form but not upload/delete
-  const shouldDisableUploadForSpecialist = isLoading || isSpecialist;
-  const shouldDisableDeleteForSpecialist = isLoading || isSpecialist;
+  const shouldDisableUploadForSpecialist = isLoading || !user?.memberRole || isSpecialist;
+  const shouldDisableDeleteForSpecialist = isLoading || !user?.memberRole || isSpecialist;
+
+  // Referrers: hide specialist-only documents, disable upload/delete on final reports
+  const shouldHideForReferrer = isLoading || !user?.memberRole || isReferrer;
+  const shouldDisableForReferrer = isLoading || !user?.memberRole || isReferrer;
   return (
     <Card>
       <CardHeader>
@@ -59,7 +63,7 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               section="ime_documents"
               category="dictation"
               accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.docx,.doc,.pdf"
-              hidden={isReferrer}
+              hidden={shouldHideForReferrer}
             />
             {/* Draft Reports - Referrer: hidden, Specialist: upload/delete */}
             <DocumentUploadField
@@ -67,7 +71,7 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="ime_documents"
               category="draft_report"
-              hidden={isReferrer}
+              hidden={shouldHideForReferrer}
             />
             {/* Final Report - Referrer: download only, Specialist: upload/delete */}
             <DocumentUploadField
@@ -75,8 +79,8 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="ime_documents"
               category="final_report"
-              disableUpload={isReferrer}
-              disableDelete={isReferrer}
+              disableUpload={shouldDisableForReferrer}
+              disableDelete={shouldDisableForReferrer}
             />
           </TabsContent>
 
@@ -96,7 +100,7 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               section="supplementary_documents"
               category="dictation"
               accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.docx,.doc,.pdf"
-              hidden={isReferrer}
+              hidden={shouldHideForReferrer}
             />
             {/* Supplementary Draft Reports - Referrer: hidden, Specialist: upload/delete */}
             <DocumentUploadField
@@ -104,7 +108,7 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="supplementary_documents"
               category="draft_report"
-              hidden={isReferrer}
+              hidden={shouldHideForReferrer}
             />
             {/* Supplementary Final Report - Referrer: download only, Specialist: upload/delete */}
             <DocumentUploadField
@@ -112,8 +116,8 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="supplementary_documents"
               category="final_report"
-              disableUpload={isReferrer}
-              disableDelete={isReferrer}
+              disableUpload={shouldDisableForReferrer}
+              disableDelete={shouldDisableForReferrer}
             />
           </TabsContent>
         </Tabs>

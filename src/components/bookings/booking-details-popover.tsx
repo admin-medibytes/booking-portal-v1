@@ -24,7 +24,7 @@ interface BookingDetailsPopoverProps {
 export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopoverProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
   // Get timezone from URL params, default to user's timezone
   const timezone = searchParams.get("timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -114,7 +114,7 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
                     <Video className="h-4 w-4 mr-1" />
                     Join Meeting
                   </Button>
-                  {user?.memberRole !== "specialist" && (
+                  {!isLoading && user?.memberRole && user.memberRole !== "specialist" && (
                     <Button variant="outline" onClick={handleReschedule} className="flex-1">
                       <Calendar className="h-4 w-4 mr-1" />
                       Reschedule
@@ -128,7 +128,7 @@ export function BookingDetailsPopover({ booking, onClose }: BookingDetailsPopove
             </DialogFooter>
         ) : (
           <DialogFooter className="flex-row gap-2">
-            {user?.memberRole !== "specialist" && (
+            {!isLoading && user?.memberRole && user.memberRole !== "specialist" && (
               <Button variant="outline" onClick={handleReschedule} className="flex-1">
                 <Calendar className="h-4 w-4 mr-1" />
                 Reschedule

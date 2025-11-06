@@ -54,11 +54,6 @@ export function DocumentUploadField({
   const deleteDocument = useDeleteDocument();
   const downloadDocument = useDownloadDocument();
 
-  // Don't render anything if this field is hidden
-  if (hidden) {
-    return null;
-  }
-  
   const handleUploadComplete = () => {
     // Refetch documents after upload
     refetch();
@@ -103,6 +98,11 @@ export function DocumentUploadField({
       toast.error("Failed to download document", { id: toastId });
     }
   };
+
+  // Don't render anything if this field is hidden
+  if (hidden) {
+    return null;
+  }
 
   return (
     <div>
