@@ -12,17 +12,26 @@ interface BookingDocumentsSectionProps {
 
 export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionProps) {
   const { user, isLoading } = useAuth();
+
+  // Check both system role (user.role) and organization role (user.memberRole)
+  const isSystemAdmin = user?.role === "admin";
+  // const isOrgAdmin = user?.memberRole === "owner" || user?.memberRole === "manager" || user?.memberRole === "team_lead";
   const isSpecialist = !isLoading && user?.memberRole === "specialist";
   const isReferrer = !isLoading && user?.memberRole === "referrer";
-  // const isAdminOrOwner = user?.role === "admin" || user?.memberRole === "owner";
+
+  // Admins (system or org) should have full access to all documents
+  const hasAdminAccess = !isLoading && isSystemAdmin;
 
   // Specialists: can view consent form but not upload/delete
-  const shouldDisableUploadForSpecialist = isLoading || !user?.memberRole || isSpecialist;
-  const shouldDisableDeleteForSpecialist = isLoading || !user?.memberRole || isSpecialist;
+  // BUT: Admins can do everything, even if they also have specialist role
+  const shouldDisableUploadForSpecialist = isLoading || (isSpecialist && !hasAdminAccess);
+  const shouldDisableDeleteForSpecialist = isLoading || (isSpecialist && !hasAdminAccess);
 
   // Referrers: hide specialist-only documents, disable upload/delete on final reports
-  const shouldHideForReferrer = isLoading || !user?.memberRole || isReferrer;
-  const shouldDisableForReferrer = isLoading || !user?.memberRole || isReferrer;
+  // BUT: Admins can do everything, even if they also have referrer role or no memberRole
+  // Only hide/disable if user is explicitly a referrer AND not an admin
+  const shouldHideForReferrer = isLoading || (isReferrer && !hasAdminAccess);
+  const shouldDisableForReferrer = isLoading || (isReferrer && !hasAdminAccess);
   return (
     <Card>
       <CardHeader>
@@ -48,13 +57,14 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               disableUpload={shouldDisableUploadForSpecialist}
               disableDelete={shouldDisableDeleteForSpecialist}
             />
-            {/* Brief Documents - Referrer: upload/delete, Specialist: hidden */}
+            {/* Brief Documents - Referrer: upload/delete, Specialist: view only */}
             <DocumentUploadField
               label="Brief Documents"
               bookingId={bookingId}
               section="ime_documents"
               category="document_brief"
-              hidden={isSpecialist}
+              disableUpload={shouldDisableUploadForSpecialist}
+              disableDelete={shouldDisableDeleteForSpecialist}
             />
             {/* Dictation - Referrer: hidden, Specialist: upload/delete */}
             <DocumentUploadField
@@ -91,7 +101,8 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="supplementary_documents"
               category="document_brief"
-              hidden={isSpecialist}
+              disableUpload={shouldDisableUploadForSpecialist}
+              disableDelete={shouldDisableDeleteForSpecialist}
             />
             {/* Supplementary Dictation - Referrer: hidden, Specialist: upload/delete */}
             <DocumentUploadField
