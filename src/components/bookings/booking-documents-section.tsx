@@ -54,6 +54,7 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="ime_documents"
               category="consent_form"
+              accept=".pdf,.doc,.docx,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               disableUpload={shouldDisableUploadForSpecialist}
               disableDelete={shouldDisableDeleteForSpecialist}
             />

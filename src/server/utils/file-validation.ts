@@ -61,6 +61,10 @@ export const ALLOWED_MIME_TYPES = {
     'image/jpeg',
     'image/jpg',
     'image/png',
+    'image/gif',
+    'image/webp',
+    'image/bmp',
+    'image/tiff',
   ],
   document_brief: [
     'application/pdf',
