@@ -72,7 +72,7 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="ime_documents"
               category="dictation"
-              accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.docx,.doc,.pdf"
+              accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.mp4,video/mp4,.docx,.doc,.pdf"
               hidden={shouldHideForReferrer}
             />
             {/* Draft Reports - Referrer: hidden, Specialist: upload/delete */}
@@ -110,7 +110,7 @@ export function BookingDocumentsSection({ bookingId }: BookingDocumentsSectionPr
               bookingId={bookingId}
               section="supplementary_documents"
               category="dictation"
-              accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.docx,.doc,.pdf"
+              accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.wma,.webm,.mp4,video/mp4,.docx,.doc,.pdf"
               hidden={shouldHideForReferrer}
             />
             {/* Supplementary Draft Reports - Referrer: hidden, Specialist: upload/delete */}

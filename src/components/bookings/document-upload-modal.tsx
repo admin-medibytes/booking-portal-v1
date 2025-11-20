@@ -54,6 +54,9 @@ function getAcceptedFileTypesText(accept: string): string {
       if (part.includes('mp4') || part.includes('m4a')) extensions.add('M4A');
       if (part.includes('ogg')) extensions.add('OGG');
       if (part.includes('webm')) extensions.add('WEBM');
+    } else if (part.startsWith('video/')) {
+      // Specific video MIME types
+      if (part.includes('mp4')) extensions.add('MP4');
     } else if (part === 'application/pdf') {
       extensions.add('PDF');
     } else if (part.includes('msword') || part.includes('wordprocessingml')) {

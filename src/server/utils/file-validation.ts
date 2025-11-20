@@ -74,6 +74,7 @@ export const ALLOWED_MIME_TYPES = {
     'audio/webm',
     'audio/ogg',
     'audio/x-m4a',
+    'video/mp4', // .mp4
     'application/pdf', // Transcripts
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
   ],
