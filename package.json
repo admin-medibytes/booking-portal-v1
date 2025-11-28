@@ -40,7 +40,8 @@
     "sync:canceled:dry": "MIGRATION_MODE=true DRY_RUN=true tsx scripts/sync-canceled-bookings.ts",
     "sync:rescheduled": "MIGRATION_MODE=true tsx scripts/sync-rescheduled-bookings.ts",
     "sync:rescheduled:dry": "MIGRATION_MODE=true DRY_RUN=true tsx scripts/sync-rescheduled-bookings.ts",
-    "hash-password": "tsx scripts/hash-password.ts"
+    "hash-password": "tsx scripts/hash-password.ts",
+    "link-referrer": "tsx scripts/link-referrer-records.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",
