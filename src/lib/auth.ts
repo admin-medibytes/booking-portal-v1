@@ -10,6 +10,8 @@ import { env } from "@/lib/env";
 import { emailService } from "@/server/services/email.service";
 import { hashPassword, verifyPassword } from "@/lib/crypto";
 import { teams } from "@/server/db/schema";
+import ResetPasswordEmail from "./email-templates/reset-password";
+import { sendEmail } from "./resend";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -74,10 +76,20 @@ export const auth = betterAuth({
       verify: async ({ password, hash }) => await verifyPassword(password, hash),
     },
     sendResetPassword: async ({ user, url }) => {
-      await emailService.sendPasswordResetEmail({
-        email: user.email,
-        resetLink: url,
+      await sendEmail({
+        from: `Medibytes <noreply@medibytes.com.au>`,
+        to: user.email,
+        subject: "Reset your password",
+        body: ResetPasswordEmail({
+          userFirstname: user.name,
+          resetPasswordLink: url,
+        }),
       });
+      
+      // await emailService.sendPasswordResetEmail({
+      //   email: user.email,
+      //   resetLink: url,
+      // });
     },
     resetPasswordPageUrl: "/reset-password",
   },
