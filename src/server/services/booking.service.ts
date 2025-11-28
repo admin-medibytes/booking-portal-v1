@@ -859,17 +859,17 @@ export class BookingService {
    * from bookings created before they had an account
    *
    * @param userId - The ID of the newly created user
-   * @param email - The email address to match referrer records
+   * @param email - The email address to match referrer records (case-insensitive)
    * @returns Number of referrer records that were linked
    */
   async linkReferrerRecordsToUser(userId: string, email: string): Promise<number> {
     try {
-      // Find all referrer records with matching email and NULL userId
+      // Find all referrer records with matching email (case-insensitive) and NULL userId
       const orphanedReferrers = await db
         .select({ id: referrers.id })
         .from(referrers)
         .where(and(
-          eq(referrers.email, email),
+          sql`LOWER(${referrers.email}) = LOWER(${email})`,
           sql`${referrers.userId} IS NULL`
         ));
 
