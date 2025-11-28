@@ -83,6 +83,8 @@ export const env = createEnv({
 
     // File Upload
     MAX_FILE_SIZE: type("string.integer"),
+
+    RESEND_API_KEY: type("string"),
   },
   client: {
     NEXT_PUBLIC_API_URL: type("string.url"),
@@ -91,6 +93,7 @@ export const env = createEnv({
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
     PORT: process.env.PORT,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
     // HOST: process.env.HOST,
     APP_NAME: process.env.APP_NAME,
     APP_URL: process.env.APP_URL,
