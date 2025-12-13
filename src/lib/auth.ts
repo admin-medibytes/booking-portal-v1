@@ -9,9 +9,10 @@ import { db } from "@/server/db";
 import { env } from "@/lib/env";
 import { emailService } from "@/server/services/email.service";
 import { hashPassword, verifyPassword } from "@/lib/crypto";
-import { teams } from "@/server/db/schema";
+import { teams, users } from "@/server/db/schema";
 import ResetPasswordEmail from "./email-templates/reset-password";
 import { sendEmail } from "./resend";
+import { eq } from "drizzle-orm";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -92,6 +93,12 @@ export const auth = betterAuth({
       // });
     },
     resetPasswordPageUrl: "/reset-password",
+    onPasswordReset: async ({ user }, request) => {
+      // your logic here
+      await db.update(users).set({
+        image: "initialized",
+      }).where(eq(users.id, user.id));
+    },
   },
 
   emailVerification: {
