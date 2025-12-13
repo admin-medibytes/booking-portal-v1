@@ -93,7 +93,7 @@ export const auth = betterAuth({
       // });
     },
     resetPasswordPageUrl: "/reset-password",
-    onPasswordReset: async ({ user }, request) => {
+    onPasswordReset: async ({ user }) => {
       // your logic here
       await db.update(users).set({
         image: "initialized",
