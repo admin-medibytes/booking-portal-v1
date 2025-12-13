@@ -20,6 +20,11 @@ export default async function HomePage() {
     redirect("/admin");
   }
 
+
+  if (session.user.image === null) {
+    redirect("/onboarding");
+  }
+
   // All other authenticated users go to bookings
   redirect("/bookings");
 }

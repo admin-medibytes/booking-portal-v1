@@ -18,7 +18,11 @@ type PasswordFormData = {
   enable2FA?: boolean | undefined;
 };
 
-export function OnboardingForm() {
+export function OnboardingForm({
+  allow2fa = true,
+}: {
+  allow2fa?: boolean;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"password" | "2fa">("password");
@@ -158,23 +162,27 @@ export function OnboardingForm() {
           )}
         </form.Field>
 
-        <form.Field name="enable2FA">
-          {(field) => (
-            <div className="flex items-center">
-              <Checkbox
-                id="enable2FA"
-                checked={field.state.value}
-                onCheckedChange={(checked) => field.handleChange(checked === true)}
-              />
-              <Label
-                htmlFor="enable2FA"
-                className="block ml-2 text-sm text-gray-900 cursor-pointer"
-              >
-                Enable Two-Factor Authentication (Recommended)
-              </Label>
-            </div>
-          )}
-        </form.Field>
+
+        {allow2fa && (
+          <form.Field name="enable2FA">
+            {(field) => (
+              <div className="flex items-center">
+                <Checkbox
+                  id="enable2FA"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked === true)}
+                />
+                <Label
+                  htmlFor="enable2FA"
+                  className="block ml-2 text-sm text-gray-900 cursor-pointer"
+                >
+                  Enable Two-Factor Authentication (Recommended)
+                </Label>
+              </div>
+            )}
+          </form.Field>
+        )}
+
       </div>
 
       {error && (
